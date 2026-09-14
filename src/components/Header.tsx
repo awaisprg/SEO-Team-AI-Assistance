@@ -52,17 +52,21 @@ export const Header: React.FC<HeaderProps> = ({
                 connection?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
               }`}
             />
-            <span className="text-slate-600 font-medium">Board:</span>
-            <span className="font-semibold text-slate-800">
-              {connection?.boardName || 'PDS/GFM-SEO'}
-            </span>
-            {connection?.isDemoData && (
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
-                Demo
+            {connection?.isDemoData ? (
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                Demo Mode
+              </span>
+            ) : (
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                Real Trello
               </span>
             )}
+            <span className="text-slate-500 font-medium">Board:</span>
+            <span className="font-semibold text-slate-800 truncate max-w-[160px]" title={connection?.boardName || 'Not Connected'}>
+              {connection?.boardName || (connection?.connected ? 'Connected' : 'Not Connected')}
+            </span>
             {connection?.lastSyncAt && (
-              <span className="text-slate-400">
+              <span className="text-slate-400 text-[11px]">
                 • Synced {new Date(connection.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}

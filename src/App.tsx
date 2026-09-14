@@ -171,7 +171,7 @@ export default function App() {
       const res = await fetch('/api/trello/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ boardId: connection?.boardId }),
       });
 
       const data = await res.json();
@@ -439,6 +439,7 @@ export default function App() {
         onSaveConnection={handleSaveConnection}
         onSync={handleSync}
         isSyncing={isSyncing}
+        onRefreshStatus={refreshAllData}
       />
 
       {/* Source Detail Modal */}

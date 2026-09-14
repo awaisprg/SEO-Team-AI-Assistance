@@ -164,9 +164,9 @@ export const SourceCardModal: React.FC<SourceCardModalProps> = ({
               href={source.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors shadow-2xs"
+              className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors shadow-2xs"
             >
-              <span>View Full Card on Trello</span>
+              <span>Open Trello Card</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>

@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { db } from './server/db/store';
+import { pgStore } from './server/db/postgres';
 import { getSeedData } from './server/trello/seed';
 import { TrelloClient } from './server/trello/client';
 import { normalizeTrelloPayload } from './server/trello/normalizer';
@@ -10,8 +11,11 @@ import { generateEvidenceAnswer } from './server/ai/answering';
 import { generateManagementBrief } from './server/ai/brief';
 import { UserRole } from './src/types';
 
-// Ensure demo data is seeded initially if store is empty
-if (Object.keys(db.getCards()).length === 0) {
+// Enforce TRELLO_MODE
+const configuredMode = (process.env.TRELLO_MODE || 'real').toLowerCase();
+
+// In demo mode ONLY, seed demo data if store is empty
+if (configuredMode === 'demo' && Object.keys(db.getCards()).length === 0) {
   const seed = getSeedData();
   db.upsertBoard(seed.board);
   db.upsertLists(seed.lists);
@@ -24,8 +28,20 @@ if (Object.keys(db.getCards()).length === 0) {
     boardName: seed.board.name,
     connected: true,
     isDemoData: true,
+    mode: 'demo',
     lastSyncAt: new Date().toISOString(),
     lastSyncStatus: 'success',
+  });
+} else if (configuredMode === 'real') {
+  // Real mode: do not fabricate cards
+  const existingConn = db.getConnection();
+  const apiKey = process.env.TRELLO_API_KEY || existingConn.apiKey || '';
+  const token = process.env.TRELLO_TOKEN || existingConn.token || '';
+  db.updateConnection({
+    apiKey,
+    token,
+    mode: 'real',
+    isDemoData: false,
   });
 }
 
@@ -49,28 +65,14 @@ app.get('/api/health', (req, res) => {
   const status = db.getConnectionStatus();
   res.json({
     status: 'ok',
+    trello: status.connected ? 'connected' : 'disconnected',
+    database: 'connected',
+    mode: status.mode,
+    board: status.boardName || undefined,
+    lastSyncAt: status.lastSyncAt,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
-    database: {
-      type: process.env.DATABASE_URL ? 'postgresql' : 'store_indexed',
-      status: 'connected',
-      cardsCount: status.totalCards,
-      clientsCount: status.totalClients,
-      activitiesCount: status.totalActivities,
-    },
-    trello: {
-      configured: status.apiKeyConfigured && status.tokenConfigured,
-      connected: status.connected,
-      isDemoData: status.isDemoData,
-      boardName: status.boardName || 'PDS/GFM-SEO',
-      lastSyncAt: status.lastSyncAt,
-    },
-    ai: {
-      provider: process.env.AI_PROVIDER || 'gemini',
-      geminiKeyConfigured: Boolean(process.env.GEMINI_API_KEY),
-      model: process.env.AI_MODEL || 'gemini-3.8-flash',
-    },
+    version: '2.0.0',
   });
 });
 
@@ -98,6 +100,47 @@ app.get('/api/trello/status', (req, res) => {
   res.json(db.getConnectionStatus());
 });
 
+// Connection test endpoint
+app.all('/api/trello/test', async (req, res) => {
+  const conn = db.getConnection();
+  const apiKey = (req.body?.apiKey || conn.apiKey || process.env.TRELLO_API_KEY || '').trim();
+  const token = (req.body?.token || conn.token || process.env.TRELLO_TOKEN || '').trim();
+
+  if (!apiKey || !token) {
+    return res.status(400).json({
+      success: false,
+      error: 'Trello API Key and Token are required to test the connection.',
+    });
+  }
+
+  try {
+    const client = new TrelloClient({ apiKey, token });
+    const test = await client.testConnection();
+
+    if (!test.success) {
+      return res.status(401).json({
+        success: false,
+        error: test.error || 'Failed to authenticate with Trello API',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Connected successfully',
+      user: {
+        username: test.username,
+        fullName: test.fullName,
+      },
+      boardsCount: test.boardsCount || 0,
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err.message || 'Connection test failed',
+    });
+  }
+});
+
 app.post('/api/trello/connect', async (req, res) => {
   if (currentUser.role !== 'ADMIN') {
     return res.status(403).json({ error: 'Admin permissions required to modify Trello credentials' });
@@ -117,12 +160,13 @@ app.post('/api/trello/connect', async (req, res) => {
     }
 
     db.updateConnection({
-      apiKey,
-      token,
+      apiKey: apiKey.trim(),
+      token: token.trim(),
       boardId: boardId || '',
       boardName: boardName || '',
       connected: true,
       isDemoData: false,
+      mode: 'real',
     });
 
     res.json({
@@ -130,36 +174,75 @@ app.post('/api/trello/connect', async (req, res) => {
       message: `Successfully connected to Trello as ${test.fullName} (@${test.username})`,
       username: test.username,
       fullName: test.fullName,
+      boardsCount: test.boardsCount || 0,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Internal Trello connection error' });
   }
 });
 
+app.post('/api/trello/disconnect', (req, res) => {
+  if (currentUser.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Admin permissions required to disconnect Trello' });
+  }
+  db.disconnect();
+  res.json({ success: true, message: 'Disconnected from Trello successfully.' });
+});
+
+app.post('/api/trello/mode', (req, res) => {
+  if (currentUser.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Admin permissions required to change mode' });
+  }
+  const { mode } = req.body;
+  if (mode !== 'real' && mode !== 'demo') {
+    return res.status(400).json({ error: 'Mode must be "real" or "demo"' });
+  }
+  db.setMode(mode);
+  res.json({ success: true, mode, message: `Switched mode to ${mode}` });
+});
+
 app.get('/api/trello/boards', async (req, res) => {
   const conn = db.getConnection();
-  if (conn.isDemoData || (!conn.apiKey && !process.env.TRELLO_API_KEY)) {
-    // Return seed boards
-    return res.json([
-      {
-        id: 'board_pds_gfm_seo',
-        name: 'PDS/GFM-SEO (Main Board)',
-        url: 'https://trello.com/b/pds-gfm-seo',
-        closed: false,
-      },
-    ]);
+  const apiKey = (conn.apiKey || process.env.TRELLO_API_KEY || '').trim();
+  const token = (conn.token || process.env.TRELLO_TOKEN || '').trim();
+
+  if (!apiKey || !token) {
+    if (conn.isDemoData || conn.mode === 'demo') {
+      return res.json([
+        {
+          id: 'board_pds_gfm_seo',
+          name: 'PDS/GFM-SEO (Demo Board)',
+          url: 'https://trello.com/b/pds-gfm-seo',
+          closed: false,
+        },
+      ]);
+    }
+    return res.status(400).json({
+      error: 'Trello API Key and Token are required to list real boards. Please configure them in Settings.',
+    });
   }
 
   try {
-    const client = new TrelloClient({
-      apiKey: conn.apiKey || process.env.TRELLO_API_KEY!,
-      token: conn.token || process.env.TRELLO_TOKEN!,
-    });
+    const client = new TrelloClient({ apiKey, token });
     const boards = await client.getBoards();
     res.json(boards);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to load boards from Trello' });
   }
+});
+
+app.get('/api/trello/sync/status', (req, res) => {
+  const status = db.getConnectionStatus();
+  const lastRun = db.getLastSyncRun();
+  res.json({
+    status: status.lastSyncStatus || 'idle',
+    lastSyncAt: status.lastSyncAt,
+    lastRun,
+    totalCards: status.totalCards,
+    totalComments: status.totalComments,
+    totalActivities: status.totalActivities,
+    totalClients: status.totalClients,
+  });
 });
 
 app.post('/api/trello/sync', async (req, res) => {
@@ -169,10 +252,13 @@ app.post('/api/trello/sync', async (req, res) => {
 
   const conn = db.getConnection();
   const startTime = new Date();
-  const boardId = req.body.boardId || conn.boardId || 'board_pds_gfm_seo';
+  const mode = conn.mode || (conn.isDemoData ? 'demo' : 'real');
+  const apiKey = (conn.apiKey || process.env.TRELLO_API_KEY || '').trim();
+  const token = (conn.token || process.env.TRELLO_TOKEN || '').trim();
+  const boardId = req.body.boardId || conn.boardId;
 
-  // If in demo mode or no live credentials
-  if (conn.isDemoData || (!conn.apiKey && !process.env.TRELLO_API_KEY)) {
+  // If in demo mode
+  if (mode === 'demo') {
     const seed = getSeedData();
     db.upsertBoard(seed.board);
     db.upsertLists(seed.lists);
@@ -196,6 +282,7 @@ app.post('/api/trello/sync', async (req, res) => {
       lastSyncAt: new Date().toISOString(),
       lastSyncStatus: 'success',
       isDemoData: true,
+      mode: 'demo',
       connected: true,
     });
 
@@ -206,12 +293,22 @@ app.post('/api/trello/sync', async (req, res) => {
     });
   }
 
-  // Live Trello sync
-  try {
-    const client = new TrelloClient({
-      apiKey: conn.apiKey || process.env.TRELLO_API_KEY!,
-      token: conn.token || process.env.TRELLO_TOKEN!,
+  // REAL TRELLO MODE: MUST NOT FABRICATE CARDS
+  if (!apiKey || !token) {
+    return res.status(400).json({
+      error:
+        'Trello credentials not configured. Please provide TRELLO_API_KEY and TRELLO_TOKEN in Settings or the environment to sync real data.',
     });
+  }
+
+  if (!boardId) {
+    return res.status(400).json({
+      error: 'Please select a Trello board to synchronize in Settings.',
+    });
+  }
+
+  try {
+    const client = new TrelloClient({ apiKey, token });
 
     const [rawBoard, rawLists, rawMembers, rawLabels, rawCards] = await Promise.all([
       client.getBoard(boardId),
@@ -233,7 +330,7 @@ app.post('/api/trello/sync', async (req, res) => {
       existingClients
     );
 
-    // Upsert into persistent store
+    // Upsert into persistent store & database
     db.upsertBoard(normalized.board);
     db.upsertLists(normalized.lists);
     db.upsertMembers(normalized.members);
@@ -257,13 +354,16 @@ app.post('/api/trello/sync', async (req, res) => {
       boardName: rawBoard.name,
       connected: true,
       isDemoData: false,
+      mode: 'real',
       lastSyncAt: new Date().toISOString(),
       lastSyncStatus: 'success',
     });
 
     res.json({
       success: true,
-      message: `Synchronized ${rawCards.length} cards and ${rawLists.length} lists from Trello board "${rawBoard.name}".`,
+      message: `Synchronized ${rawCards.length} cards and ${rawLists.length} lists from real Trello board "${rawBoard.name}".`,
+      cardsCount: rawCards.length,
+      listsCount: rawLists.length,
       run,
     });
   } catch (err: any) {
@@ -559,6 +659,10 @@ app.get('/api/management-briefs/:id', (req, res) => {
 // 9. VITE SPA FALLBACK & STATIC SERVING
 // -------------------------------------------------------------
 async function setupViteMiddleware() {
+  if (pgStore.isConfigured()) {
+    pgStore.initSchema().catch((err) => console.warn('Database initialization warning:', err.message));
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({

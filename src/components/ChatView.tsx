@@ -236,10 +236,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="text-slate-400 hover:text-slate-600 p-0.5 rounded"
-                                  title="Open in Trello"
+                                  className="inline-flex items-center space-x-1 text-[10px] font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded transition-colors shrink-0"
+                                  title="Open Trello Card"
                                 >
-                                  <ExternalLink className="w-3 h-3" />
+                                  <span>Open Trello Card</span>
+                                  <ExternalLink className="w-2.5 h-2.5" />
                                 </a>
                               </div>
                               <div className="flex flex-wrap items-center gap-1.5 mb-2">

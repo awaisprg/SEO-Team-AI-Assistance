@@ -152,6 +152,7 @@ export interface SyncRun {
 export interface TrelloConnectionStatus {
   connected: boolean;
   isDemoData: boolean;
+  mode: 'real' | 'demo';
   boardId?: string;
   boardName?: string;
   lastSyncAt?: string;

@@ -19,6 +19,7 @@ import {
 } from '../../src/types';
 import fs from 'fs';
 import path from 'path';
+import { pgStore } from './postgres';
 
 export interface TrelloConnectionConfig {
   apiKey: string;
@@ -27,6 +28,7 @@ export interface TrelloConnectionConfig {
   boardName: string;
   connected: boolean;
   isDemoData: boolean;
+  mode?: 'real' | 'demo';
   lastSyncAt?: string;
   lastSyncStatus?: string;
 }
@@ -72,10 +74,27 @@ class Store {
   }
 
   private loadInitialState(): StorageState {
+    const isExplicitDemo = process.env.TRELLO_MODE === 'demo';
+    const isRealMode = !isExplicitDemo;
+
     try {
       if (fs.existsSync(DATA_FILE)) {
         const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.connection) {
+          // Sync environment credentials if present
+          if (process.env.TRELLO_API_KEY && !parsed.connection.apiKey) {
+            parsed.connection.apiKey = process.env.TRELLO_API_KEY;
+          }
+          if (process.env.TRELLO_TOKEN && !parsed.connection.token) {
+            parsed.connection.token = process.env.TRELLO_TOKEN;
+          }
+          if (process.env.TRELLO_MODE) {
+            parsed.connection.mode = process.env.TRELLO_MODE as 'real' | 'demo';
+            parsed.connection.isDemoData = process.env.TRELLO_MODE === 'demo';
+          }
+          return parsed;
+        }
       }
     } catch (err) {
       console.warn('Could not read existing state file, initializing clean state:', err);
@@ -88,7 +107,8 @@ class Store {
         boardId: '',
         boardName: '',
         connected: false,
-        isDemoData: true,
+        isDemoData: isExplicitDemo,
+        mode: isRealMode ? 'real' : 'demo',
       },
       boards: {},
       lists: {},
@@ -124,9 +144,11 @@ class Store {
 
   getConnectionStatus(): TrelloConnectionStatus {
     const cards = Object.values(this.state.cards);
+    const mode = this.state.connection.mode || (this.state.connection.isDemoData ? 'demo' : 'real');
     return {
-      connected: this.state.connection.connected || this.state.connection.isDemoData,
-      isDemoData: this.state.connection.isDemoData,
+      connected: this.state.connection.connected || (this.state.connection.isDemoData && mode === 'demo'),
+      isDemoData: mode === 'demo',
+      mode,
       boardId: this.state.connection.boardId,
       boardName: this.state.connection.boardName,
       lastSyncAt: this.state.connection.lastSyncAt,
@@ -145,10 +167,34 @@ class Store {
     this.persist();
   }
 
+  disconnect() {
+    this.state.connection = {
+      apiKey: '',
+      token: '',
+      boardId: '',
+      boardName: '',
+      connected: false,
+      isDemoData: false,
+      mode: 'real',
+      lastSyncAt: undefined,
+      lastSyncStatus: undefined,
+    };
+    this.persist();
+  }
+
+  setMode(mode: 'real' | 'demo') {
+    this.state.connection.mode = mode;
+    this.state.connection.isDemoData = mode === 'demo';
+    this.persist();
+  }
+
   // --- Boards ---
   upsertBoard(board: TrelloBoard) {
     this.state.boards[board.id] = board;
     this.persist();
+    if (pgStore.isConfigured()) {
+      pgStore.upsertBoard(board).catch((err) => console.warn('Postgres upsertBoard error:', err.message));
+    }
   }
 
   getBoards(): TrelloBoard[] {
@@ -172,6 +218,9 @@ class Store {
       }
     }
     this.persist();
+    if (pgStore.isConfigured()) {
+      pgStore.upsertLists(lists).catch((err) => console.warn('Postgres upsertLists error:', err.message));
+    }
   }
 
   getLists(boardId?: string): TrelloList[] {
@@ -412,6 +461,9 @@ class Store {
       }
     }
     this.persist();
+    if (pgStore.isConfigured()) {
+      pgStore.upsertCards(cards).catch((err) => console.warn('Postgres upsertCards error:', err.message));
+    }
   }
 
   getCards(filter?: { clientCanonical?: string; status?: StatusSemantic }): TrelloCard[] {
@@ -519,6 +571,9 @@ class Store {
       this.state.syncRuns.pop();
     }
     this.persist();
+    if (pgStore.isConfigured()) {
+      pgStore.recordSyncRun(run, this.state.connection.boardId).catch((err) => console.warn('Postgres recordSyncRun error:', err.message));
+    }
   }
 
   getSyncRuns(): SyncRun[] {
