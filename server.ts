@@ -310,12 +310,13 @@ app.post('/api/trello/sync', async (req, res) => {
   try {
     const client = new TrelloClient({ apiKey, token });
 
-    const [rawBoard, rawLists, rawMembers, rawLabels, rawCards] = await Promise.all([
+    const [rawBoard, rawLists, rawMembers, rawLabels, rawCards, rawBoardChecklists] = await Promise.all([
       client.getBoard(boardId),
       client.getLists(boardId),
       client.getMembers(boardId),
       client.getLabels(boardId),
       client.getCardsWithDetails(boardId),
+      client.getBoardChecklists(boardId),
     ]);
 
     const existingClients = db.getClients();
@@ -326,16 +327,20 @@ app.post('/api/trello/sync', async (req, res) => {
         members: rawMembers,
         labels: rawLabels,
         cards: rawCards,
+        boardChecklists: rawBoardChecklists,
       },
       existingClients
     );
 
-    // Upsert into persistent store & database
-    db.upsertBoard(normalized.board);
-    db.upsertLists(normalized.lists);
-    db.upsertMembers(normalized.members);
-    db.upsertLabels(normalized.labels);
-    db.upsertCards(normalized.cards);
+    // Completely replace with clean board data and remove any old demo records
+    db.replaceBoardData(normalized);
+
+    // Auto-generate fresh real management brief
+    try {
+      await generateManagementBrief({ periodType: 'this_month' });
+    } catch (bErr: any) {
+      console.warn('Auto-brief generation notice:', bErr.message);
+    }
 
     const run = {
       id: `sync_${Date.now()}`,
@@ -361,9 +366,10 @@ app.post('/api/trello/sync', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Synchronized ${rawCards.length} cards and ${rawLists.length} lists from real Trello board "${rawBoard.name}".`,
+      message: `Synchronized ${rawCards.length} cards, ${rawBoardChecklists.length} checklists, and ${normalized.clients.length} clients from real Trello board "${rawBoard.name}".`,
       cardsCount: rawCards.length,
       listsCount: rawLists.length,
+      clientsCount: normalized.clients.length,
       run,
     });
   } catch (err: any) {
@@ -571,42 +577,73 @@ app.get('/api/team', (req, res) => {
   const members = db.getMembers();
   const activities = db.getActivities();
 
-  const activeCards = cards.filter((c) => c.statusSemantic !== 'Completed' && !c.closed);
-  const completedCards = cards.filter((c) => c.statusSemantic === 'Completed');
-  const inReviewCards = cards.filter((c) => c.statusSemantic === 'In Review');
-  const aiInitiatives = cards.filter((c) =>
-    c.labels.some((l) => l.name.toLowerCase().includes('ai') || l.name.toLowerCase().includes('geo'))
+  const activeCards = cards.filter(
+    (c) => c.statusSemantic !== 'Completed' && !c.closed && !c.listName?.toLowerCase().includes('complete')
   );
-  const contentCards = cards.filter((c) =>
-    c.labels.some((l) => l.name.toLowerCase().includes('content'))
+  const completedCards = cards.filter(
+    (c) => c.statusSemantic === 'Completed' || c.listName?.toLowerCase().includes('complete')
   );
-  const seoCards = cards.filter((c) =>
-    c.labels.some((l) => l.name.toLowerCase().includes('technical') || l.name.toLowerCase().includes('seo'))
+  const inReviewCards = cards.filter(
+    (c) => c.statusSemantic === 'In Review' || c.listName?.toLowerCase().includes('review')
   );
-
-  const memberOverviews = members.map((m) => {
-    const pName = m.fullName.toLowerCase();
-    const assignedCards = cards.filter(
-      (c) =>
-        c.members.some((mem) => mem.id === m.id) ||
-        c.listName.toLowerCase().includes(pName)
-    );
-    const pActivities = activities.filter((a) => a.person.toLowerCase().includes(pName));
-
-    return {
-      member: m,
-      activeCardsCount: assignedCards.filter((c) => c.statusSemantic !== 'Completed').length,
-      completedActivitiesCount: pActivities.filter((a) => a.action === 'completed').length,
-      recentCards: assignedCards.slice(0, 4).map((c) => ({
-        id: c.id,
-        name: c.name,
-        listName: c.listName,
-        status: c.statusSemantic,
-        url: c.url,
-      })),
-      recentActivities: pActivities.slice(0, 4),
-    };
+  const aiInitiatives = cards.filter((c) => {
+    const text = (c.name + ' ' + (c.desc || '') + ' ' + c.labels.map((l) => l.name).join(' ')).toLowerCase();
+    return text.includes('ai') || text.includes('geo') || text.includes('aeo') || text.includes('schema');
   });
+  const contentCards = cards.filter((c) => {
+    const text = (c.name + ' ' + (c.desc || '') + ' ' + c.labels.map((l) => l.name).join(' ')).toLowerCase();
+    return text.includes('content') || text.includes('service page') || text.includes('retargeting') || text.includes('guest post') || text.includes('web 2.0') || text.includes('article');
+  });
+  const seoCards = cards.filter((c) => {
+    const text = (c.name + ' ' + (c.desc || '') + ' ' + c.labels.map((l) => l.name).join(' ')).toLowerCase();
+    return text.includes('seo') || text.includes('technical') || text.includes('schema') || text.includes('audit') || text.includes('gbp') || text.includes('citation') || text.includes('tagging') || text.includes('listing');
+  });
+
+  const memberOverviews = members
+    .map((m) => {
+      const pName = m.fullName.toLowerCase();
+      const pUser = (m.username || '').toLowerCase();
+      const assignedCards = cards.filter((c) => {
+        if (c.members.some((mem) => mem.id === m.id)) return true;
+        const lName = c.listName.toLowerCase();
+        if (lName.includes(pName) || pName.includes(lName)) return true;
+        if (pUser && (lName.includes(pUser) || pUser.includes(lName))) return true;
+        if (lName.includes('adil') && pName.includes('adil')) return true;
+        if (lName.includes('haseeb') && pName.includes('haseeb')) return true;
+        if (lName.includes('ali hamza') && pName.includes('ali hamza')) return true;
+        if (lName.includes('ahmad hamza') && pName.includes('ahmad hamza')) return true;
+        if (lName.includes('azeem') && (pName.includes('azeem') || pUser.includes('aahmad'))) return true;
+        if (lName.includes('humna') && pName.includes('humna')) return true;
+        return false;
+      });
+
+      let completedTasksCount = 0;
+      for (const c of assignedCards) {
+        for (const cl of c.checklists) {
+          completedTasksCount += cl.items.filter((i) => i.state === 'complete').length;
+        }
+        if (c.statusSemantic === 'Completed' || c.closed) {
+          completedTasksCount += 1;
+        }
+      }
+
+      const pActivities = activities.filter((a) => a.person.toLowerCase().includes(pName));
+
+      return {
+        member: m,
+        activeCardsCount: assignedCards.filter((c) => c.statusSemantic !== 'Completed' && !c.closed).length,
+        completedActivitiesCount: completedTasksCount || pActivities.filter((a) => a.action === 'completed').length,
+        recentCards: assignedCards.slice(0, 5).map((c) => ({
+          id: c.id,
+          name: c.name,
+          listName: c.listName,
+          status: c.statusSemantic,
+          url: c.url,
+        })),
+        recentActivities: pActivities.slice(0, 4),
+      };
+    })
+    .sort((a, b) => b.activeCardsCount + b.completedActivitiesCount - (a.activeCardsCount + a.completedActivitiesCount));
 
   res.json({
     metrics: {
@@ -661,6 +698,43 @@ app.get('/api/management-briefs/:id', (req, res) => {
 async function setupViteMiddleware() {
   if (pgStore.isConfigured()) {
     pgStore.initSchema().catch((err) => console.warn('Database initialization warning:', err.message));
+  }
+
+  // Ensure clean state and auto-generate real brief if real data exists
+  try {
+    db.cleanDemoDataIfReal();
+    const isReal = db.getConnectionStatus().mode === 'real';
+    const existingCards = db.getCards();
+    const existingClients = db.getClients();
+
+    if (isReal && existingCards.length > 0 && existingClients.length <= 1) {
+      const boards = db.getBoards();
+      const board = boards[0] || {
+        id: db.getConnectionStatus().boardId || '68114872282c6eabcdad8400',
+        name: db.getConnectionStatus().boardName || 'PDS/GFM-SEO',
+        url: '',
+        closed: false,
+      };
+      const normalized = normalizeTrelloPayload(
+        {
+          board: { id: board.id, name: board.name, url: board.url || '', closed: false },
+          lists: db.getLists(),
+          members: db.getMembers(),
+          labels: db.getLabels(),
+          cards: existingCards,
+          boardChecklists: Object.values((db as any).state.checklists || {}),
+        },
+        []
+      );
+      db.replaceBoardData(normalized);
+    }
+
+    const briefs = db.getManagementBriefs();
+    if (isReal && briefs.length === 0) {
+      await generateManagementBrief({ periodType: 'this_month' });
+    }
+  } catch (initErr: any) {
+    console.warn('Initial real data setup notice:', initErr.message);
   }
 
   if (process.env.NODE_ENV !== 'production') {

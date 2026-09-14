@@ -253,6 +253,16 @@ export class TrelloClient {
     }
   }
 
+  // Board-level checklists (returns all checklists with their checkItems in a single call)
+  async getBoardChecklists(boardId: string): Promise<any[]> {
+    try {
+      return await this.fetchTrello<any[]>(`/boards/${boardId}/checklists`);
+    } catch (err: any) {
+      console.warn('Failed to fetch board checklists (proceeding without board checklists):', err.message);
+      return [];
+    }
+  }
+
   // Board-level members
   async getMembers(boardId: string): Promise<{ id: string; fullName: string; username: string; avatarUrl?: string }[]> {
     return this.fetchTrello(`/boards/${boardId}/members`, {

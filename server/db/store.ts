@@ -71,6 +71,145 @@ class Store {
 
   constructor() {
     this.state = this.loadInitialState();
+    this.cleanDemoDataIfReal();
+  }
+
+  cleanDemoDataIfReal() {
+    const isReal = this.state.connection.mode === 'real' || !this.state.connection.isDemoData;
+    const hasRealCards = Object.values(this.state.cards).some((c) => !c.id.startsWith('card_'));
+
+    if (isReal && hasRealCards) {
+      // 1. Purge demo cards
+      for (const [id] of Object.entries(this.state.cards)) {
+        if (id.startsWith('card_')) {
+          delete this.state.cards[id];
+        }
+      }
+
+      // 2. Purge demo lists
+      for (const [id] of Object.entries(this.state.lists)) {
+        if (id.startsWith('list_')) {
+          delete this.state.lists[id];
+        }
+      }
+
+      // 3. Purge demo members
+      for (const [id] of Object.entries(this.state.members)) {
+        if (id.startsWith('mem_')) {
+          delete this.state.members[id];
+        }
+      }
+
+      // 4. Purge demo clients
+      const demoClientNames = ['apex spine & orthopedics', 'bay area vein center', 'advanced well md'];
+      for (const [id, c] of Object.entries(this.state.clients)) {
+        if (id.startsWith('client_') && demoClientNames.includes(c.canonicalName.toLowerCase())) {
+          delete this.state.clients[id];
+        }
+      }
+
+      // 5. Purge demo briefs that have hardcoded demo client names
+      for (const [id, brief] of Object.entries(this.state.managementBriefs)) {
+        const text = `${brief.title} ${brief.executiveSummary} ${(brief.majorAccomplishments || []).join(' ')}`.toLowerCase();
+        if (demoClientNames.some((dcn) => text.includes(dcn))) {
+          delete this.state.managementBriefs[id];
+        }
+      }
+
+      // 6. Purge orphaned checklists, comments, activities, attachments
+      for (const [id, cl] of Object.entries(this.state.checklists)) {
+        if (cl.cardId.startsWith('card_')) delete this.state.checklists[id];
+      }
+      for (const [id, cm] of Object.entries(this.state.comments)) {
+        if (cm.cardId.startsWith('card_')) delete this.state.comments[id];
+      }
+      for (const [id, act] of Object.entries(this.state.activities)) {
+        if (act.cardId.startsWith('card_')) delete this.state.activities[id];
+      }
+      for (const [id, att] of Object.entries(this.state.attachments)) {
+        if (att.cardId.startsWith('card_')) delete this.state.attachments[id];
+      }
+
+      this.persist();
+    }
+  }
+
+  replaceBoardData(data: {
+    board: TrelloBoard;
+    lists: TrelloList[];
+    members: TrelloMember[];
+    labels: TrelloLabel[];
+    cards: TrelloCard[];
+    checklists: TrelloChecklist[];
+    comments: TrelloComment[];
+    activities: TrelloActivity[];
+    attachments: TrelloAttachment[];
+    clients?: ClientEntity[];
+  }) {
+    this.state.boards[data.board.id] = data.board;
+
+    // Cleanly replace lists with board lists
+    this.state.lists = {};
+    for (const l of data.lists) {
+      this.state.lists[l.id] = l;
+    }
+
+    // Cleanly replace members
+    this.state.members = {};
+    for (const m of data.members) {
+      this.state.members[m.id] = m;
+    }
+
+    // Cleanly replace labels
+    this.state.labels = {};
+    for (const lbl of data.labels) {
+      this.state.labels[lbl.id] = lbl;
+    }
+
+    // Cleanly replace cards
+    this.state.cards = {};
+    for (const c of data.cards) {
+      this.state.cards[c.id] = c;
+    }
+
+    // Cleanly replace checklists
+    this.state.checklists = {};
+    for (const cl of data.checklists) {
+      this.state.checklists[cl.id] = cl;
+    }
+
+    // Cleanly replace comments
+    this.state.comments = {};
+    for (const cm of data.comments) {
+      this.state.comments[cm.id] = cm;
+    }
+
+    // Cleanly replace activities
+    this.state.activities = {};
+    for (const act of data.activities) {
+      this.state.activities[act.id] = act;
+    }
+
+    // Cleanly replace attachments
+    this.state.attachments = {};
+    for (const att of data.attachments) {
+      this.state.attachments[att.id] = att;
+    }
+
+    // Populate clients if supplied
+    if (data.clients && data.clients.length > 0) {
+      this.state.clients = {};
+      for (const client of data.clients) {
+        this.state.clients[client.id] = client;
+      }
+    }
+
+    this.cleanDemoDataIfReal();
+    this.persist();
+
+    if (pgStore.isConfigured()) {
+      pgStore.upsertCards(data.cards).catch((err) => console.warn('Postgres upsertCards error:', err.message));
+    }
   }
 
   private loadInitialState(): StorageState {
@@ -224,7 +363,13 @@ class Store {
   }
 
   getLists(boardId?: string): TrelloList[] {
-    const all = Object.values(this.state.lists);
+    const isReal = this.state.connection.mode === 'real' || !this.state.connection.isDemoData;
+    const hasRealLists = Object.values(this.state.lists).some((l) => !l.id.startsWith('list_'));
+
+    let all = Object.values(this.state.lists);
+    if (isReal && hasRealLists) {
+      all = all.filter((l) => !l.id.startsWith('list_'));
+    }
     if (!boardId) return all;
     return all.filter((l) => l.boardId === boardId);
   }
@@ -267,7 +412,14 @@ class Store {
   }
 
   getMembers(): TrelloMember[] {
-    return Object.values(this.state.members);
+    const isReal = this.state.connection.mode === 'real' || !this.state.connection.isDemoData;
+    const hasRealMembers = Object.values(this.state.members).some((m) => !m.id.startsWith('mem_'));
+
+    let all = Object.values(this.state.members);
+    if (isReal && hasRealMembers) {
+      all = all.filter((m) => !m.id.startsWith('mem_'));
+    }
+    return all;
   }
 
   // --- Labels ---
@@ -320,17 +472,22 @@ class Store {
   }
 
   getClients(): ClientEntity[] {
-    // Recompute counts for fresh accuracy
     const clients = Object.values(this.state.clients);
     const cards = Object.values(this.state.cards);
     const activities = Object.values(this.state.activities);
 
     return clients.map((client) => {
-      const matchingCards = cards.filter(
-        (c) =>
-          c.clientCanonical?.toLowerCase() === client.canonicalName.toLowerCase() ||
-          client.aliases.some((a) => c.name.toLowerCase().includes(a.toLowerCase()))
-      );
+      const isDedicatedClient = (c: TrelloCard) =>
+        c.clientCanonical?.toLowerCase() === client.canonicalName.toLowerCase();
+
+      const matchingCards = cards.filter((c) => {
+        if (isDedicatedClient(c)) return true;
+        const text = `${c.name} ${c.desc || ''}`.toLowerCase();
+        if (client.aliases.some((a) => text.includes(a.toLowerCase()))) return true;
+        if (c.checklists.some((cl) => client.aliases.some((a) => cl.name.toLowerCase().includes(a.toLowerCase())))) return true;
+        if (c.checklists.some((cl) => cl.items.some((item) => client.aliases.some((a) => item.name.toLowerCase().includes(a.toLowerCase()))))) return true;
+        return false;
+      });
 
       const activeCards = matchingCards.filter(
         (c) => c.statusSemantic !== 'Completed' && !c.closed
@@ -338,13 +495,35 @@ class Store {
 
       let totalTasks = 0;
       let completedTasks = 0;
-      const teamSet = new Set<string>();
+      const teamSet = new Set<string>(client.teamMembers || []);
 
       for (const card of matchingCards) {
         card.members.forEach((m) => teamSet.add(m.fullName));
+        const dedicated = isDedicatedClient(card);
+
         for (const cl of card.checklists) {
-          totalTasks += cl.items.length;
-          completedTasks += cl.items.filter((i) => i.state === 'complete').length;
+          const isClientCl = client.aliases.some((a) => cl.name.toLowerCase().includes(a.toLowerCase()));
+          if (dedicated || isClientCl) {
+            totalTasks += cl.items.length;
+            completedTasks += cl.items.filter((i) => i.state === 'complete').length;
+          } else {
+            for (const item of cl.items) {
+              const iLower = item.name.toLowerCase();
+              if (client.aliases.some((a) => iLower.includes(a.toLowerCase()))) {
+                totalTasks += 1;
+                if (item.state === 'complete') {
+                  completedTasks += 1;
+                }
+              }
+            }
+          }
+        }
+
+        if (dedicated && card.checklists.length === 0) {
+          totalTasks += 1;
+          if (card.statusSemantic === 'Completed' || card.closed) {
+            completedTasks += 1;
+          }
         }
       }
 
@@ -362,9 +541,9 @@ class Store {
 
       return {
         ...client,
-        activeCardCount: activeCards.length,
-        totalTasksCount: totalTasks,
-        completedTasksCount: completedTasks,
+        activeCardCount: activeCards.length || client.activeCardCount,
+        totalTasksCount: totalTasks || client.totalTasksCount,
+        completedTasksCount: completedTasks || client.completedTasksCount,
         teamMembers: Array.from(teamSet).filter(Boolean),
         lastActivityDate: lastActivity,
       };
@@ -467,7 +646,14 @@ class Store {
   }
 
   getCards(filter?: { clientCanonical?: string; status?: StatusSemantic }): TrelloCard[] {
+    const isReal = this.state.connection.mode === 'real' || !this.state.connection.isDemoData;
+    const hasRealCards = Object.values(this.state.cards).some((c) => !c.id.startsWith('card_'));
+
     let list = Object.values(this.state.cards);
+    if (isReal && hasRealCards) {
+      list = list.filter((c) => !c.id.startsWith('card_'));
+    }
+
     if (filter?.clientCanonical) {
       list = list.filter(
         (c) => c.clientCanonical?.toLowerCase() === filter.clientCanonical?.toLowerCase()
@@ -634,7 +820,18 @@ class Store {
   }
 
   getManagementBriefs(): ManagementBrief[] {
-    return Object.values(this.state.managementBriefs).sort(
+    const isReal = this.state.connection.mode === 'real' || !this.state.connection.isDemoData;
+    const demoClientNames = ['apex spine & orthopedics', 'bay area vein center', 'advanced well md'];
+
+    let briefs = Object.values(this.state.managementBriefs);
+    if (isReal) {
+      briefs = briefs.filter((brief) => {
+        const text = `${brief.title} ${brief.executiveSummary} ${(brief.majorAccomplishments || []).join(' ')}`.toLowerCase();
+        return !demoClientNames.some((dcn) => text.includes(dcn));
+      });
+    }
+
+    return briefs.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   }
