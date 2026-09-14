@@ -1,0 +1,2203 @@
+{
+  "connection": {
+    "apiKey": "",
+    "token": "",
+    "boardId": "board_pds_gfm_seo",
+    "boardName": "PDS/GFM-SEO",
+    "connected": true,
+    "isDemoData": true,
+    "lastSyncAt": "2026-09-14T17:16:20.804Z",
+    "lastSyncStatus": "success"
+  },
+  "boards": {
+    "board_pds_gfm_seo": {
+      "id": "board_pds_gfm_seo",
+      "name": "PDS/GFM-SEO",
+      "url": "https://trello.com/b/pds-gfm-seo",
+      "closed": false
+    }
+  },
+  "lists": {
+    "list_pds_resources": {
+      "id": "list_pds_resources",
+      "boardId": "board_pds_gfm_seo",
+      "name": "PDS Resources",
+      "closed": false,
+      "pos": 1,
+      "semanticType": "resources",
+      "mappedStatus": "Planned"
+    },
+    "list_gfm_clients": {
+      "id": "list_gfm_clients",
+      "boardId": "board_pds_gfm_seo",
+      "name": "GFM Clients",
+      "closed": false,
+      "pos": 2,
+      "semanticType": "client",
+      "mappedStatus": "In Process"
+    },
+    "list_todo_gfm_pds": {
+      "id": "list_todo_gfm_pds",
+      "boardId": "board_pds_gfm_seo",
+      "name": "To Do GFM/PDS",
+      "closed": false,
+      "pos": 3,
+      "semanticType": "status",
+      "mappedStatus": "To Do"
+    },
+    "list_todo_clients": {
+      "id": "list_todo_clients",
+      "boardId": "board_pds_gfm_seo",
+      "name": "To Do Clients",
+      "closed": false,
+      "pos": 4,
+      "semanticType": "status",
+      "mappedStatus": "To Do"
+    },
+    "list_in_process": {
+      "id": "list_in_process",
+      "boardId": "board_pds_gfm_seo",
+      "name": "In Process",
+      "closed": false,
+      "pos": 5,
+      "semanticType": "status",
+      "mappedStatus": "In Process"
+    },
+    "list_haseeb_afzal": {
+      "id": "list_haseeb_afzal",
+      "boardId": "board_pds_gfm_seo",
+      "name": "Haseeb Afzal",
+      "closed": false,
+      "pos": 6,
+      "semanticType": "person",
+      "mappedPerson": "Haseeb Afzal",
+      "mappedStatus": "In Process"
+    },
+    "list_adil": {
+      "id": "list_adil",
+      "boardId": "board_pds_gfm_seo",
+      "name": "Adil",
+      "closed": false,
+      "pos": 7,
+      "semanticType": "person",
+      "mappedPerson": "Adil",
+      "mappedStatus": "In Process"
+    },
+    "list_hamza": {
+      "id": "list_hamza",
+      "boardId": "board_pds_gfm_seo",
+      "name": "Hamza",
+      "closed": false,
+      "pos": 8,
+      "semanticType": "person",
+      "mappedPerson": "Hamza",
+      "mappedStatus": "In Process"
+    },
+    "list_azeem_ahmad": {
+      "id": "list_azeem_ahmad",
+      "boardId": "board_pds_gfm_seo",
+      "name": "Azeem Ahmad",
+      "closed": false,
+      "pos": 9,
+      "semanticType": "person",
+      "mappedPerson": "Azeem Ahmad",
+      "mappedStatus": "In Process"
+    },
+    "list_humna_qayyum": {
+      "id": "list_humna_qayyum",
+      "boardId": "board_pds_gfm_seo",
+      "name": "Humna Qayyum",
+      "closed": false,
+      "pos": 10,
+      "semanticType": "person",
+      "mappedPerson": "Humna Qayyum",
+      "mappedStatus": "In Process"
+    },
+    "list_in_review": {
+      "id": "list_in_review",
+      "boardId": "board_pds_gfm_seo",
+      "name": "In Review",
+      "closed": false,
+      "pos": 11,
+      "semanticType": "status",
+      "mappedStatus": "In Review"
+    },
+    "list_completed": {
+      "id": "list_completed",
+      "boardId": "board_pds_gfm_seo",
+      "name": "Completed",
+      "closed": false,
+      "pos": 12,
+      "semanticType": "status",
+      "mappedStatus": "Completed"
+    },
+    "list_adhoc_tasks": {
+      "id": "list_adhoc_tasks",
+      "boardId": "board_pds_gfm_seo",
+      "name": "Ad Hoc Tasks",
+      "closed": false,
+      "pos": 13,
+      "semanticType": "adhoc",
+      "mappedStatus": "To Do"
+    }
+  },
+  "members": {
+    "mem_awais": {
+      "id": "mem_awais",
+      "fullName": "Awais",
+      "username": "awais_seo",
+      "role": "SEO & Content Lead"
+    },
+    "mem_haseeb": {
+      "id": "mem_haseeb",
+      "fullName": "Haseeb Afzal",
+      "username": "haseeb_afzal",
+      "role": "Sr. SEO Specialist"
+    },
+    "mem_adil": {
+      "id": "mem_adil",
+      "fullName": "Adil",
+      "username": "adil_tech",
+      "role": "Technical SEO Specialist"
+    },
+    "mem_hamza": {
+      "id": "mem_hamza",
+      "fullName": "Hamza",
+      "username": "hamza_content",
+      "role": "Content Strategist"
+    },
+    "mem_azeem": {
+      "id": "mem_azeem",
+      "fullName": "Azeem Ahmad",
+      "username": "azeem_ahmad",
+      "role": "SEO Specialist"
+    },
+    "mem_humna": {
+      "id": "mem_humna",
+      "fullName": "Humna Qayyum",
+      "username": "humna_qayyum",
+      "role": "Content Specialist"
+    }
+  },
+  "labels": {
+    "lbl_in_progress": {
+      "id": "lbl_in_progress",
+      "name": "In Progress",
+      "color": "yellow"
+    },
+    "lbl_high_priority": {
+      "id": "lbl_high_priority",
+      "name": "High Priority",
+      "color": "red"
+    },
+    "lbl_in_review": {
+      "id": "lbl_in_review",
+      "name": "In Review",
+      "color": "orange"
+    },
+    "lbl_completed": {
+      "id": "lbl_completed",
+      "name": "Completed",
+      "color": "green"
+    },
+    "lbl_ai_initiative": {
+      "id": "lbl_ai_initiative",
+      "name": "AI Initiative",
+      "color": "purple"
+    },
+    "lbl_geo_aeo": {
+      "id": "lbl_geo_aeo",
+      "name": "GEO / AEO",
+      "color": "sky"
+    },
+    "lbl_technical_seo": {
+      "id": "lbl_technical_seo",
+      "name": "Technical SEO",
+      "color": "blue"
+    },
+    "lbl_content": {
+      "id": "lbl_content",
+      "name": "Content Strategy",
+      "color": "pink"
+    }
+  },
+  "cards": {
+    "card_precision_podiatry": {
+      "id": "card_precision_podiatry",
+      "boardId": "board_pds_gfm_seo",
+      "listId": "list_in_process",
+      "listName": "In Process",
+      "name": "Precision Podiatry PLLC",
+      "desc": "Full-service medical SEO and localized content expansion for multi-clinic podiatry practice across Austin & Dallas locations.",
+      "url": "https://trello.com/c/precision-podiatry-pllc",
+      "due": "2026-09-30T17:00:00Z",
+      "dateLastActivity": "2026-09-12T14:30:00Z",
+      "closed": false,
+      "statusSemantic": "In Process",
+      "clientCanonical": "Precision Podiatry PLLC",
+      "labels": [
+        {
+          "id": "lbl_in_progress",
+          "name": "In Progress",
+          "color": "yellow"
+        },
+        {
+          "id": "lbl_high_priority",
+          "name": "High Priority",
+          "color": "red"
+        },
+        {
+          "id": "lbl_technical_seo",
+          "name": "Technical SEO",
+          "color": "blue"
+        }
+      ],
+      "members": [
+        {
+          "id": "mem_awais",
+          "fullName": "Awais",
+          "username": "awais_seo",
+          "role": "SEO & Content Lead"
+        },
+        {
+          "id": "mem_haseeb",
+          "fullName": "Haseeb Afzal",
+          "username": "haseeb_afzal",
+          "role": "Sr. SEO Specialist"
+        }
+      ],
+      "checklists": [
+        {
+          "id": "cl_precision_workflow",
+          "cardId": "card_precision_podiatry",
+          "name": "Workflow",
+          "items": [
+            {
+              "id": "cli_prec_1",
+              "checklistId": "cl_precision_workflow",
+              "cardId": "card_precision_podiatry",
+              "name": "Website & SEO Audit",
+              "state": "complete",
+              "completedAt": "2026-08-28T10:00:00Z"
+            },
+            {
+              "id": "cli_prec_2",
+              "checklistId": "cl_precision_workflow",
+              "cardId": "card_precision_podiatry",
+              "name": "Client Onboarding",
+              "state": "complete",
+              "completedAt": "2026-08-30T15:00:00Z"
+            },
+            {
+              "id": "cli_prec_3",
+              "checklistId": "cl_precision_workflow",
+              "cardId": "card_precision_podiatry",
+              "name": "SEO Strategy",
+              "state": "complete",
+              "completedAt": "2026-09-03T14:30:00Z"
+            },
+            {
+              "id": "cli_prec_4",
+              "checklistId": "cl_precision_workflow",
+              "cardId": "card_precision_podiatry",
+              "name": "Website Structure & Planning",
+              "state": "complete",
+              "completedAt": "2026-09-07T11:00:00Z"
+            },
+            {
+              "id": "cli_prec_5",
+              "checklistId": "cl_precision_workflow",
+              "cardId": "card_precision_podiatry",
+              "name": "Content Strategy & Development",
+              "state": "incomplete"
+            }
+          ]
+        }
+      ],
+      "comments": [
+        {
+          "id": "comm_prec_1",
+          "cardId": "card_precision_podiatry",
+          "authorId": "mem_awais",
+          "authorName": "Awais",
+          "text": "Client onboarding call concluded. Identified primary target market in Austin & Dallas. Finalized core podiatry service keywords.",
+          "createdAt": "2026-08-30T16:00:00Z"
+        },
+        {
+          "id": "comm_prec_2",
+          "cardId": "card_precision_podiatry",
+          "authorId": "mem_awais",
+          "authorName": "Awais",
+          "text": "SEO Strategy presented and confirmed with Dr. Miller. Targeting plantar fasciitis, bunion surgery, and diabetic foot care clusters.",
+          "createdAt": "2026-09-03T15:00:00Z"
+        },
+        {
+          "id": "comm_prec_3",
+          "cardId": "card_precision_podiatry",
+          "authorId": "mem_haseeb",
+          "authorName": "Haseeb Afzal",
+          "text": "Services information added to client drive. Currently drafting the first batch of 5 specialized service pages for Content Strategy.",
+          "createdAt": "2026-09-12T14:20:00Z"
+        }
+      ],
+      "activities": [
+        {
+          "id": "act_prec_1",
+          "cardId": "card_precision_podiatry",
+          "cardTitle": "Precision Podiatry PLLC",
+          "clientCanonical": "Precision Podiatry PLLC",
+          "person": "Awais",
+          "activityType": "Website & SEO Audit",
+          "action": "completed",
+          "timestamp": "2026-08-28T10:00:00Z",
+          "details": "Awais completed Website & SEO Audit on this card"
+        },
+        {
+          "id": "act_prec_2",
+          "cardId": "card_precision_podiatry",
+          "cardTitle": "Precision Podiatry PLLC",
+          "clientCanonical": "Precision Podiatry PLLC",
+          "person": "Awais",
+          "activityType": "Client Onboarding",
+          "action": "completed",
+          "timestamp": "2026-08-30T15:00:00Z",
+          "details": "Awais completed Client Onboarding on this card"
+        },
+        {
+          "id": "act_prec_3",
+          "cardId": "card_precision_podiatry",
+          "cardTitle": "Precision Podiatry PLLC",
+          "clientCanonical": "Precision Podiatry PLLC",
+          "person": "Awais",
+          "activityType": "SEO Strategy",
+          "action": "completed",
+          "timestamp": "2026-09-03T14:30:00Z",
+          "details": "Awais completed SEO Strategy on this card"
+        },
+        {
+          "id": "act_prec_4",
+          "cardId": "card_precision_podiatry",
+          "cardTitle": "Precision Podiatry PLLC",
+          "clientCanonical": "Precision Podiatry PLLC",
+          "person": "Awais",
+          "activityType": "Website Structure & Planning",
+          "action": "completed",
+          "timestamp": "2026-09-07T11:00:00Z",
+          "details": "Awais completed Website Structure & Planning on this card"
+        },
+        {
+          "id": "act_prec_5",
+          "cardId": "card_precision_podiatry",
+          "cardTitle": "Precision Podiatry PLLC",
+          "clientCanonical": "Precision Podiatry PLLC",
+          "person": "Haseeb Afzal",
+          "activityType": "Content Drafts",
+          "action": "commented",
+          "timestamp": "2026-09-12T14:20:00Z",
+          "details": "Haseeb Afzal updated progress on Content Strategy & Development"
+        }
+      ],
+      "attachments": [
+        {
+          "id": "att_prec_1",
+          "cardId": "card_precision_podiatry",
+          "name": "Precision_Podiatry_Technical_SEO_Audit_v1.pdf",
+          "url": "https://trello.com/1/cards/card_precision_podiatry/attachments/att_prec_1",
+          "mimeType": "application/pdf",
+          "date": "2026-08-28T09:45:00Z"
+        },
+        {
+          "id": "att_prec_2",
+          "cardId": "card_precision_podiatry",
+          "name": "Target_Keyword_Universe_Master.xlsx",
+          "url": "https://trello.com/1/cards/card_precision_podiatry/attachments/att_prec_2",
+          "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "date": "2026-09-03T14:00:00Z"
+        }
+      ]
+    },
+    "card_advanced_well_md": {
+      "id": "card_advanced_well_md",
+      "boardId": "board_pds_gfm_seo",
+      "listId": "list_in_review",
+      "listName": "In Review",
+      "name": "Advanced Well MD Audit Review and Action Plan",
+      "desc": "Comprehensive technical crawl, missing schema fix, and functional medicine treatment page re-architecture.",
+      "url": "https://trello.com/c/advanced-well-md-audit-review",
+      "due": "2026-09-22T17:00:00Z",
+      "dateLastActivity": "2026-09-13T11:15:00Z",
+      "closed": false,
+      "statusSemantic": "In Review",
+      "clientCanonical": "Advanced Well MD",
+      "labels": [
+        {
+          "id": "lbl_in_progress",
+          "name": "In Progress",
+          "color": "yellow"
+        },
+        {
+          "id": "lbl_in_review",
+          "name": "In Review",
+          "color": "orange"
+        },
+        {
+          "id": "lbl_technical_seo",
+          "name": "Technical SEO",
+          "color": "blue"
+        }
+      ],
+      "members": [
+        {
+          "id": "mem_awais",
+          "fullName": "Awais",
+          "username": "awais_seo",
+          "role": "SEO & Content Lead"
+        },
+        {
+          "id": "mem_adil",
+          "fullName": "Adil",
+          "username": "adil_tech",
+          "role": "Technical SEO Specialist"
+        },
+        {
+          "id": "mem_humna",
+          "fullName": "Humna Qayyum",
+          "username": "humna_qayyum",
+          "role": "Content Specialist"
+        }
+      ],
+      "checklists": [
+        {
+          "id": "cl_adv_workflow",
+          "cardId": "card_advanced_well_md",
+          "name": "Action Plan Progress",
+          "items": [
+            {
+              "id": "cli_adv_1",
+              "checklistId": "cl_adv_workflow",
+              "cardId": "card_advanced_well_md",
+              "name": "Technical SEO Crawl & 404 Resolution",
+              "state": "complete",
+              "completedAt": "2026-09-04T12:00:00Z"
+            },
+            {
+              "id": "cli_adv_2",
+              "checklistId": "cl_adv_workflow",
+              "cardId": "card_advanced_well_md",
+              "name": "Medical Clinic Schema Implementation",
+              "state": "complete",
+              "completedAt": "2026-09-08T16:20:00Z"
+            },
+            {
+              "id": "cli_adv_3",
+              "checklistId": "cl_adv_workflow",
+              "cardId": "card_advanced_well_md",
+              "name": "New Service Pages Content Creation",
+              "state": "complete",
+              "completedAt": "2026-09-12T17:00:00Z"
+            },
+            {
+              "id": "cli_adv_4",
+              "checklistId": "cl_adv_workflow",
+              "cardId": "card_advanced_well_md",
+              "name": "Client Approval & Production Publish",
+              "state": "incomplete"
+            }
+          ]
+        }
+      ],
+      "comments": [
+        {
+          "id": "comm_adv_1",
+          "cardId": "card_advanced_well_md",
+          "authorId": "mem_adil",
+          "authorName": "Adil",
+          "text": "Resolved 34 redirect chains and repaired the canonical loops on the anti-aging therapy pages.",
+          "createdAt": "2026-09-04T13:00:00Z"
+        },
+        {
+          "id": "comm_adv_2",
+          "cardId": "card_advanced_well_md",
+          "authorId": "mem_humna",
+          "authorName": "Humna Qayyum",
+          "text": "Two new service pages have been created and shared with client for review (Bioidentical Hormone Replacement & Gut Health Protocol).",
+          "createdAt": "2026-09-12T17:15:00Z"
+        },
+        {
+          "id": "comm_adv_3",
+          "cardId": "card_advanced_well_md",
+          "authorId": "mem_awais",
+          "authorName": "Awais",
+          "text": "Card moved to In Review while awaiting Dr. Davis sign-off on copy.",
+          "createdAt": "2026-09-13T11:15:00Z"
+        }
+      ],
+      "activities": [
+        {
+          "id": "act_adv_1",
+          "cardId": "card_advanced_well_md",
+          "cardTitle": "Advanced Well MD Audit Review and Action Plan",
+          "clientCanonical": "Advanced Well MD",
+          "person": "Adil",
+          "activityType": "Technical SEO Crawl",
+          "action": "completed",
+          "timestamp": "2026-09-04T12:00:00Z",
+          "details": "Adil completed Technical SEO Crawl & 404 Resolution on this card"
+        },
+        {
+          "id": "act_adv_2",
+          "cardId": "card_advanced_well_md",
+          "cardTitle": "Advanced Well MD Audit Review and Action Plan",
+          "clientCanonical": "Advanced Well MD",
+          "person": "Adil",
+          "activityType": "Schema Implementation",
+          "action": "completed",
+          "timestamp": "2026-09-08T16:20:00Z",
+          "details": "Adil completed Medical Clinic Schema Implementation on this card"
+        },
+        {
+          "id": "act_adv_3",
+          "cardId": "card_advanced_well_md",
+          "cardTitle": "Advanced Well MD Audit Review and Action Plan",
+          "clientCanonical": "Advanced Well MD",
+          "person": "Humna Qayyum",
+          "activityType": "Service Pages Creation",
+          "action": "completed",
+          "timestamp": "2026-09-12T17:00:00Z",
+          "details": "Humna Qayyum completed New Service Pages Content Creation on this card"
+        },
+        {
+          "id": "act_adv_4",
+          "cardId": "card_advanced_well_md",
+          "cardTitle": "Advanced Well MD Audit Review and Action Plan",
+          "clientCanonical": "Advanced Well MD",
+          "person": "Awais",
+          "activityType": "Status Move",
+          "action": "moved",
+          "timestamp": "2026-09-13T11:15:00Z",
+          "details": "Awais moved this card from In Process to In Review"
+        }
+      ],
+      "attachments": [
+        {
+          "id": "att_adv_1",
+          "cardId": "card_advanced_well_md",
+          "name": "Advanced_Well_MD_Website_Audit_Report.pdf",
+          "url": "https://trello.com/1/cards/card_advanced_well_md/attachments/att_adv_1",
+          "mimeType": "application/pdf",
+          "date": "2026-09-04T11:30:00Z"
+        }
+      ]
+    },
+    "card_ai_overview_analysis": {
+      "id": "card_ai_overview_analysis",
+      "boardId": "board_pds_gfm_seo",
+      "listId": "list_completed",
+      "listName": "Completed",
+      "name": "AI Overview Competitor Analysis",
+      "desc": "Systematic analysis of Google AI Overview citations across 40 healthcare keywords. Documented citation pattern frequency, listicle vs tabular trigger factors, and publisher authority thresholds.",
+      "url": "https://trello.com/c/ai-overview-competitor-analysis",
+      "due": "2026-09-05T17:00:00Z",
+      "dateLastActivity": "2026-09-05T16:45:00Z",
+      "closed": false,
+      "statusSemantic": "Completed",
+      "labels": [
+        {
+          "id": "lbl_completed",
+          "name": "Completed",
+          "color": "green"
+        },
+        {
+          "id": "lbl_ai_initiative",
+          "name": "AI Initiative",
+          "color": "purple"
+        },
+        {
+          "id": "lbl_geo_aeo",
+          "name": "GEO / AEO",
+          "color": "sky"
+        }
+      ],
+      "members": [
+        {
+          "id": "mem_haseeb",
+          "fullName": "Haseeb Afzal",
+          "username": "haseeb_afzal",
+          "role": "Sr. SEO Specialist"
+        },
+        {
+          "id": "mem_awais",
+          "fullName": "Awais",
+          "username": "awais_seo",
+          "role": "SEO & Content Lead"
+        }
+      ],
+      "checklists": [
+        {
+          "id": "cl_ai_overview",
+          "cardId": "card_ai_overview_analysis",
+          "name": "Research Phases",
+          "items": [
+            {
+              "id": "cli_aio_1",
+              "checklistId": "cl_ai_overview",
+              "cardId": "card_ai_overview_analysis",
+              "name": "Keyword Selection & Benchmark Query List (40 medical queries)",
+              "state": "complete",
+              "completedAt": "2026-09-01T11:00:00Z"
+            },
+            {
+              "id": "cli_aio_2",
+              "checklistId": "cl_ai_overview",
+              "cardId": "card_ai_overview_analysis",
+              "name": "SERP Scraping & AI Overview capture across Google US",
+              "state": "complete",
+              "completedAt": "2026-09-03T16:00:00Z"
+            },
+            {
+              "id": "cli_aio_3",
+              "checklistId": "cl_ai_overview",
+              "cardId": "card_ai_overview_analysis",
+              "name": "Citation Pattern Analysis & Formatting Correlation",
+              "state": "complete",
+              "completedAt": "2026-09-05T14:00:00Z"
+            },
+            {
+              "id": "cli_aio_4",
+              "checklistId": "cl_ai_overview",
+              "cardId": "card_ai_overview_analysis",
+              "name": "Documentation & Internal Team Action SOP",
+              "state": "complete",
+              "completedAt": "2026-09-05T16:30:00Z"
+            }
+          ]
+        }
+      ],
+      "comments": [
+        {
+          "id": "comm_aio_1",
+          "cardId": "card_ai_overview_analysis",
+          "authorId": "mem_haseeb",
+          "authorName": "Haseeb Afzal",
+          "text": "Found that tabular data, HTML bulleted lists, and concise 40-word direct Q&A definitions have a 3x higher citation rate in Google AI Overviews for medical symptom and treatment queries.",
+          "createdAt": "2026-09-05T14:15:00Z"
+        },
+        {
+          "id": "comm_aio_2",
+          "cardId": "card_ai_overview_analysis",
+          "authorId": "mem_awais",
+          "authorName": "Awais",
+          "text": "Excellent findings. Incorporating these formatting guidelines immediately into our content strategy for client service pages.",
+          "createdAt": "2026-09-05T16:45:00Z"
+        }
+      ],
+      "activities": [
+        {
+          "id": "act_aio_1",
+          "cardId": "card_ai_overview_analysis",
+          "cardTitle": "AI Overview Competitor Analysis",
+          "person": "Haseeb Afzal",
+          "activityType": "Citation Pattern Analysis",
+          "action": "completed",
+          "timestamp": "2026-09-05T14:00:00Z",
+          "details": "Haseeb Afzal completed Citation Pattern Analysis on this card"
+        },
+        {
+          "id": "act_aio_2",
+          "cardId": "card_ai_overview_analysis",
+          "cardTitle": "AI Overview Competitor Analysis",
+          "person": "Haseeb Afzal",
+          "activityType": "Research Documentation",
+          "action": "completed",
+          "timestamp": "2026-09-05T16:30:00Z",
+          "details": "Haseeb Afzal completed Documentation & Internal Team Action SOP on this card"
+        }
+      ],
+      "attachments": [
+        {
+          "id": "att_aio_1",
+          "cardId": "card_ai_overview_analysis",
+          "name": "AI_Overview_Healthcare_Citation_Study_Sep2026.pdf",
+          "url": "https://trello.com/1/cards/card_ai_overview_analysis/attachments/att_aio_1",
+          "mimeType": "application/pdf",
+          "date": "2026-09-05T16:35:00Z"
+        }
+      ]
+    },
+    "card_ai_search_visibility": {
+      "id": "card_ai_search_visibility",
+      "boardId": "board_pds_gfm_seo",
+      "listId": "list_in_process",
+      "listName": "In Process",
+      "name": "AI Search Visibility Research - GEO / AEO Strategy",
+      "desc": "Developing Generative Engine Optimization (GEO) framework to optimize client visibility across Google AI Overviews, ChatGPT Search, and Perplexity.",
+      "url": "https://trello.com/c/ai-search-visibility-research",
+      "due": "2026-09-25T17:00:00Z",
+      "dateLastActivity": "2026-09-11T16:10:00Z",
+      "closed": false,
+      "statusSemantic": "In Process",
+      "labels": [
+        {
+          "id": "lbl_in_progress",
+          "name": "In Progress",
+          "color": "yellow"
+        },
+        {
+          "id": "lbl_ai_initiative",
+          "name": "AI Initiative",
+          "color": "purple"
+        },
+        {
+          "id": "lbl_geo_aeo",
+          "name": "GEO / AEO",
+          "color": "sky"
+        }
+      ],
+      "members": [
+        {
+          "id": "mem_haseeb",
+          "fullName": "Haseeb Afzal",
+          "username": "haseeb_afzal",
+          "role": "Sr. SEO Specialist"
+        },
+        {
+          "id": "mem_hamza",
+          "fullName": "Hamza",
+          "username": "hamza_content",
+          "role": "Content Strategist"
+        }
+      ],
+      "checklists": [
+        {
+          "id": "cl_geo_framework",
+          "cardId": "card_ai_search_visibility",
+          "name": "GEO Strategy Deliverables",
+          "items": [
+            {
+              "id": "cli_geo_1",
+              "checklistId": "cl_geo_framework",
+              "cardId": "card_ai_search_visibility",
+              "name": "Audit brand mention citations in Perplexity & ChatGPT",
+              "state": "complete",
+              "completedAt": "2026-09-08T15:00:00Z"
+            },
+            {
+              "id": "cli_geo_2",
+              "checklistId": "cl_geo_framework",
+              "cardId": "card_ai_search_visibility",
+              "name": "Draft AEO (Answer Engine Optimization) FAQ schema blueprint",
+              "state": "complete",
+              "completedAt": "2026-09-11T14:30:00Z"
+            },
+            {
+              "id": "cli_geo_3",
+              "checklistId": "cl_geo_framework",
+              "cardId": "card_ai_search_visibility",
+              "name": "Deploy pilot test on 3 client test pages",
+              "state": "incomplete"
+            }
+          ]
+        }
+      ],
+      "comments": [
+        {
+          "id": "comm_geo_1",
+          "cardId": "card_ai_search_visibility",
+          "authorId": "mem_haseeb",
+          "authorName": "Haseeb Afzal",
+          "text": "Perplexity citations heavily favor Wikipedia, Wikidata, and structured author schema with verifiable medical credentials.",
+          "createdAt": "2026-09-08T15:30:00Z"
+        },
+        {
+          "id": "comm_geo_2",
+          "cardId": "card_ai_search_visibility",
+          "authorId": "mem_hamza",
+          "authorName": "Hamza",
+          "text": "Finalized the AEO FAQ blueprint. Planning to roll it out initially for Precision Podiatry and Advanced Well MD.",
+          "createdAt": "2026-09-11T16:10:00Z"
+        }
+      ],
+      "activities": [
+        {
+          "id": "act_geo_1",
+          "cardId": "card_ai_search_visibility",
+          "cardTitle": "AI Search Visibility Research - GEO / AEO Strategy",
+          "person": "Haseeb Afzal",
+          "activityType": "Brand Citation Audit",
+          "action": "completed",
+          "timestamp": "2026-09-08T15:00:00Z",
+          "details": "Haseeb Afzal completed Audit brand mention citations in Perplexity & ChatGPT"
+        },
+        {
+          "id": "act_geo_2",
+          "cardId": "card_ai_search_visibility",
+          "cardTitle": "AI Search Visibility Research - GEO / AEO Strategy",
+          "person": "Hamza",
+          "activityType": "AEO Blueprint",
+          "action": "completed",
+          "timestamp": "2026-09-11T14:30:00Z",
+          "details": "Hamza completed Draft AEO FAQ schema blueprint"
+        }
+      ],
+      "attachments": []
+    },
+    "card_ai_productivity_experiment": {
+      "id": "card_ai_productivity_experiment",
+      "boardId": "board_pds_gfm_seo",
+      "listId": "list_completed",
+      "listName": "Completed",
+      "name": "AI Productivity Workflow Experiment: Content Outlines & Schema",
+      "desc": "Benchmarking AI tooling (ChatGPT & Claude) to accelerate routine SEO workflows: content brief outline generation and JSON-LD schema generation.",
+      "url": "https://trello.com/c/ai-productivity-experiment",
+      "due": "2026-09-08T17:00:00Z",
+      "dateLastActivity": "2026-09-08T18:00:00Z",
+      "closed": false,
+      "statusSemantic": "Completed",
+      "labels": [
+        {
+          "id": "lbl_completed",
+          "name": "Completed",
+          "color": "green"
+        },
+        {
+          "id": "lbl_ai_initiative",
+          "name": "AI Initiative",
+          "color": "purple"
+        }
+      ],
+      "members": [
+        {
+          "id": "mem_adil",
+          "fullName": "Adil",
+          "username": "adil_tech",
+          "role": "Technical SEO Specialist"
+        },
+        {
+          "id": "mem_humna",
+          "fullName": "Humna Qayyum",
+          "username": "humna_qayyum",
+          "role": "Content Specialist"
+        },
+        {
+          "id": "mem_awais",
+          "fullName": "Awais",
+          "username": "awais_seo",
+          "role": "SEO & Content Lead"
+        }
+      ],
+      "checklists": [
+        {
+          "id": "cl_ai_prod",
+          "cardId": "card_ai_productivity_experiment",
+          "name": "Productivity Benchmarks",
+          "items": [
+            {
+              "id": "cli_aip_1",
+              "checklistId": "cl_ai_prod",
+              "cardId": "card_ai_productivity_experiment",
+              "name": "Prompt engineering for medical content outline generation",
+              "state": "complete",
+              "completedAt": "2026-09-02T16:00:00Z"
+            },
+            {
+              "id": "cli_aip_2",
+              "checklistId": "cl_ai_prod",
+              "cardId": "card_ai_productivity_experiment",
+              "name": "Automated Physician JSON-LD generator validation",
+              "state": "complete",
+              "completedAt": "2026-09-06T14:00:00Z"
+            },
+            {
+              "id": "cli_aip_3",
+              "checklistId": "cl_ai_prod",
+              "cardId": "card_ai_productivity_experiment",
+              "name": "Time-savings benchmark report across 10 sample tasks",
+              "state": "complete",
+              "completedAt": "2026-09-08T17:30:00Z"
+            }
+          ]
+        }
+      ],
+      "comments": [
+        {
+          "id": "comm_aip_1",
+          "cardId": "card_ai_productivity_experiment",
+          "authorId": "mem_adil",
+          "authorName": "Adil",
+          "text": "Using structured prompting for schema validation reduced schema coding time from 40 minutes to under 8 minutes per provider profile.",
+          "createdAt": "2026-09-06T14:30:00Z"
+        },
+        {
+          "id": "comm_aip_2",
+          "cardId": "card_ai_productivity_experiment",
+          "authorId": "mem_humna",
+          "authorName": "Humna Qayyum",
+          "text": "Content outline drafting time dropped by 45% while preserving strict E-E-A-T medical criteria.",
+          "createdAt": "2026-09-08T17:45:00Z"
+        }
+      ],
+      "activities": [
+        {
+          "id": "act_aip_1",
+          "cardId": "card_ai_productivity_experiment",
+          "cardTitle": "AI Productivity Workflow Experiment",
+          "person": "Adil",
+          "activityType": "Schema Automation",
+          "action": "completed",
+          "timestamp": "2026-09-06T14:00:00Z",
+          "details": "Adil completed Automated Physician JSON-LD generator validation on this card"
+        },
+        {
+          "id": "act_aip_2",
+          "cardId": "card_ai_productivity_experiment",
+          "cardTitle": "AI Productivity Workflow Experiment",
+          "person": "Humna Qayyum",
+          "activityType": "Benchmark Report",
+          "action": "completed",
+          "timestamp": "2026-09-08T17:30:00Z",
+          "details": "Humna Qayyum completed Time-savings benchmark report on this card"
+        }
+      ],
+      "attachments": []
+    },
+    "card_apex_spine": {
+      "id": "card_apex_spine",
+      "boardId": "board_pds_gfm_seo",
+      "listId": "list_completed",
+      "listName": "Completed",
+      "name": "Apex Spine & Orthopedics - Technical SEO Audit & Core Web Vitals",
+      "desc": "Complete crawl and Core Web Vitals optimization to remedy mobile INP and CLS issues across orthopedic surgery sub-pages.",
+      "url": "https://trello.com/c/apex-spine-technical-seo",
+      "due": "2026-09-10T17:00:00Z",
+      "dateLastActivity": "2026-09-10T16:00:00Z",
+      "closed": false,
+      "statusSemantic": "Completed",
+      "clientCanonical": "Apex Spine & Orthopedics",
+      "labels": [
+        {
+          "id": "lbl_completed",
+          "name": "Completed",
+          "color": "green"
+        },
+        {
+          "id": "lbl_technical_seo",
+          "name": "Technical SEO",
+          "color": "blue"
+        }
+      ],
+      "members": [
+        {
+          "id": "mem_adil",
+          "fullName": "Adil",
+          "username": "adil_tech",
+          "role": "Technical SEO Specialist"
+        },
+        {
+          "id": "mem_azeem",
+          "fullName": "Azeem Ahmad",
+          "username": "azeem_ahmad",
+          "role": "SEO Specialist"
+        }
+      ],
+      "checklists": [
+        {
+          "id": "cl_apex_tech",
+          "cardId": "card_apex_spine",
+          "name": "Technical Audit Items",
+          "items": [
+            {
+              "id": "cli_apx_1",
+              "checklistId": "cl_apex_tech",
+              "cardId": "card_apex_spine",
+              "name": "Core Web Vitals INP optimization",
+              "state": "complete",
+              "completedAt": "2026-09-08T11:00:00Z"
+            },
+            {
+              "id": "cli_apx_2",
+              "checklistId": "cl_apex_tech",
+              "cardId": "card_apex_spine",
+              "name": "Fix orphan pages and internal linking hierarchy",
+              "state": "complete",
+              "completedAt": "2026-09-09T15:00:00Z"
+            },
+            {
+              "id": "cli_apx_3",
+              "checklistId": "cl_apex_tech",
+              "cardId": "card_apex_spine",
+              "name": "Implement MedicalCondition Schema for spinal decompression",
+              "state": "complete",
+              "completedAt": "2026-09-10T15:45:00Z"
+            }
+          ]
+        }
+      ],
+      "comments": [
+        {
+          "id": "comm_apx_1",
+          "cardId": "card_apex_spine",
+          "authorId": "mem_adil",
+          "authorName": "Adil",
+          "text": "Mobile performance score improved from 48 to 86 on PageSpeed Insights after deferred font loading and image dimension attributes.",
+          "createdAt": "2026-09-08T12:00:00Z"
+        },
+        {
+          "id": "comm_apx_2",
+          "cardId": "card_apex_spine",
+          "authorId": "mem_azeem",
+          "authorName": "Azeem Ahmad",
+          "text": "Internal linking silo structure established for 14 orthopedic conditions.",
+          "createdAt": "2026-09-09T16:00:00Z"
+        }
+      ],
+      "activities": [
+        {
+          "id": "act_apx_1",
+          "cardId": "card_apex_spine",
+          "cardTitle": "Apex Spine & Orthopedics - Technical SEO Audit",
+          "clientCanonical": "Apex Spine & Orthopedics",
+          "person": "Adil",
+          "activityType": "INP Optimization",
+          "action": "completed",
+          "timestamp": "2026-09-08T11:00:00Z",
+          "details": "Adil completed Core Web Vitals INP optimization on this card"
+        },
+        {
+          "id": "act_apx_2",
+          "cardId": "card_apex_spine",
+          "cardTitle": "Apex Spine & Orthopedics - Technical SEO Audit",
+          "clientCanonical": "Apex Spine & Orthopedics",
+          "person": "Azeem Ahmad",
+          "activityType": "Internal Linking",
+          "action": "completed",
+          "timestamp": "2026-09-09T15:00:00Z",
+          "details": "Azeem Ahmad completed Fix orphan pages and internal linking hierarchy on this card"
+        }
+      ],
+      "attachments": []
+    },
+    "card_bay_area_vein": {
+      "id": "card_bay_area_vein",
+      "boardId": "board_pds_gfm_seo",
+      "listId": "list_in_review",
+      "listName": "In Review",
+      "name": "Bay Area Vein Center - Content Strategy & Service Page Expansion",
+      "desc": "Developing comprehensive E-E-A-T verified service copy for Varicose Vein Treatment, Spider Vein Sclerotherapy, and Endovenous Laser Ablation.",
+      "url": "https://trello.com/c/bay-area-vein-content-strategy",
+      "due": "2026-09-18T17:00:00Z",
+      "dateLastActivity": "2026-09-11T09:40:00Z",
+      "closed": false,
+      "statusSemantic": "In Review",
+      "clientCanonical": "Bay Area Vein Center",
+      "labels": [
+        {
+          "id": "lbl_in_progress",
+          "name": "In Progress",
+          "color": "yellow"
+        },
+        {
+          "id": "lbl_in_review",
+          "name": "In Review",
+          "color": "orange"
+        },
+        {
+          "id": "lbl_content",
+          "name": "Content Strategy",
+          "color": "pink"
+        }
+      ],
+      "members": [
+        {
+          "id": "mem_hamza",
+          "fullName": "Hamza",
+          "username": "hamza_content",
+          "role": "Content Strategist"
+        },
+        {
+          "id": "mem_humna",
+          "fullName": "Humna Qayyum",
+          "username": "humna_qayyum",
+          "role": "Content Specialist"
+        }
+      ],
+      "checklists": [
+        {
+          "id": "cl_bay_content",
+          "cardId": "card_bay_area_vein",
+          "name": "Content Production",
+          "items": [
+            {
+              "id": "cli_bav_1",
+              "checklistId": "cl_bay_content",
+              "cardId": "card_bay_area_vein",
+              "name": "Keyword research & search intent clustering",
+              "state": "complete",
+              "completedAt": "2026-09-04T10:00:00Z"
+            },
+            {
+              "id": "cli_bav_2",
+              "checklistId": "cl_bay_content",
+              "cardId": "card_bay_area_vein",
+              "name": "Draft 3 primary vein treatment landing pages",
+              "state": "complete",
+              "completedAt": "2026-09-10T17:00:00Z"
+            },
+            {
+              "id": "cli_bav_3",
+              "checklistId": "cl_bay_content",
+              "cardId": "card_bay_area_vein",
+              "name": "Medical Director review & fact-checking",
+              "state": "incomplete"
+            },
+            {
+              "id": "cli_bav_4",
+              "checklistId": "cl_bay_content",
+              "cardId": "card_bay_area_vein",
+              "name": "Publish and configure localized FAQ schema",
+              "state": "incomplete"
+            }
+          ]
+        }
+      ],
+      "comments": [
+        {
+          "id": "comm_bav_1",
+          "cardId": "card_bay_area_vein",
+          "authorId": "mem_humna",
+          "authorName": "Humna Qayyum",
+          "text": "Completed drafting 3 pillar pages adhering to Google healthcare quality rater guidelines with dedicated physician bios and citation footnotes.",
+          "createdAt": "2026-09-10T17:15:00Z"
+        },
+        {
+          "id": "comm_bav_2",
+          "cardId": "card_bay_area_vein",
+          "authorId": "mem_hamza",
+          "authorName": "Hamza",
+          "text": "Moved to In Review. Shared drafts with clinic medical director Dr. Sterling.",
+          "createdAt": "2026-09-11T09:40:00Z"
+        }
+      ],
+      "activities": [
+        {
+          "id": "act_bav_1",
+          "cardId": "card_bay_area_vein",
+          "cardTitle": "Bay Area Vein Center - Content Strategy",
+          "clientCanonical": "Bay Area Vein Center",
+          "person": "Humna Qayyum",
+          "activityType": "Drafting Pillar Pages",
+          "action": "completed",
+          "timestamp": "2026-09-10T17:00:00Z",
+          "details": "Humna Qayyum completed Draft 3 primary vein treatment landing pages on this card"
+        },
+        {
+          "id": "act_bav_2",
+          "cardId": "card_bay_area_vein",
+          "cardTitle": "Bay Area Vein Center - Content Strategy",
+          "clientCanonical": "Bay Area Vein Center",
+          "person": "Hamza",
+          "activityType": "Status Move",
+          "action": "moved",
+          "timestamp": "2026-09-11T09:40:00Z",
+          "details": "Hamza moved this card to In Review"
+        }
+      ],
+      "attachments": []
+    },
+    "card_ai_overview_monitoring": {
+      "id": "card_ai_overview_monitoring",
+      "boardId": "board_pds_gfm_seo",
+      "listId": "list_in_process",
+      "listName": "In Process",
+      "name": "AI Overview Visibility Monitoring Framework",
+      "desc": "Weekly tracking protocol to monitor if client domains appear in AI Overviews and ChatGPT search for core target queries.",
+      "url": "https://trello.com/c/ai-overview-monitoring-framework",
+      "due": "2026-09-28T17:00:00Z",
+      "dateLastActivity": "2026-09-12T10:00:00Z",
+      "closed": false,
+      "statusSemantic": "In Process",
+      "labels": [
+        {
+          "id": "lbl_in_progress",
+          "name": "In Progress",
+          "color": "yellow"
+        },
+        {
+          "id": "lbl_ai_initiative",
+          "name": "AI Initiative",
+          "color": "purple"
+        },
+        {
+          "id": "lbl_geo_aeo",
+          "name": "GEO / AEO",
+          "color": "sky"
+        }
+      ],
+      "members": [
+        {
+          "id": "mem_haseeb",
+          "fullName": "Haseeb Afzal",
+          "username": "haseeb_afzal",
+          "role": "Sr. SEO Specialist"
+        },
+        {
+          "id": "mem_azeem",
+          "fullName": "Azeem Ahmad",
+          "username": "azeem_ahmad",
+          "role": "SEO Specialist"
+        }
+      ],
+      "checklists": [
+        {
+          "id": "cl_ai_mon",
+          "cardId": "card_ai_overview_monitoring",
+          "name": "Monitoring Setup",
+          "items": [
+            {
+              "id": "cli_aim_1",
+              "checklistId": "cl_ai_mon",
+              "cardId": "card_ai_overview_monitoring",
+              "name": "Select 50 benchmark queries across all active GFM clients",
+              "state": "complete",
+              "completedAt": "2026-09-09T14:00:00Z"
+            },
+            {
+              "id": "cli_aim_2",
+              "checklistId": "cl_ai_mon",
+              "cardId": "card_ai_overview_monitoring",
+              "name": "Build weekly rank & citation tracking spreadsheet",
+              "state": "complete",
+              "completedAt": "2026-09-12T09:30:00Z"
+            },
+            {
+              "id": "cli_aim_3",
+              "checklistId": "cl_ai_mon",
+              "cardId": "card_ai_overview_monitoring",
+              "name": "Automate weekly notification alerts",
+              "state": "incomplete"
+            }
+          ]
+        }
+      ],
+      "comments": [
+        {
+          "id": "comm_aim_1",
+          "cardId": "card_ai_overview_monitoring",
+          "authorId": "mem_haseeb",
+          "authorName": "Haseeb Afzal",
+          "text": "50 target queries mapped. Precision Podiatry is already cited in Google AI Overviews for \"minimally invasive bunion surgery recovery time\"!",
+          "createdAt": "2026-09-12T10:00:00Z"
+        }
+      ],
+      "activities": [
+        {
+          "id": "act_aim_1",
+          "cardId": "card_ai_overview_monitoring",
+          "cardTitle": "AI Overview Visibility Monitoring Framework",
+          "person": "Haseeb Afzal",
+          "activityType": "Benchmark Queries",
+          "action": "completed",
+          "timestamp": "2026-09-09T14:00:00Z",
+          "details": "Haseeb Afzal completed Select 50 benchmark queries on this card"
+        },
+        {
+          "id": "act_aim_2",
+          "cardId": "card_ai_overview_monitoring",
+          "cardTitle": "AI Overview Visibility Monitoring Framework",
+          "person": "Azeem Ahmad",
+          "activityType": "Tracking Sheet",
+          "action": "completed",
+          "timestamp": "2026-09-12T09:30:00Z",
+          "details": "Azeem Ahmad completed Build weekly rank & citation tracking spreadsheet on this card"
+        }
+      ],
+      "attachments": []
+    },
+    "card_schema_automation": {
+      "id": "card_schema_automation",
+      "boardId": "board_pds_gfm_seo",
+      "listId": "list_completed",
+      "listName": "Completed",
+      "name": "Automated Medical Schema Generation Tool",
+      "desc": "Internal Node.js CLI script that parses physician NPI & clinic addresses to output verified MedicalBusiness and Physician JSON-LD schema without manual coding.",
+      "url": "https://trello.com/c/schema-automation-script",
+      "due": "2026-09-07T17:00:00Z",
+      "dateLastActivity": "2026-09-07T15:30:00Z",
+      "closed": false,
+      "statusSemantic": "Completed",
+      "labels": [
+        {
+          "id": "lbl_completed",
+          "name": "Completed",
+          "color": "green"
+        },
+        {
+          "id": "lbl_ai_initiative",
+          "name": "AI Initiative",
+          "color": "purple"
+        },
+        {
+          "id": "lbl_technical_seo",
+          "name": "Technical SEO",
+          "color": "blue"
+        }
+      ],
+      "members": [
+        {
+          "id": "mem_adil",
+          "fullName": "Adil",
+          "username": "adil_tech",
+          "role": "Technical SEO Specialist"
+        }
+      ],
+      "checklists": [
+        {
+          "id": "cl_schema_auto",
+          "cardId": "card_schema_automation",
+          "name": "Script Milestones",
+          "items": [
+            {
+              "id": "cli_sa_1",
+              "checklistId": "cl_schema_auto",
+              "cardId": "card_schema_automation",
+              "name": "Schema.org MedicalClinic validator integration",
+              "state": "complete",
+              "completedAt": "2026-09-04T16:00:00Z"
+            },
+            {
+              "id": "cli_sa_2",
+              "checklistId": "cl_schema_auto",
+              "cardId": "card_schema_automation",
+              "name": "Tested on Advanced Well MD & Precision Podiatry provider rosters",
+              "state": "complete",
+              "completedAt": "2026-09-07T14:30:00Z"
+            }
+          ]
+        }
+      ],
+      "comments": [
+        {
+          "id": "comm_sa_1",
+          "cardId": "card_schema_automation",
+          "authorId": "mem_adil",
+          "authorName": "Adil",
+          "text": "Tool is now live in internal scripts repository. Saves around 3 hours per client onboarding.",
+          "createdAt": "2026-09-07T15:30:00Z"
+        }
+      ],
+      "activities": [
+        {
+          "id": "act_sa_1",
+          "cardId": "card_schema_automation",
+          "cardTitle": "Automated Medical Schema Generation Tool",
+          "person": "Adil",
+          "activityType": "Tool Deployment",
+          "action": "completed",
+          "timestamp": "2026-09-07T14:30:00Z",
+          "details": "Adil completed Tested on Advanced Well MD & Precision Podiatry on this card"
+        }
+      ],
+      "attachments": []
+    }
+  },
+  "checklists": {
+    "cl_precision_workflow": {
+      "id": "cl_precision_workflow",
+      "cardId": "card_precision_podiatry",
+      "name": "Workflow",
+      "items": [
+        {
+          "id": "cli_prec_1",
+          "checklistId": "cl_precision_workflow",
+          "cardId": "card_precision_podiatry",
+          "name": "Website & SEO Audit",
+          "state": "complete",
+          "completedAt": "2026-08-28T10:00:00Z"
+        },
+        {
+          "id": "cli_prec_2",
+          "checklistId": "cl_precision_workflow",
+          "cardId": "card_precision_podiatry",
+          "name": "Client Onboarding",
+          "state": "complete",
+          "completedAt": "2026-08-30T15:00:00Z"
+        },
+        {
+          "id": "cli_prec_3",
+          "checklistId": "cl_precision_workflow",
+          "cardId": "card_precision_podiatry",
+          "name": "SEO Strategy",
+          "state": "complete",
+          "completedAt": "2026-09-03T14:30:00Z"
+        },
+        {
+          "id": "cli_prec_4",
+          "checklistId": "cl_precision_workflow",
+          "cardId": "card_precision_podiatry",
+          "name": "Website Structure & Planning",
+          "state": "complete",
+          "completedAt": "2026-09-07T11:00:00Z"
+        },
+        {
+          "id": "cli_prec_5",
+          "checklistId": "cl_precision_workflow",
+          "cardId": "card_precision_podiatry",
+          "name": "Content Strategy & Development",
+          "state": "incomplete"
+        }
+      ]
+    },
+    "cl_adv_workflow": {
+      "id": "cl_adv_workflow",
+      "cardId": "card_advanced_well_md",
+      "name": "Action Plan Progress",
+      "items": [
+        {
+          "id": "cli_adv_1",
+          "checklistId": "cl_adv_workflow",
+          "cardId": "card_advanced_well_md",
+          "name": "Technical SEO Crawl & 404 Resolution",
+          "state": "complete",
+          "completedAt": "2026-09-04T12:00:00Z"
+        },
+        {
+          "id": "cli_adv_2",
+          "checklistId": "cl_adv_workflow",
+          "cardId": "card_advanced_well_md",
+          "name": "Medical Clinic Schema Implementation",
+          "state": "complete",
+          "completedAt": "2026-09-08T16:20:00Z"
+        },
+        {
+          "id": "cli_adv_3",
+          "checklistId": "cl_adv_workflow",
+          "cardId": "card_advanced_well_md",
+          "name": "New Service Pages Content Creation",
+          "state": "complete",
+          "completedAt": "2026-09-12T17:00:00Z"
+        },
+        {
+          "id": "cli_adv_4",
+          "checklistId": "cl_adv_workflow",
+          "cardId": "card_advanced_well_md",
+          "name": "Client Approval & Production Publish",
+          "state": "incomplete"
+        }
+      ]
+    },
+    "cl_ai_overview": {
+      "id": "cl_ai_overview",
+      "cardId": "card_ai_overview_analysis",
+      "name": "Research Phases",
+      "items": [
+        {
+          "id": "cli_aio_1",
+          "checklistId": "cl_ai_overview",
+          "cardId": "card_ai_overview_analysis",
+          "name": "Keyword Selection & Benchmark Query List (40 medical queries)",
+          "state": "complete",
+          "completedAt": "2026-09-01T11:00:00Z"
+        },
+        {
+          "id": "cli_aio_2",
+          "checklistId": "cl_ai_overview",
+          "cardId": "card_ai_overview_analysis",
+          "name": "SERP Scraping & AI Overview capture across Google US",
+          "state": "complete",
+          "completedAt": "2026-09-03T16:00:00Z"
+        },
+        {
+          "id": "cli_aio_3",
+          "checklistId": "cl_ai_overview",
+          "cardId": "card_ai_overview_analysis",
+          "name": "Citation Pattern Analysis & Formatting Correlation",
+          "state": "complete",
+          "completedAt": "2026-09-05T14:00:00Z"
+        },
+        {
+          "id": "cli_aio_4",
+          "checklistId": "cl_ai_overview",
+          "cardId": "card_ai_overview_analysis",
+          "name": "Documentation & Internal Team Action SOP",
+          "state": "complete",
+          "completedAt": "2026-09-05T16:30:00Z"
+        }
+      ]
+    },
+    "cl_geo_framework": {
+      "id": "cl_geo_framework",
+      "cardId": "card_ai_search_visibility",
+      "name": "GEO Strategy Deliverables",
+      "items": [
+        {
+          "id": "cli_geo_1",
+          "checklistId": "cl_geo_framework",
+          "cardId": "card_ai_search_visibility",
+          "name": "Audit brand mention citations in Perplexity & ChatGPT",
+          "state": "complete",
+          "completedAt": "2026-09-08T15:00:00Z"
+        },
+        {
+          "id": "cli_geo_2",
+          "checklistId": "cl_geo_framework",
+          "cardId": "card_ai_search_visibility",
+          "name": "Draft AEO (Answer Engine Optimization) FAQ schema blueprint",
+          "state": "complete",
+          "completedAt": "2026-09-11T14:30:00Z"
+        },
+        {
+          "id": "cli_geo_3",
+          "checklistId": "cl_geo_framework",
+          "cardId": "card_ai_search_visibility",
+          "name": "Deploy pilot test on 3 client test pages",
+          "state": "incomplete"
+        }
+      ]
+    },
+    "cl_ai_prod": {
+      "id": "cl_ai_prod",
+      "cardId": "card_ai_productivity_experiment",
+      "name": "Productivity Benchmarks",
+      "items": [
+        {
+          "id": "cli_aip_1",
+          "checklistId": "cl_ai_prod",
+          "cardId": "card_ai_productivity_experiment",
+          "name": "Prompt engineering for medical content outline generation",
+          "state": "complete",
+          "completedAt": "2026-09-02T16:00:00Z"
+        },
+        {
+          "id": "cli_aip_2",
+          "checklistId": "cl_ai_prod",
+          "cardId": "card_ai_productivity_experiment",
+          "name": "Automated Physician JSON-LD generator validation",
+          "state": "complete",
+          "completedAt": "2026-09-06T14:00:00Z"
+        },
+        {
+          "id": "cli_aip_3",
+          "checklistId": "cl_ai_prod",
+          "cardId": "card_ai_productivity_experiment",
+          "name": "Time-savings benchmark report across 10 sample tasks",
+          "state": "complete",
+          "completedAt": "2026-09-08T17:30:00Z"
+        }
+      ]
+    },
+    "cl_apex_tech": {
+      "id": "cl_apex_tech",
+      "cardId": "card_apex_spine",
+      "name": "Technical Audit Items",
+      "items": [
+        {
+          "id": "cli_apx_1",
+          "checklistId": "cl_apex_tech",
+          "cardId": "card_apex_spine",
+          "name": "Core Web Vitals INP optimization",
+          "state": "complete",
+          "completedAt": "2026-09-08T11:00:00Z"
+        },
+        {
+          "id": "cli_apx_2",
+          "checklistId": "cl_apex_tech",
+          "cardId": "card_apex_spine",
+          "name": "Fix orphan pages and internal linking hierarchy",
+          "state": "complete",
+          "completedAt": "2026-09-09T15:00:00Z"
+        },
+        {
+          "id": "cli_apx_3",
+          "checklistId": "cl_apex_tech",
+          "cardId": "card_apex_spine",
+          "name": "Implement MedicalCondition Schema for spinal decompression",
+          "state": "complete",
+          "completedAt": "2026-09-10T15:45:00Z"
+        }
+      ]
+    },
+    "cl_bay_content": {
+      "id": "cl_bay_content",
+      "cardId": "card_bay_area_vein",
+      "name": "Content Production",
+      "items": [
+        {
+          "id": "cli_bav_1",
+          "checklistId": "cl_bay_content",
+          "cardId": "card_bay_area_vein",
+          "name": "Keyword research & search intent clustering",
+          "state": "complete",
+          "completedAt": "2026-09-04T10:00:00Z"
+        },
+        {
+          "id": "cli_bav_2",
+          "checklistId": "cl_bay_content",
+          "cardId": "card_bay_area_vein",
+          "name": "Draft 3 primary vein treatment landing pages",
+          "state": "complete",
+          "completedAt": "2026-09-10T17:00:00Z"
+        },
+        {
+          "id": "cli_bav_3",
+          "checklistId": "cl_bay_content",
+          "cardId": "card_bay_area_vein",
+          "name": "Medical Director review & fact-checking",
+          "state": "incomplete"
+        },
+        {
+          "id": "cli_bav_4",
+          "checklistId": "cl_bay_content",
+          "cardId": "card_bay_area_vein",
+          "name": "Publish and configure localized FAQ schema",
+          "state": "incomplete"
+        }
+      ]
+    },
+    "cl_ai_mon": {
+      "id": "cl_ai_mon",
+      "cardId": "card_ai_overview_monitoring",
+      "name": "Monitoring Setup",
+      "items": [
+        {
+          "id": "cli_aim_1",
+          "checklistId": "cl_ai_mon",
+          "cardId": "card_ai_overview_monitoring",
+          "name": "Select 50 benchmark queries across all active GFM clients",
+          "state": "complete",
+          "completedAt": "2026-09-09T14:00:00Z"
+        },
+        {
+          "id": "cli_aim_2",
+          "checklistId": "cl_ai_mon",
+          "cardId": "card_ai_overview_monitoring",
+          "name": "Build weekly rank & citation tracking spreadsheet",
+          "state": "complete",
+          "completedAt": "2026-09-12T09:30:00Z"
+        },
+        {
+          "id": "cli_aim_3",
+          "checklistId": "cl_ai_mon",
+          "cardId": "card_ai_overview_monitoring",
+          "name": "Automate weekly notification alerts",
+          "state": "incomplete"
+        }
+      ]
+    },
+    "cl_schema_auto": {
+      "id": "cl_schema_auto",
+      "cardId": "card_schema_automation",
+      "name": "Script Milestones",
+      "items": [
+        {
+          "id": "cli_sa_1",
+          "checklistId": "cl_schema_auto",
+          "cardId": "card_schema_automation",
+          "name": "Schema.org MedicalClinic validator integration",
+          "state": "complete",
+          "completedAt": "2026-09-04T16:00:00Z"
+        },
+        {
+          "id": "cli_sa_2",
+          "checklistId": "cl_schema_auto",
+          "cardId": "card_schema_automation",
+          "name": "Tested on Advanced Well MD & Precision Podiatry provider rosters",
+          "state": "complete",
+          "completedAt": "2026-09-07T14:30:00Z"
+        }
+      ]
+    }
+  },
+  "comments": {
+    "comm_prec_1": {
+      "id": "comm_prec_1",
+      "cardId": "card_precision_podiatry",
+      "authorId": "mem_awais",
+      "authorName": "Awais",
+      "text": "Client onboarding call concluded. Identified primary target market in Austin & Dallas. Finalized core podiatry service keywords.",
+      "createdAt": "2026-08-30T16:00:00Z"
+    },
+    "comm_prec_2": {
+      "id": "comm_prec_2",
+      "cardId": "card_precision_podiatry",
+      "authorId": "mem_awais",
+      "authorName": "Awais",
+      "text": "SEO Strategy presented and confirmed with Dr. Miller. Targeting plantar fasciitis, bunion surgery, and diabetic foot care clusters.",
+      "createdAt": "2026-09-03T15:00:00Z"
+    },
+    "comm_prec_3": {
+      "id": "comm_prec_3",
+      "cardId": "card_precision_podiatry",
+      "authorId": "mem_haseeb",
+      "authorName": "Haseeb Afzal",
+      "text": "Services information added to client drive. Currently drafting the first batch of 5 specialized service pages for Content Strategy.",
+      "createdAt": "2026-09-12T14:20:00Z"
+    },
+    "comm_adv_1": {
+      "id": "comm_adv_1",
+      "cardId": "card_advanced_well_md",
+      "authorId": "mem_adil",
+      "authorName": "Adil",
+      "text": "Resolved 34 redirect chains and repaired the canonical loops on the anti-aging therapy pages.",
+      "createdAt": "2026-09-04T13:00:00Z"
+    },
+    "comm_adv_2": {
+      "id": "comm_adv_2",
+      "cardId": "card_advanced_well_md",
+      "authorId": "mem_humna",
+      "authorName": "Humna Qayyum",
+      "text": "Two new service pages have been created and shared with client for review (Bioidentical Hormone Replacement & Gut Health Protocol).",
+      "createdAt": "2026-09-12T17:15:00Z"
+    },
+    "comm_adv_3": {
+      "id": "comm_adv_3",
+      "cardId": "card_advanced_well_md",
+      "authorId": "mem_awais",
+      "authorName": "Awais",
+      "text": "Card moved to In Review while awaiting Dr. Davis sign-off on copy.",
+      "createdAt": "2026-09-13T11:15:00Z"
+    },
+    "comm_aio_1": {
+      "id": "comm_aio_1",
+      "cardId": "card_ai_overview_analysis",
+      "authorId": "mem_haseeb",
+      "authorName": "Haseeb Afzal",
+      "text": "Found that tabular data, HTML bulleted lists, and concise 40-word direct Q&A definitions have a 3x higher citation rate in Google AI Overviews for medical symptom and treatment queries.",
+      "createdAt": "2026-09-05T14:15:00Z"
+    },
+    "comm_aio_2": {
+      "id": "comm_aio_2",
+      "cardId": "card_ai_overview_analysis",
+      "authorId": "mem_awais",
+      "authorName": "Awais",
+      "text": "Excellent findings. Incorporating these formatting guidelines immediately into our content strategy for client service pages.",
+      "createdAt": "2026-09-05T16:45:00Z"
+    },
+    "comm_geo_1": {
+      "id": "comm_geo_1",
+      "cardId": "card_ai_search_visibility",
+      "authorId": "mem_haseeb",
+      "authorName": "Haseeb Afzal",
+      "text": "Perplexity citations heavily favor Wikipedia, Wikidata, and structured author schema with verifiable medical credentials.",
+      "createdAt": "2026-09-08T15:30:00Z"
+    },
+    "comm_geo_2": {
+      "id": "comm_geo_2",
+      "cardId": "card_ai_search_visibility",
+      "authorId": "mem_hamza",
+      "authorName": "Hamza",
+      "text": "Finalized the AEO FAQ blueprint. Planning to roll it out initially for Precision Podiatry and Advanced Well MD.",
+      "createdAt": "2026-09-11T16:10:00Z"
+    },
+    "comm_aip_1": {
+      "id": "comm_aip_1",
+      "cardId": "card_ai_productivity_experiment",
+      "authorId": "mem_adil",
+      "authorName": "Adil",
+      "text": "Using structured prompting for schema validation reduced schema coding time from 40 minutes to under 8 minutes per provider profile.",
+      "createdAt": "2026-09-06T14:30:00Z"
+    },
+    "comm_aip_2": {
+      "id": "comm_aip_2",
+      "cardId": "card_ai_productivity_experiment",
+      "authorId": "mem_humna",
+      "authorName": "Humna Qayyum",
+      "text": "Content outline drafting time dropped by 45% while preserving strict E-E-A-T medical criteria.",
+      "createdAt": "2026-09-08T17:45:00Z"
+    },
+    "comm_apx_1": {
+      "id": "comm_apx_1",
+      "cardId": "card_apex_spine",
+      "authorId": "mem_adil",
+      "authorName": "Adil",
+      "text": "Mobile performance score improved from 48 to 86 on PageSpeed Insights after deferred font loading and image dimension attributes.",
+      "createdAt": "2026-09-08T12:00:00Z"
+    },
+    "comm_apx_2": {
+      "id": "comm_apx_2",
+      "cardId": "card_apex_spine",
+      "authorId": "mem_azeem",
+      "authorName": "Azeem Ahmad",
+      "text": "Internal linking silo structure established for 14 orthopedic conditions.",
+      "createdAt": "2026-09-09T16:00:00Z"
+    },
+    "comm_bav_1": {
+      "id": "comm_bav_1",
+      "cardId": "card_bay_area_vein",
+      "authorId": "mem_humna",
+      "authorName": "Humna Qayyum",
+      "text": "Completed drafting 3 pillar pages adhering to Google healthcare quality rater guidelines with dedicated physician bios and citation footnotes.",
+      "createdAt": "2026-09-10T17:15:00Z"
+    },
+    "comm_bav_2": {
+      "id": "comm_bav_2",
+      "cardId": "card_bay_area_vein",
+      "authorId": "mem_hamza",
+      "authorName": "Hamza",
+      "text": "Moved to In Review. Shared drafts with clinic medical director Dr. Sterling.",
+      "createdAt": "2026-09-11T09:40:00Z"
+    },
+    "comm_aim_1": {
+      "id": "comm_aim_1",
+      "cardId": "card_ai_overview_monitoring",
+      "authorId": "mem_haseeb",
+      "authorName": "Haseeb Afzal",
+      "text": "50 target queries mapped. Precision Podiatry is already cited in Google AI Overviews for \"minimally invasive bunion surgery recovery time\"!",
+      "createdAt": "2026-09-12T10:00:00Z"
+    },
+    "comm_sa_1": {
+      "id": "comm_sa_1",
+      "cardId": "card_schema_automation",
+      "authorId": "mem_adil",
+      "authorName": "Adil",
+      "text": "Tool is now live in internal scripts repository. Saves around 3 hours per client onboarding.",
+      "createdAt": "2026-09-07T15:30:00Z"
+    }
+  },
+  "activities": {
+    "act_prec_1": {
+      "id": "act_prec_1",
+      "cardId": "card_precision_podiatry",
+      "cardTitle": "Precision Podiatry PLLC",
+      "clientCanonical": "Precision Podiatry PLLC",
+      "person": "Awais",
+      "activityType": "Website & SEO Audit",
+      "action": "completed",
+      "timestamp": "2026-08-28T10:00:00Z",
+      "details": "Awais completed Website & SEO Audit on this card"
+    },
+    "act_prec_2": {
+      "id": "act_prec_2",
+      "cardId": "card_precision_podiatry",
+      "cardTitle": "Precision Podiatry PLLC",
+      "clientCanonical": "Precision Podiatry PLLC",
+      "person": "Awais",
+      "activityType": "Client Onboarding",
+      "action": "completed",
+      "timestamp": "2026-08-30T15:00:00Z",
+      "details": "Awais completed Client Onboarding on this card"
+    },
+    "act_prec_3": {
+      "id": "act_prec_3",
+      "cardId": "card_precision_podiatry",
+      "cardTitle": "Precision Podiatry PLLC",
+      "clientCanonical": "Precision Podiatry PLLC",
+      "person": "Awais",
+      "activityType": "SEO Strategy",
+      "action": "completed",
+      "timestamp": "2026-09-03T14:30:00Z",
+      "details": "Awais completed SEO Strategy on this card"
+    },
+    "act_prec_4": {
+      "id": "act_prec_4",
+      "cardId": "card_precision_podiatry",
+      "cardTitle": "Precision Podiatry PLLC",
+      "clientCanonical": "Precision Podiatry PLLC",
+      "person": "Awais",
+      "activityType": "Website Structure & Planning",
+      "action": "completed",
+      "timestamp": "2026-09-07T11:00:00Z",
+      "details": "Awais completed Website Structure & Planning on this card"
+    },
+    "act_prec_5": {
+      "id": "act_prec_5",
+      "cardId": "card_precision_podiatry",
+      "cardTitle": "Precision Podiatry PLLC",
+      "clientCanonical": "Precision Podiatry PLLC",
+      "person": "Haseeb Afzal",
+      "activityType": "Content Drafts",
+      "action": "commented",
+      "timestamp": "2026-09-12T14:20:00Z",
+      "details": "Haseeb Afzal updated progress on Content Strategy & Development"
+    },
+    "act_adv_1": {
+      "id": "act_adv_1",
+      "cardId": "card_advanced_well_md",
+      "cardTitle": "Advanced Well MD Audit Review and Action Plan",
+      "clientCanonical": "Advanced Well MD",
+      "person": "Adil",
+      "activityType": "Technical SEO Crawl",
+      "action": "completed",
+      "timestamp": "2026-09-04T12:00:00Z",
+      "details": "Adil completed Technical SEO Crawl & 404 Resolution on this card"
+    },
+    "act_adv_2": {
+      "id": "act_adv_2",
+      "cardId": "card_advanced_well_md",
+      "cardTitle": "Advanced Well MD Audit Review and Action Plan",
+      "clientCanonical": "Advanced Well MD",
+      "person": "Adil",
+      "activityType": "Schema Implementation",
+      "action": "completed",
+      "timestamp": "2026-09-08T16:20:00Z",
+      "details": "Adil completed Medical Clinic Schema Implementation on this card"
+    },
+    "act_adv_3": {
+      "id": "act_adv_3",
+      "cardId": "card_advanced_well_md",
+      "cardTitle": "Advanced Well MD Audit Review and Action Plan",
+      "clientCanonical": "Advanced Well MD",
+      "person": "Humna Qayyum",
+      "activityType": "Service Pages Creation",
+      "action": "completed",
+      "timestamp": "2026-09-12T17:00:00Z",
+      "details": "Humna Qayyum completed New Service Pages Content Creation on this card"
+    },
+    "act_adv_4": {
+      "id": "act_adv_4",
+      "cardId": "card_advanced_well_md",
+      "cardTitle": "Advanced Well MD Audit Review and Action Plan",
+      "clientCanonical": "Advanced Well MD",
+      "person": "Awais",
+      "activityType": "Status Move",
+      "action": "moved",
+      "timestamp": "2026-09-13T11:15:00Z",
+      "details": "Awais moved this card from In Process to In Review"
+    },
+    "act_aio_1": {
+      "id": "act_aio_1",
+      "cardId": "card_ai_overview_analysis",
+      "cardTitle": "AI Overview Competitor Analysis",
+      "person": "Haseeb Afzal",
+      "activityType": "Citation Pattern Analysis",
+      "action": "completed",
+      "timestamp": "2026-09-05T14:00:00Z",
+      "details": "Haseeb Afzal completed Citation Pattern Analysis on this card"
+    },
+    "act_aio_2": {
+      "id": "act_aio_2",
+      "cardId": "card_ai_overview_analysis",
+      "cardTitle": "AI Overview Competitor Analysis",
+      "person": "Haseeb Afzal",
+      "activityType": "Research Documentation",
+      "action": "completed",
+      "timestamp": "2026-09-05T16:30:00Z",
+      "details": "Haseeb Afzal completed Documentation & Internal Team Action SOP on this card"
+    },
+    "act_geo_1": {
+      "id": "act_geo_1",
+      "cardId": "card_ai_search_visibility",
+      "cardTitle": "AI Search Visibility Research - GEO / AEO Strategy",
+      "person": "Haseeb Afzal",
+      "activityType": "Brand Citation Audit",
+      "action": "completed",
+      "timestamp": "2026-09-08T15:00:00Z",
+      "details": "Haseeb Afzal completed Audit brand mention citations in Perplexity & ChatGPT"
+    },
+    "act_geo_2": {
+      "id": "act_geo_2",
+      "cardId": "card_ai_search_visibility",
+      "cardTitle": "AI Search Visibility Research - GEO / AEO Strategy",
+      "person": "Hamza",
+      "activityType": "AEO Blueprint",
+      "action": "completed",
+      "timestamp": "2026-09-11T14:30:00Z",
+      "details": "Hamza completed Draft AEO FAQ schema blueprint"
+    },
+    "act_aip_1": {
+      "id": "act_aip_1",
+      "cardId": "card_ai_productivity_experiment",
+      "cardTitle": "AI Productivity Workflow Experiment",
+      "person": "Adil",
+      "activityType": "Schema Automation",
+      "action": "completed",
+      "timestamp": "2026-09-06T14:00:00Z",
+      "details": "Adil completed Automated Physician JSON-LD generator validation on this card"
+    },
+    "act_aip_2": {
+      "id": "act_aip_2",
+      "cardId": "card_ai_productivity_experiment",
+      "cardTitle": "AI Productivity Workflow Experiment",
+      "person": "Humna Qayyum",
+      "activityType": "Benchmark Report",
+      "action": "completed",
+      "timestamp": "2026-09-08T17:30:00Z",
+      "details": "Humna Qayyum completed Time-savings benchmark report on this card"
+    },
+    "act_apx_1": {
+      "id": "act_apx_1",
+      "cardId": "card_apex_spine",
+      "cardTitle": "Apex Spine & Orthopedics - Technical SEO Audit",
+      "clientCanonical": "Apex Spine & Orthopedics",
+      "person": "Adil",
+      "activityType": "INP Optimization",
+      "action": "completed",
+      "timestamp": "2026-09-08T11:00:00Z",
+      "details": "Adil completed Core Web Vitals INP optimization on this card"
+    },
+    "act_apx_2": {
+      "id": "act_apx_2",
+      "cardId": "card_apex_spine",
+      "cardTitle": "Apex Spine & Orthopedics - Technical SEO Audit",
+      "clientCanonical": "Apex Spine & Orthopedics",
+      "person": "Azeem Ahmad",
+      "activityType": "Internal Linking",
+      "action": "completed",
+      "timestamp": "2026-09-09T15:00:00Z",
+      "details": "Azeem Ahmad completed Fix orphan pages and internal linking hierarchy on this card"
+    },
+    "act_bav_1": {
+      "id": "act_bav_1",
+      "cardId": "card_bay_area_vein",
+      "cardTitle": "Bay Area Vein Center - Content Strategy",
+      "clientCanonical": "Bay Area Vein Center",
+      "person": "Humna Qayyum",
+      "activityType": "Drafting Pillar Pages",
+      "action": "completed",
+      "timestamp": "2026-09-10T17:00:00Z",
+      "details": "Humna Qayyum completed Draft 3 primary vein treatment landing pages on this card"
+    },
+    "act_bav_2": {
+      "id": "act_bav_2",
+      "cardId": "card_bay_area_vein",
+      "cardTitle": "Bay Area Vein Center - Content Strategy",
+      "clientCanonical": "Bay Area Vein Center",
+      "person": "Hamza",
+      "activityType": "Status Move",
+      "action": "moved",
+      "timestamp": "2026-09-11T09:40:00Z",
+      "details": "Hamza moved this card to In Review"
+    },
+    "act_aim_1": {
+      "id": "act_aim_1",
+      "cardId": "card_ai_overview_monitoring",
+      "cardTitle": "AI Overview Visibility Monitoring Framework",
+      "person": "Haseeb Afzal",
+      "activityType": "Benchmark Queries",
+      "action": "completed",
+      "timestamp": "2026-09-09T14:00:00Z",
+      "details": "Haseeb Afzal completed Select 50 benchmark queries on this card"
+    },
+    "act_aim_2": {
+      "id": "act_aim_2",
+      "cardId": "card_ai_overview_monitoring",
+      "cardTitle": "AI Overview Visibility Monitoring Framework",
+      "person": "Azeem Ahmad",
+      "activityType": "Tracking Sheet",
+      "action": "completed",
+      "timestamp": "2026-09-12T09:30:00Z",
+      "details": "Azeem Ahmad completed Build weekly rank & citation tracking spreadsheet on this card"
+    },
+    "act_sa_1": {
+      "id": "act_sa_1",
+      "cardId": "card_schema_automation",
+      "cardTitle": "Automated Medical Schema Generation Tool",
+      "person": "Adil",
+      "activityType": "Tool Deployment",
+      "action": "completed",
+      "timestamp": "2026-09-07T14:30:00Z",
+      "details": "Adil completed Tested on Advanced Well MD & Precision Podiatry on this card"
+    }
+  },
+  "attachments": {
+    "att_prec_1": {
+      "id": "att_prec_1",
+      "cardId": "card_precision_podiatry",
+      "name": "Precision_Podiatry_Technical_SEO_Audit_v1.pdf",
+      "url": "https://trello.com/1/cards/card_precision_podiatry/attachments/att_prec_1",
+      "mimeType": "application/pdf",
+      "date": "2026-08-28T09:45:00Z"
+    },
+    "att_prec_2": {
+      "id": "att_prec_2",
+      "cardId": "card_precision_podiatry",
+      "name": "Target_Keyword_Universe_Master.xlsx",
+      "url": "https://trello.com/1/cards/card_precision_podiatry/attachments/att_prec_2",
+      "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "date": "2026-09-03T14:00:00Z"
+    },
+    "att_adv_1": {
+      "id": "att_adv_1",
+      "cardId": "card_advanced_well_md",
+      "name": "Advanced_Well_MD_Website_Audit_Report.pdf",
+      "url": "https://trello.com/1/cards/card_advanced_well_md/attachments/att_adv_1",
+      "mimeType": "application/pdf",
+      "date": "2026-09-04T11:30:00Z"
+    },
+    "att_aio_1": {
+      "id": "att_aio_1",
+      "cardId": "card_ai_overview_analysis",
+      "name": "AI_Overview_Healthcare_Citation_Study_Sep2026.pdf",
+      "url": "https://trello.com/1/cards/card_ai_overview_analysis/attachments/att_aio_1",
+      "mimeType": "application/pdf",
+      "date": "2026-09-05T16:35:00Z"
+    }
+  },
+  "clients": {
+    "client_precision_podiatry": {
+      "id": "client_precision_podiatry",
+      "canonicalName": "Precision Podiatry PLLC",
+      "aliases": [
+        "Precision Podiatry",
+        "Precision Podiatry PLLC",
+        "PrecisionPodiatry",
+        "Precision Podiatry Texas"
+      ],
+      "status": "Active",
+      "activeCardCount": 1,
+      "completedTasksCount": 4,
+      "totalTasksCount": 5,
+      "teamMembers": [
+        "Awais",
+        "Haseeb Afzal"
+      ],
+      "lastActivityDate": "2026-09-12T14:30:00Z"
+    },
+    "client_advanced_well_md": {
+      "id": "client_advanced_well_md",
+      "canonicalName": "Advanced Well MD",
+      "aliases": [
+        "Advanced Well MD",
+        "Advanced Well",
+        "AdvancedWellMD"
+      ],
+      "status": "Active",
+      "activeCardCount": 1,
+      "completedTasksCount": 3,
+      "totalTasksCount": 4,
+      "teamMembers": [
+        "Awais",
+        "Adil",
+        "Humna Qayyum"
+      ],
+      "lastActivityDate": "2026-09-13T11:15:00Z"
+    },
+    "client_apex_spine": {
+      "id": "client_apex_spine",
+      "canonicalName": "Apex Spine & Orthopedics",
+      "aliases": [
+        "Apex Spine",
+        "Apex Spine & Orthopedics",
+        "Apex Orthopedics"
+      ],
+      "status": "Active",
+      "activeCardCount": 1,
+      "completedTasksCount": 5,
+      "totalTasksCount": 5,
+      "teamMembers": [
+        "Adil",
+        "Azeem Ahmad"
+      ],
+      "lastActivityDate": "2026-09-10T16:00:00Z"
+    },
+    "client_bay_area_vein": {
+      "id": "client_bay_area_vein",
+      "canonicalName": "Bay Area Vein Center",
+      "aliases": [
+        "Bay Area Vein",
+        "Bay Area Vein Center",
+        "BayAreaVein"
+      ],
+      "status": "Active",
+      "activeCardCount": 1,
+      "completedTasksCount": 2,
+      "totalTasksCount": 4,
+      "teamMembers": [
+        "Hamza",
+        "Humna Qayyum"
+      ],
+      "lastActivityDate": "2026-09-11T09:40:00Z"
+    }
+  },
+  "syncRuns": [],
+  "chatSessions": {},
+  "managementBriefs": {}
+}
