@@ -133,7 +133,7 @@ export default function App() {
 
   // Generate Executive Brief
   const handleGenerateBrief = async (
-    periodType: 'this_week' | 'last_week' | 'this_month' | 'last_month'
+    periodType: 'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month'
   ) => {
     setIsGeneratingBrief(true);
     try {

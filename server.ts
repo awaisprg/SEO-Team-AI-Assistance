@@ -310,13 +310,17 @@ app.post('/api/trello/sync', async (req, res) => {
   try {
     const client = new TrelloClient({ apiKey, token });
 
-    const [rawBoard, rawLists, rawMembers, rawLabels, rawCards, rawBoardChecklists] = await Promise.all([
+    const [rawBoard, rawLists, rawMembers, rawLabels, rawCards, rawBoardChecklists, rawBoardActions] = await Promise.all([
       client.getBoard(boardId),
       client.getLists(boardId),
       client.getMembers(boardId),
       client.getLabels(boardId),
       client.getCardsWithDetails(boardId),
       client.getBoardChecklists(boardId),
+      client.getBoardActions(boardId, 1000).catch((err) => {
+        console.warn('Could not fetch board actions (fallback to empty):', err.message);
+        return [];
+      }),
     ]);
 
     const existingClients = db.getClients();
@@ -328,6 +332,7 @@ app.post('/api/trello/sync', async (req, res) => {
         labels: rawLabels,
         cards: rawCards,
         boardChecklists: rawBoardChecklists,
+        boardActions: rawBoardActions,
       },
       existingClients
     );

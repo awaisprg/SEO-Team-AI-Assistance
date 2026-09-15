@@ -17,7 +17,7 @@ import { ManagementBrief, ChatSource } from '../types';
 interface BriefViewProps {
   currentBrief: ManagementBrief | null;
   savedBriefs: ManagementBrief[];
-  onGenerateBrief: (periodType: 'this_week' | 'last_week' | 'this_month' | 'last_month') => void;
+  onGenerateBrief: (periodType: 'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month') => void;
   onSelectBrief: (brief: ManagementBrief) => void;
   isGenerating: boolean;
   onSelectSource: (source: ChatSource) => void;
@@ -32,8 +32,8 @@ export const BriefView: React.FC<BriefViewProps> = ({
   onSelectSource,
 }) => {
   const [selectedPeriod, setSelectedPeriod] = useState<
-    'this_week' | 'last_week' | 'this_month' | 'last_month'
-  >('this_month');
+    'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month'
+  >('overall');
   const [copied, setCopied] = useState(false);
 
   const handleCopyMarkdown = () => {
@@ -96,26 +96,39 @@ ${currentBrief.talkingPoints.map((tp) => `- ${tp}`).join('\n')}
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 Reporting Period
               </label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {[
-                  { id: 'this_week', label: 'This Week' },
-                  { id: 'last_week', label: 'Last Week' },
-                  { id: 'this_month', label: 'This Month' },
-                  { id: 'last_month', label: 'Last Month' },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    id={`period-btn-${item.id}`}
-                    onClick={() => setSelectedPeriod(item.id as any)}
-                    className={`px-2.5 py-1.5 text-xs rounded-md border font-medium transition-colors cursor-pointer text-center ${
-                      selectedPeriod === item.id
-                        ? 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+              <div className="space-y-1.5">
+                <button
+                  id="period-btn-overall"
+                  onClick={() => setSelectedPeriod('overall')}
+                  className={`w-full px-2.5 py-1.5 text-xs rounded-md border font-medium transition-colors cursor-pointer text-center ${
+                    selectedPeriod === 'overall'
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  Overall Summary (Active Pipeline)
+                </button>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[
+                    { id: 'this_week', label: 'Last 7 Days (Week)' },
+                    { id: 'last_week', label: 'Last Week' },
+                    { id: 'this_month', label: 'Last 30 Days (Month)' },
+                    { id: 'last_month', label: 'Last Month' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      id={`period-btn-${item.id}`}
+                      onClick={() => setSelectedPeriod(item.id as any)}
+                      className={`px-2.5 py-1.5 text-xs rounded-md border font-medium transition-colors cursor-pointer text-center ${
+                        selectedPeriod === item.id
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -221,6 +234,49 @@ ${currentBrief.talkingPoints.map((tp) => `- ${tp}`).join('\n')}
                   <span>Print / PDF</span>
                 </button>
               </div>
+            </div>
+
+            {/* Metrics Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {currentBrief.periodType === 'overall' ? (
+                <>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 col-span-2">
+                    <span className="text-[11px] font-medium text-slate-500 block">Total Active Deliverables</span>
+                    <span className="text-xl font-bold text-slate-900 mt-0.5 block">{currentBrief.activePipelineCount ?? 0}</span>
+                    <span className="text-[10px] text-slate-400">All uncompleted cards across board</span>
+                  </div>
+                  <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-lg p-3 col-span-2">
+                    <span className="text-[11px] font-medium text-emerald-800 block">Quality Review Gate</span>
+                    <span className="text-xl font-bold text-emerald-900 mt-0.5 block">
+                      {currentBrief.sourceCards.filter((s) => s.status === 'In Review').length || 'Active'}
+                    </span>
+                    <span className="text-[10px] text-emerald-700">Completed by team, pending review</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="bg-emerald-50/70 border border-emerald-200 rounded-lg p-3">
+                    <span className="text-[11px] font-medium text-emerald-800 block">Cards Completed</span>
+                    <span className="text-xl font-bold text-emerald-900 mt-0.5 block">{currentBrief.cardsCompletedCount ?? 0}</span>
+                    <span className="text-[10px] text-emerald-700">Marked complete in period</span>
+                  </div>
+                  <div className="bg-blue-50/70 border border-blue-200 rounded-lg p-3">
+                    <span className="text-[11px] font-medium text-blue-800 block">Checklist Items</span>
+                    <span className="text-xl font-bold text-blue-900 mt-0.5 block">{currentBrief.checklistTasksCompletedCount ?? 0}</span>
+                    <span className="text-[10px] text-blue-700">Finalized deliverables</span>
+                  </div>
+                  <div className="bg-indigo-50/70 border border-indigo-200 rounded-lg p-3">
+                    <span className="text-[11px] font-medium text-indigo-800 block">Cards Created</span>
+                    <span className="text-xl font-bold text-indigo-900 mt-0.5 block">{currentBrief.cardsCreatedCount ?? 0}</span>
+                    <span className="text-[10px] text-indigo-700">Initiated in period</span>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                    <span className="text-[11px] font-medium text-slate-600 block">Active Pipeline</span>
+                    <span className="text-xl font-bold text-slate-900 mt-0.5 block">{currentBrief.activePipelineCount ?? 0}</span>
+                    <span className="text-[10px] text-slate-500">Currently in progress</span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Executive Summary */}

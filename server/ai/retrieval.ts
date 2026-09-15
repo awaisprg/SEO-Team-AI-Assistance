@@ -171,17 +171,44 @@ export function hybridRetrieve(intent: QueryIntent, threshold = 35): ScoredCard[
     const sim = cosineSimilarity(queryEmbedding, cardEmb);
     score += Math.round(sim * 25);
 
-    // 7. Date Filtering (if requested)
-    if (intent.dateFrom && intent.dateTo) {
-      const cardDate = new Date(card.dateLastActivity).getTime();
-      const from = new Date(intent.dateFrom).getTime();
-      const to = new Date(intent.dateTo).getTime();
-      const matchesDate = cardDate >= from && cardDate <= to;
-      if (matchesDate) {
-        score += 15;
-        reasons.push(`Activity in ${intent.timeRangeDescription || 'period'}`);
+    // 7. Overall Summary filtering
+    if (intent.isOverall) {
+      if (card.isUnderProgress) {
+        score += 45;
+        reasons.push('Active deliverable under progress');
       } else {
-        score -= 15;
+        score -= 60; // Penalize completed cards for overall active summary
+      }
+    }
+
+    // 8. Date Filtering (Strictly Created or Completed in Window)
+    if (intent.dateFrom && intent.dateTo) {
+      const from = intent.dateFrom;
+      const to = intent.dateTo;
+
+      const isCreatedInWindow = card.createdAt >= from && card.createdAt <= to;
+      const isCompletedInWindow = Boolean(
+        card.completedAt &&
+        card.completedAtVerified &&
+        card.completedAt >= from &&
+        card.completedAt <= to
+      );
+      const hasChecklistCompletedInWindow = card.checklists.some((cl) =>
+        cl.items.some((it) => it.completedAt && it.completedAt >= from && it.completedAt <= to)
+      );
+
+      if (isCreatedInWindow || isCompletedInWindow || hasChecklistCompletedInWindow) {
+        score += 45;
+        if (isCompletedInWindow) {
+          reasons.push(`Card marked complete in ${intent.timeRangeDescription || 'period'}`);
+        } else if (isCreatedInWindow) {
+          reasons.push(`Card created in ${intent.timeRangeDescription || 'period'}`);
+        } else {
+          reasons.push(`Checklist tasks completed in ${intent.timeRangeDescription || 'period'}`);
+        }
+      } else {
+        // Exclude older completed or inactive cards that had no creation or completion in this window
+        score -= 50;
       }
     }
 

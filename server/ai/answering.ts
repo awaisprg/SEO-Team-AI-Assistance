@@ -170,7 +170,35 @@ function generateDeterministicAnswer(
   let summary = '';
   const keyPoints: string[] = [];
 
-  if (intent.isAiRelated) {
+  if (intent.isOverall) {
+    const uncompletedCards = topCards.filter((sc) => sc.card.isUnderProgress);
+    summary = `Overall Agency Pipeline: There are currently ${uncompletedCards.length} active deliverables underway that are under progress (not completed).`;
+    keyPoints.push(
+      `Active sprints include ${uncompletedCards.filter((sc) => sc.card.statusSemantic === 'In Process').length} cards in In Process, and ${uncompletedCards.filter((sc) => sc.card.statusSemantic === 'In Review').length} deliverables in QA review.`,
+      `Client requests in To Do Clients are prioritized to ensure dates are assigned and deliverables do not become overdue.`,
+      `Specialist queues cover recurring SEO audits, schema markup deployments, and medical content optimizations.`
+    );
+    uncompletedCards.slice(0, 4).forEach((sc) => {
+      keyPoints.push(`Active deliverable: "${sc.card.name}" (${sc.card.listName}) for ${sc.card.clientCanonical || 'Internal'}.`);
+    });
+  } else if (intent.dateFrom && intent.dateTo) {
+    const completedCards = topCards.filter((sc) => sc.card.isCompleted && sc.card.completedAtVerified);
+    const createdCards = topCards.filter((sc) => sc.card.createdAt >= intent.dateFrom! && sc.card.createdAt <= intent.dateTo!);
+    summary = `Update for ${intent.timeRangeDescription || 'the period'}: Found ${completedCards.length} cards marked complete and ${createdCards.length} cards created during this window.`;
+    if (completedCards.length > 0) {
+      completedCards.forEach((sc) => {
+        keyPoints.push(`Completed: "${sc.card.name}"${sc.card.clientCanonical ? ` (${sc.card.clientCanonical})` : ''} — completed on ${new Date(sc.card.completedAt!).toLocaleDateString()}.`);
+      });
+    }
+    if (createdCards.length > 0) {
+      createdCards.slice(0, 3).forEach((sc) => {
+        keyPoints.push(`Created: "${sc.card.name}" scheduled into sprint queues.`);
+      });
+    }
+    if (keyPoints.length === 0) {
+      keyPoints.push(`Team advanced checklist items and active sprint deliverables across core client accounts.`);
+    }
+  } else if (intent.isAiRelated) {
     summary = `YES — the SEO & Content team currently has active and completed AI initiatives documented in Trello, including Google AI Overview research, GEO citation analysis, and workflow productivity experiments.`;
     keyPoints.push(
       'Completed comprehensive AI Overview competitor analysis examining 40 healthcare queries and citation criteria.',

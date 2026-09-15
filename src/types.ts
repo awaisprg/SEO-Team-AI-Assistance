@@ -62,6 +62,7 @@ export interface TrelloChecklistItem {
   name: string;
   state: 'complete' | 'incomplete';
   completedAt?: string;
+  completedBy?: string;
 }
 
 export interface TrelloChecklist {
@@ -111,9 +112,17 @@ export interface TrelloCard {
   desc: string;
   url: string;
   due?: string | null;
+  createdAt?: string;
   dateLastActivity: string;
   closed: boolean;
   statusSemantic: StatusSemantic;
+  isCompleted?: boolean;
+  isUnderProgress?: boolean;
+  completedAt?: string | null;
+  completedAtVerified?: boolean;
+  completedBy?: string | null;
+  agencySource?: 'PDS' | 'GFM' | 'Internal';
+  priority?: 'High Priority' | 'Medium Priority' | 'Low Priority' | 'Normal';
   clientCanonical?: string;
   labels: TrelloLabel[];
   members: TrelloMember[];
@@ -127,7 +136,9 @@ export interface ClientEntity {
   id: string;
   canonicalName: string;
   aliases: string[];
-  status: string;
+  status: 'Active' | 'Closed';
+  agency?: 'PDS' | 'GFM' | 'Both' | 'Internal';
+  isHighPriority?: boolean;
   activeCardCount: number;
   completedTasksCount: number;
   totalTasksCount: number;
@@ -220,11 +231,15 @@ export interface ChatSession {
 
 export interface ManagementBrief {
   id: string;
-  periodType: 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'custom';
+  periodType: 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'overall' | 'custom';
   dateFrom: string;
   dateTo: string;
   title: string;
   executiveSummary: string;
+  cardsCreatedCount?: number;
+  cardsCompletedCount?: number;
+  checklistTasksCompletedCount?: number;
+  activePipelineCount?: number;
   majorAccomplishments: string[];
   seoActivity: string[];
   contentActivity: string[];

@@ -194,35 +194,87 @@ export function detectClientFromCard(
   return undefined;
 }
 
+export function getCardCreatedAt(cardId: string, fallbackDate?: string): string {
+  if (cardId && typeof cardId === 'string' && cardId.length >= 8) {
+    try {
+      const timestamp = parseInt(cardId.substring(0, 8), 16);
+      if (!isNaN(timestamp) && timestamp > 1400000000 && timestamp < 2500000000) {
+        return new Date(timestamp * 1000).toISOString();
+      }
+    } catch {}
+  }
+  return fallbackDate || new Date().toISOString();
+}
+
+export interface RegisteredClientInfo {
+  canonicalName: string;
+  aliases: string[];
+  agency?: 'PDS' | 'GFM' | 'Both' | 'Internal';
+  isClosed?: boolean;
+  isHighPriority?: boolean;
+}
+
 export function buildClientRegistry(
   raw: RawTrelloData,
   existingClients: { canonicalName: string; aliases: string[] }[] = []
-): { canonicalName: string; aliases: string[] }[] {
-  const clientMap = new Map<string, Set<string>>();
+): RegisteredClientInfo[] {
+  const clientMetaMap = new Map<string, {
+    canonicalName: string;
+    aliases: Set<string>;
+    agency?: 'PDS' | 'GFM' | 'Both' | 'Internal';
+    isClosed?: boolean;
+    isHighPriority?: boolean;
+  }>();
 
-  const addClient = (canonical: string, aliases: string[] = []) => {
+  const addClient = (
+    canonical: string,
+    aliases: string[] = [],
+    meta?: { agency?: 'PDS' | 'GFM' | 'Both' | 'Internal'; isClosed?: boolean; isHighPriority?: boolean }
+  ) => {
     const cleanCanonical = canonical.trim().replace(/\s+/g, ' ');
     if (!cleanCanonical || cleanCanonical.length < 3) return;
     const lower = cleanCanonical.toLowerCase();
-    if (!clientMap.has(lower)) {
-      clientMap.set(lower, new Set([cleanCanonical]));
+
+    if (!clientMetaMap.has(lower)) {
+      clientMetaMap.set(lower, {
+        canonicalName: cleanCanonical,
+        aliases: new Set([cleanCanonical]),
+        agency: meta?.agency || 'Internal',
+        isClosed: meta?.isClosed ?? false,
+        isHighPriority: meta?.isHighPriority ?? false,
+      });
     }
-    const set = clientMap.get(lower)!;
+
+    const entry = clientMetaMap.get(lower)!;
     aliases.forEach((a) => {
       const cleanA = a.trim();
-      if (cleanA.length >= 2) set.add(cleanA);
+      if (cleanA.length >= 2) entry.aliases.add(cleanA);
     });
+
+    if (meta?.agency) {
+      if (entry.agency && entry.agency !== 'Internal' && entry.agency !== meta.agency) {
+        entry.agency = 'Both';
+      } else if (!entry.agency || entry.agency === 'Internal') {
+        entry.agency = meta.agency;
+      }
+    }
+    if (meta?.isClosed !== undefined) {
+      entry.isClosed = entry.isClosed || meta.isClosed;
+    }
+    if (meta?.isHighPriority) {
+      entry.isHighPriority = true;
+    }
 
     // Auto-generate common alias variations
     const withoutSuffix = cleanCanonical.replace(/,?\s*(LLC|PLLC|Inc|P\.C\.|PC|PA|Ltd)\.?$/i, '').trim();
     if (withoutSuffix && withoutSuffix !== cleanCanonical && withoutSuffix.length >= 3) {
-      set.add(withoutSuffix);
+      entry.aliases.add(withoutSuffix);
     }
     if (cleanCanonical.includes('&')) {
-      set.add(cleanCanonical.replace(/&/g, 'and').trim());
+      entry.aliases.add(cleanCanonical.replace(/&/g, 'and').trim());
     }
     if (cleanCanonical.includes(' and ')) {
-      set.add(cleanCanonical.replace(/\band\b/g, '&').trim());
+      entry.aliases.add(cleanCanonical.replace(/\band\b/g, '&').trim());
     }
   };
 
@@ -244,16 +296,16 @@ export function buildClientRegistry(
 
   for (const list of raw.lists || []) {
     const listLower = list.name.toLowerCase();
-    const isClientList = (listLower.includes('client') && !listLower.includes('to do')) || listLower.includes('pds resource');
+    const isPds = listLower.includes('pds resource');
+    const isGfm = listLower.includes('gfm client') || (listLower.includes('client') && !listLower.includes('to do') && !isPds);
 
-    if (isClientList) {
+    if (isPds || isGfm) {
       for (const card of raw.cards || []) {
-        if (card.idList === list.id) {
+        if (card.idList === list.id || card.listId === list.id) {
           const cardName = card.name.trim();
           const lowerName = cardName.toLowerCase();
           if (skipWords.some((w) => lowerName.includes(w))) continue;
           if (cardName.length >= 3) {
-            // Unify spelling variations
             let canonical = cardName;
             if (lowerName.includes('mindful behavioral') || lowerName.includes('mindul behaviour')) {
               canonical = 'Mindful Behavioral Solutions';
@@ -274,7 +326,13 @@ export function buildClientRegistry(
             } else if (lowerName.includes('precision podiatry')) {
               canonical = 'Precision Podiatry PLLC';
             }
-            addClient(canonical, [cardName]);
+
+            const cardLabels = (card.labels || []).map((l: any) => (l.name || '').toLowerCase());
+            const isClosed = cardLabels.some((l: string) => l.includes('project closed') || l.includes('discontinue'));
+            const isHighPriority = cardLabels.some((l: string) => l.includes('high priority'));
+            const agency: 'PDS' | 'GFM' = isPds ? 'PDS' : 'GFM';
+
+            addClient(canonical, [cardName], { agency, isClosed, isHighPriority });
           }
         }
       }
@@ -294,11 +352,10 @@ export function buildClientRegistry(
         !clLower.includes('review') &&
         !clLower.includes('internal')
       ) {
-        // Check if matches or creates new client
         let matched = false;
-        for (const [lowerKey] of clientMap.entries()) {
+        for (const [lowerKey, entry] of clientMetaMap.entries()) {
           if (clLower.includes(lowerKey) || lowerKey.includes(clLower)) {
-            addClient(clientMap.get(lowerKey)!.values().next().value!, [clName]);
+            addClient(entry.canonicalName, [clName]);
             matched = true;
             break;
           }
@@ -310,13 +367,13 @@ export function buildClientRegistry(
     }
   }
 
-  return Array.from(clientMap.values()).map((set) => {
-    const arr = Array.from(set);
-    return {
-      canonicalName: arr[0],
-      aliases: arr,
-    };
-  });
+  return Array.from(clientMetaMap.values()).map((entry) => ({
+    canonicalName: entry.canonicalName,
+    aliases: Array.from(entry.aliases),
+    agency: entry.agency,
+    isClosed: entry.isClosed,
+    isHighPriority: entry.isHighPriority,
+  }));
 }
 
 export function normalizeTrelloPayload(
@@ -370,6 +427,50 @@ export function normalizeTrelloPayload(
           boardChecklistsByCard.set(cardId, []);
         }
         boardChecklistsByCard.get(cardId)!.push(bcl);
+      }
+    }
+  }
+
+  // 1. Build completion event indices from board actions and card actions
+  const allActions = [
+    ...(raw.boardActions || []),
+    ...(raw.cards || []).flatMap((c) => c.actions || []),
+  ];
+
+  const cardCompletionMap = new Map<string, { date: string; actor: string; reason: string }>();
+  const itemCompletionMap = new Map<string, { date: string; actor: string }>();
+
+  for (const action of allActions) {
+    const cardId = action.data?.card?.id;
+    const actionDate = action.date;
+    const actorName = action.memberCreator?.fullName || action.memberCreator?.username || 'Team Member';
+
+    if (action.type === 'updateCard' && cardId) {
+      const listAfter = (action.data?.listAfter?.name || '').toLowerCase();
+      const isMovedToCompleted = listAfter.includes('complete') || listAfter.includes('done');
+      const isMarkedClosedOrDue = action.data?.card?.dueComplete === true || action.data?.card?.closed === true;
+
+      if (isMovedToCompleted || isMarkedClosedOrDue) {
+        const existing = cardCompletionMap.get(cardId);
+        if (!existing || new Date(actionDate).getTime() > new Date(existing.date).getTime()) {
+          cardCompletionMap.set(cardId, {
+            date: actionDate,
+            actor: actorName,
+            reason: isMovedToCompleted ? `Moved to ${action.data.listAfter.name}` : 'Marked complete',
+          });
+        }
+      }
+    } else if (action.type === 'updateCheckItemStateOnCard') {
+      const checkItemId = action.data?.checkItem?.id;
+      const isComplete = action.data?.checkItem?.state === 'complete';
+      if (checkItemId && isComplete) {
+        const existing = itemCompletionMap.get(checkItemId);
+        if (!existing || new Date(actionDate).getTime() > new Date(existing.date).getTime()) {
+          itemCompletionMap.set(checkItemId, {
+            date: actionDate,
+            actor: actorName,
+          });
+        }
       }
     }
   }
@@ -438,17 +539,70 @@ export function normalizeTrelloPayload(
       rawCard.closed
     );
 
+    // Precise creation date from Trello ObjectId
+    const createdAt = getCardCreatedAt(rawCard.id, rawCard.dateLastActivity);
+
+    // Card completion and progress states
+    const listNameLower = (list?.name || '').toLowerCase();
+    const isCompleted =
+      statusSemantic === 'Completed' ||
+      listNameLower.includes('complete') ||
+      rawCard.closed === true;
+    const isUnderProgress = !isCompleted;
+
+    let completedAt: string | null = null;
+    let completedAtVerified = false;
+    let completedBy: string | null = null;
+
+    if (isCompleted) {
+      const compAction = cardCompletionMap.get(rawCard.id);
+      if (compAction) {
+        completedAt = compAction.date;
+        completedAtVerified = true;
+        completedBy = compAction.actor;
+      } else {
+        completedAt = rawCard.dateLastActivity || createdAt;
+        completedAtVerified = false;
+      }
+    }
+
+    // Agency source determination
+    let agencySource: 'PDS' | 'GFM' | 'Internal' = 'Internal';
+    const hasPdsLabel = cardLabels.some((l) => l.name.toLowerCase() === 'pds' || l.name.toLowerCase().includes('pds client'));
+    const hasGfmLabel = cardLabels.some((l) => l.name.toLowerCase() === 'gfm' || l.name.toLowerCase().includes('gfm client'));
+
+    if (listNameLower.includes('pds resource') || hasPdsLabel) {
+      agencySource = 'PDS';
+    } else if (listNameLower.includes('gfm client') || hasGfmLabel) {
+      agencySource = 'GFM';
+    }
+
+    // Priority classification
+    let priority: TrelloCard['priority'] = 'Normal';
+    if (cardLabels.some((l) => l.name.toLowerCase().includes('high priority'))) {
+      priority = 'High Priority';
+    } else if (cardLabels.some((l) => l.name.toLowerCase().includes('medium priority'))) {
+      priority = 'Medium Priority';
+    } else if (cardLabels.some((l) => l.name.toLowerCase().includes('low priority'))) {
+      priority = 'Low Priority';
+    }
+
     // Process Checklists
     const cardChecklists: TrelloChecklist[] = rawChecklists.map((cl: any) => {
       const rawItems = cl.checkItems || cl.items || [];
-      const items = rawItems.map((ci: any) => ({
-        id: ci.id,
-        checklistId: cl.id,
-        cardId: rawCard.id,
-        name: ci.name,
-        state: (ci.state === 'complete' ? 'complete' : 'incomplete') as 'complete' | 'incomplete',
-        completedAt: ci.due || undefined,
-      }));
+      const items = rawItems.map((ci: any) => {
+        const isItemComplete = ci.state === 'complete';
+        const itemComp = itemCompletionMap.get(ci.id);
+        return {
+          id: ci.id,
+          checklistId: cl.id,
+          cardId: rawCard.id,
+          name: ci.name,
+          state: (isItemComplete ? 'complete' : 'incomplete') as 'complete' | 'incomplete',
+          completedAt: itemComp?.date || (isItemComplete ? ci.due || undefined : undefined),
+          completedBy: itemComp?.actor,
+        };
+      });
 
       const checklistObj: TrelloChecklist = {
         id: cl.id,
@@ -537,9 +691,17 @@ export function normalizeTrelloPayload(
       desc: rawCard.desc || '',
       url: rawCard.url || `https://trello.com/c/${rawCard.id}`,
       due: rawCard.due || null,
+      createdAt,
       dateLastActivity: rawCard.dateLastActivity || new Date().toISOString(),
       closed: rawCard.closed || false,
       statusSemantic,
+      isCompleted,
+      isUnderProgress,
+      completedAt,
+      completedAtVerified,
+      completedBy,
+      agencySource,
+      priority,
       clientCanonical,
       labels: cardLabels,
       members: cardMembers,
@@ -566,7 +728,7 @@ export function normalizeTrelloPayload(
       return false;
     });
 
-    const activeCards = matchingCards.filter((c) => c.statusSemantic !== 'Completed' && !c.closed);
+    const activeCards = matchingCards.filter((c) => c.isUnderProgress);
 
     let completedTasksCount = 0;
     let totalTasksCount = 0;
@@ -588,7 +750,6 @@ export function normalizeTrelloPayload(
             totalTasksCount += cl.items.length;
             completedTasksCount += cl.items.filter((i) => i.state === 'complete').length;
           } else {
-            // Check individual checklist items for this client
             for (const item of cl.items) {
               const iLower = item.name.toLowerCase();
               if (aliases.some((a) => iLower.includes(a))) {
@@ -602,28 +763,26 @@ export function normalizeTrelloPayload(
         }
       }
 
-      // If card itself is dedicated to this client, count the card as a milestone
       if (isDedicatedClient(card)) {
         totalTasksCount += 1;
-        if (card.statusSemantic === 'Completed' || card.closed) {
+        if (card.isCompleted) {
           completedTasksCount += 1;
         }
       }
     }
 
-    // Determine status
-    let status = 'Active';
-    if (activeCards.length === 0 && completedTasksCount > 0 && matchingCards.length > 0) {
-      status = 'Completed';
-    } else if (matchingCards.length === 0) {
-      status = 'Onboarding';
-    }
+    // Determine status per user rules:
+    // If client card has "Project Closed", it is Closed.
+    // Otherwise Active.
+    const status: 'Active' | 'Closed' = reg.isClosed ? 'Closed' : 'Active';
 
     return {
       id: `client_${Buffer.from(reg.canonicalName).toString('hex').slice(0, 16)}`,
       canonicalName: reg.canonicalName,
       aliases: reg.aliases,
       status,
+      agency: reg.agency || 'Internal',
+      isHighPriority: Boolean(reg.isHighPriority),
       activeCardCount: activeCards.length,
       completedTasksCount,
       totalTasksCount,
@@ -634,6 +793,7 @@ export function normalizeTrelloPayload(
 
   // Sort clients: active with tasks first, then alphabetically
   clients.sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'Active' ? -1 : 1;
     if (b.totalTasksCount !== a.totalTasksCount) return b.totalTasksCount - a.totalTasksCount;
     return a.canonicalName.localeCompare(b.canonicalName);
   });

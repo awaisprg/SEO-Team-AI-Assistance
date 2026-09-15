@@ -12,7 +12,9 @@ export interface QueryIntent {
     | 'time_range'
     | 'blockers'
     | 'management_brief'
+    | 'overall_summary'
     | 'general_team';
+  isOverall?: boolean;
   topic?: string;
   client?: string;
   person?: string;
@@ -125,55 +127,69 @@ export function extractQueryIntent(
     status = 'Blocked';
   }
 
-  // 5. Date detection (Anchor reference date: Sep 2026 based on metadata)
+  // 5. Overall summary check
+  let isOverall = false;
+  if (
+    q.includes('overall summary') ||
+    q.includes('overall report') ||
+    q.includes('all cards') ||
+    q.includes('not completed') ||
+    q.includes('under progress') ||
+    q.includes('pipeline summary') ||
+    q.includes('entire pipeline')
+  ) {
+    isOverall = true;
+  }
+
+  // 6. Date detection (Using dynamic now, supporting 7 days and 30 days created/completed)
   let dateFrom: string | undefined;
   let dateTo: string | undefined;
   let timeRangeDescription: string | undefined;
 
-  const now = new Date('2026-09-14T10:00:00Z');
+  const now = new Date();
 
-  if (q.includes('august')) {
-    dateFrom = '2026-08-01T00:00:00Z';
-    dateTo = '2026-08-31T23:59:59Z';
-    timeRangeDescription = 'August 2026';
-  } else if (q.includes('september')) {
-    dateFrom = '2026-09-01T00:00:00Z';
-    dateTo = '2026-09-30T23:59:59Z';
-    timeRangeDescription = 'September 2026';
+  if (q.includes('last 7 days') || q.includes('past 7 days') || q.includes('7 days')) {
+    dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    dateTo = now.toISOString();
+    timeRangeDescription = 'Last 7 Days (Created or Completed)';
+  } else if (q.includes('last week') || q.includes('update of last week') || q.includes('last week report')) {
+    dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    dateTo = now.toISOString();
+    timeRangeDescription = 'Last 7 Days (Created or Completed)';
   } else if (q.includes('this week')) {
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    dateFrom = startOfWeek.toISOString();
+    dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
     dateTo = now.toISOString();
-    timeRangeDescription = 'This week';
-  } else if (q.includes('last week')) {
-    const endLastWeek = new Date(now);
-    endLastWeek.setDate(now.getDate() - now.getDay() - 1);
-    const startLastWeek = new Date(endLastWeek);
-    startLastWeek.setDate(endLastWeek.getDate() - 6);
-    dateFrom = startLastWeek.toISOString();
-    dateTo = endLastWeek.toISOString();
-    timeRangeDescription = 'Last week';
+    timeRangeDescription = 'This Week (Last 7 Days)';
+  } else if (
+    q.includes('last 30 days') ||
+    q.includes('past 30 days') ||
+    q.includes('30 days') ||
+    q.includes('1 month') ||
+    q.includes('1 month report') ||
+    q.includes('one month') ||
+    q.includes('last month report') ||
+    q.includes('last month')
+  ) {
+    dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    dateTo = now.toISOString();
+    timeRangeDescription = 'Last 30 Days (Created or Completed)';
   } else if (q.includes('this month')) {
-    dateFrom = '2026-09-01T00:00:00Z';
-    dateTo = '2026-09-30T23:59:59Z';
-    timeRangeDescription = 'This month (September)';
-  } else if (q.includes('last month')) {
-    dateFrom = '2026-08-01T00:00:00Z';
-    dateTo = '2026-08-31T23:59:59Z';
-    timeRangeDescription = 'Last month (August)';
-  } else if (q.includes('last 30 days') || q.includes('past 30 days')) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - 30);
-    dateFrom = d.toISOString();
+    dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
     dateTo = now.toISOString();
-    timeRangeDescription = 'Last 30 days';
+    timeRangeDescription = 'This Month (Last 30 Days)';
   }
 
-  // 6. Primary Intent classification
+  // 7. Primary Intent classification
   let intent: QueryIntent['intent'] = 'general_team';
 
-  if (q.includes('what can i tell senior management') || q.includes('tell management') || q.includes('senior management') || q.includes('management brief')) {
+  if (isOverall) {
+    intent = 'overall_summary';
+  } else if (
+    q.includes('what can i tell senior management') ||
+    q.includes('tell management') ||
+    q.includes('senior management') ||
+    q.includes('management brief')
+  ) {
     intent = 'management_brief';
   } else if (matchedClient) {
     intent = 'client_summary';
@@ -196,6 +212,7 @@ export function extractQueryIntent(
   return {
     rawQuestion: question,
     intent,
+    isOverall,
     topic,
     client: matchedClient,
     person: matchedPerson,
