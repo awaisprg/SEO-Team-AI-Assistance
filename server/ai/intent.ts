@@ -148,35 +148,49 @@ export function extractQueryIntent(
 
   const now = new Date();
 
-  if (q.includes('last 7 days') || q.includes('past 7 days') || q.includes('7 days')) {
-    dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    dateTo = now.toISOString();
-    timeRangeDescription = 'Last 7 Days (Created or Completed)';
-  } else if (q.includes('last week') || q.includes('update of last week') || q.includes('last week report')) {
-    dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    dateTo = now.toISOString();
-    timeRangeDescription = 'Last 7 Days (Created or Completed)';
-  } else if (q.includes('this week')) {
-    dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    dateTo = now.toISOString();
-    timeRangeDescription = 'This Week (Last 7 Days)';
-  } else if (
-    q.includes('last 30 days') ||
-    q.includes('past 30 days') ||
-    q.includes('30 days') ||
-    q.includes('1 month') ||
-    q.includes('1 month report') ||
-    q.includes('one month') ||
-    q.includes('last month report') ||
-    q.includes('last month')
-  ) {
-    dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    dateTo = now.toISOString();
-    timeRangeDescription = 'Last 30 Days (Created or Completed)';
-  } else if (q.includes('this month')) {
-    dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    dateTo = now.toISOString();
-    timeRangeDescription = 'This Month (Last 30 Days)';
+  const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  for (let i = 0; i < months.length; i++) {
+    if (q.includes(months[i])) {
+      const monthName = months[i].charAt(0).toUpperCase() + months[i].slice(1);
+      const year = 2026;
+      dateFrom = new Date(Date.UTC(year, i, 1)).toISOString();
+      dateTo = new Date(Date.UTC(year, i + 1, 0, 23, 59, 59, 999)).toISOString();
+      timeRangeDescription = `${monthName} ${year}`;
+      break;
+    }
+  }
+
+  if (!timeRangeDescription) {
+    if (q.includes('last 7 days') || q.includes('past 7 days') || q.includes('7 days')) {
+      dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      dateTo = now.toISOString();
+      timeRangeDescription = 'Last 7 Days (Created or Completed)';
+    } else if (q.includes('last week') || q.includes('update of last week') || q.includes('last week report')) {
+      dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      dateTo = now.toISOString();
+      timeRangeDescription = 'Last 7 Days (Created or Completed)';
+    } else if (q.includes('this week')) {
+      dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      dateTo = now.toISOString();
+      timeRangeDescription = 'This Week (Last 7 Days)';
+    } else if (
+      q.includes('last 30 days') ||
+      q.includes('past 30 days') ||
+      q.includes('30 days') ||
+      q.includes('1 month') ||
+      q.includes('1 month report') ||
+      q.includes('one month') ||
+      q.includes('last month report') ||
+      q.includes('last month')
+    ) {
+      dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      dateTo = now.toISOString();
+      timeRangeDescription = 'Last 30 Days (Created or Completed)';
+    } else if (q.includes('this month')) {
+      dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      dateTo = now.toISOString();
+      timeRangeDescription = 'This Month (Last 30 Days)';
+    }
   }
 
   // 7. Primary Intent classification

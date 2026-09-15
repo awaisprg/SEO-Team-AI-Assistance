@@ -22,8 +22,6 @@ import path from 'path';
 import { pgStore } from './postgres';
 
 export interface TrelloConnectionConfig {
-  apiKey: string;
-  token: string;
   boardId: string;
   boardName: string;
   connected: boolean;
@@ -31,6 +29,8 @@ export interface TrelloConnectionConfig {
   mode?: 'real' | 'demo';
   lastSyncAt?: string;
   lastSyncStatus?: string;
+  trelloApiKey?: string;
+  trelloToken?: string;
 }
 
 export interface SearchFilterParams {
@@ -212,6 +212,45 @@ class Store {
     }
   }
 
+  async loadFromPostgres(): Promise<boolean> {
+    if (!pgStore.isConfigured()) return false;
+    try {
+      const data = await pgStore.loadAllState();
+      if (!data) return false;
+      if (Object.keys(data.cards).length > 0 || Object.keys(data.boards).length > 0) {
+        this.state.boards = data.boards;
+        this.state.lists = data.lists;
+        this.state.members = data.members;
+        this.state.labels = data.labels;
+        this.state.clients = data.clients;
+        this.state.cards = data.cards;
+        this.state.syncRuns = data.syncRuns;
+        this.state.managementBriefs = data.managementBriefs;
+        this.state.chatSessions = data.chatSessions;
+        this.state.comments = {};
+        this.state.activities = {};
+        this.state.attachments = {};
+        this.state.checklists = {};
+        for (const c of Object.values(data.cards)) {
+          for (const cm of c.comments || []) this.state.comments[cm.id] = cm;
+          for (const a of c.activities || []) this.state.activities[a.id] = a;
+          for (const att of c.attachments || []) this.state.attachments[att.id] = att;
+          for (const chk of c.checklists || []) this.state.checklists[chk.id] = chk;
+        }
+        if (Object.keys(data.boards).length > 0) {
+          const firstBoard = Object.values(data.boards)[0];
+          this.state.connection.boardId = firstBoard.id;
+          this.state.connection.boardName = firstBoard.name;
+          this.state.connection.connected = true;
+        }
+        return true;
+      }
+    } catch (err: any) {
+      console.warn('Could not load state from PostgreSQL:', err.message);
+    }
+    return false;
+  }
+
   private loadInitialState(): StorageState {
     const isExplicitDemo = process.env.TRELLO_MODE === 'demo';
     const isRealMode = !isExplicitDemo;
@@ -221,17 +260,13 @@ class Store {
         const raw = fs.readFileSync(DATA_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
         if (parsed && parsed.connection) {
-          // Sync environment credentials if present
-          if (process.env.TRELLO_API_KEY && !parsed.connection.apiKey) {
-            parsed.connection.apiKey = process.env.TRELLO_API_KEY;
-          }
-          if (process.env.TRELLO_TOKEN && !parsed.connection.token) {
-            parsed.connection.token = process.env.TRELLO_TOKEN;
-          }
           if (process.env.TRELLO_MODE) {
             parsed.connection.mode = process.env.TRELLO_MODE as 'real' | 'demo';
             parsed.connection.isDemoData = process.env.TRELLO_MODE === 'demo';
           }
+          // Ensure secrets are never retained in state
+          delete parsed.connection.apiKey;
+          delete parsed.connection.token;
           return parsed;
         }
       }
@@ -241,8 +276,6 @@ class Store {
 
     return {
       connection: {
-        apiKey: process.env.TRELLO_API_KEY || '',
-        token: process.env.TRELLO_TOKEN || '',
         boardId: '',
         boardName: '',
         connected: false,
@@ -272,7 +305,7 @@ class Store {
       }
       fs.writeFileSync(DATA_FILE, JSON.stringify(this.state, null, 2), 'utf-8');
     } catch (err) {
-      console.error('Failed to persist store state:', err);
+      // Safe catch for read-only filesystem on Vercel / serverless containers
     }
   }
 
@@ -281,9 +314,28 @@ class Store {
     return { ...this.state.connection };
   }
 
+  getTrelloCredentials(): { apiKey: string; token: string } {
+    const apiKey = (this.state.connection.trelloApiKey || process.env.TRELLO_API_KEY || '').trim();
+    const token = (this.state.connection.trelloToken || process.env.TRELLO_TOKEN || '').trim();
+    return { apiKey, token };
+  }
+
+  setTrelloCredentials(apiKey: string, token: string) {
+    this.state.connection.trelloApiKey = apiKey.trim();
+    this.state.connection.trelloToken = token.trim();
+    this.persist();
+  }
+
   getConnectionStatus(): TrelloConnectionStatus {
     const cards = Object.values(this.state.cards);
     const mode = this.state.connection.mode || (this.state.connection.isDemoData ? 'demo' : 'real');
+    const creds = this.getTrelloCredentials();
+    const maskedKey = creds.apiKey
+      ? creds.apiKey.length > 8
+        ? `${creds.apiKey.slice(0, 4)}...${creds.apiKey.slice(-4)}`
+        : '••••••••'
+      : undefined;
+
     return {
       connected: this.state.connection.connected || (this.state.connection.isDemoData && mode === 'demo'),
       isDemoData: mode === 'demo',
@@ -296,8 +348,10 @@ class Store {
       totalComments: Object.values(this.state.comments).length,
       totalActivities: Object.values(this.state.activities).length,
       totalClients: Object.values(this.state.clients).length,
-      apiKeyConfigured: Boolean(this.state.connection.apiKey || process.env.TRELLO_API_KEY),
-      tokenConfigured: Boolean(this.state.connection.token || process.env.TRELLO_TOKEN),
+      apiKeyConfigured: Boolean(creds.apiKey),
+      tokenConfigured: Boolean(creds.token),
+      maskedApiKey: maskedKey,
+      hasCustomCredentials: Boolean(this.state.connection.trelloApiKey),
     };
   }
 
@@ -308,8 +362,6 @@ class Store {
 
   disconnect() {
     this.state.connection = {
-      apiKey: '',
-      token: '',
       boardId: '',
       boardName: '',
       connected: false,
@@ -387,6 +439,9 @@ class Store {
       // Re-evaluate cards associated with this list
       this.recomputeCardsStatusForList(listId);
       this.persist();
+      if (pgStore.isConfigured()) {
+        pgStore.updateListSemantics(listId, semanticType, mappedStatus, mappedPerson).catch((err) => console.warn('Postgres updateListSemantics error:', err.message));
+      }
     }
   }
 
@@ -452,6 +507,9 @@ class Store {
       };
       this.state.clients[existing.id] = existing;
       this.persist();
+      if (pgStore.isConfigured()) {
+        pgStore.upsertClients([existing]).catch((err) => console.warn('Postgres upsertClients error:', err.message));
+      }
       return existing;
     } else {
       const newClient: ClientEntity = {
@@ -467,6 +525,9 @@ class Store {
       };
       this.state.clients[newClient.id] = newClient;
       this.persist();
+      if (pgStore.isConfigured()) {
+        pgStore.upsertClients([newClient]).catch((err) => console.warn('Postgres upsertClients error:', err.message));
+      }
       return newClient;
     }
   }
@@ -758,7 +819,7 @@ class Store {
     }
     this.persist();
     if (pgStore.isConfigured()) {
-      pgStore.recordSyncRun(run, this.state.connection.boardId).catch((err) => console.warn('Postgres recordSyncRun error:', err.message));
+      pgStore.recordSyncRun(run).catch((err) => console.warn('Postgres recordSyncRun error:', err.message));
     }
   }
 
@@ -810,6 +871,9 @@ class Store {
     session.messages.push(fullMsg);
     session.updatedAt = new Date().toISOString();
     this.persist();
+    if (pgStore.isConfigured()) {
+      pgStore.addChatMessage(sessionId, fullMsg).catch((err) => console.warn('Postgres addChatMessage error:', err.message));
+    }
     return fullMsg;
   }
 
@@ -817,6 +881,9 @@ class Store {
   saveManagementBrief(brief: ManagementBrief) {
     this.state.managementBriefs[brief.id] = brief;
     this.persist();
+    if (pgStore.isConfigured()) {
+      pgStore.saveManagementBrief(brief).catch((err) => console.warn('Postgres saveManagementBrief error:', err.message));
+    }
   }
 
   getManagementBriefs(): ManagementBrief[] {
@@ -844,12 +911,11 @@ class Store {
   clearAll() {
     this.state = {
       connection: {
-        apiKey: process.env.TRELLO_API_KEY || '',
-        token: process.env.TRELLO_TOKEN || '',
         boardId: '',
         boardName: '',
         connected: false,
         isDemoData: false,
+        mode: 'demo',
       },
       boards: {},
       lists: {},

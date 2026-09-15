@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   MessageSquareText,
   FileText,
@@ -18,6 +18,7 @@ import { ClientsView } from './components/ClientsView';
 import { TeamView } from './components/TeamView';
 import { TrelloSettingsModal } from './components/TrelloSettingsModal';
 import { SourceCardModal } from './components/SourceCardModal';
+import { AuthScreen } from './components/AuthScreen';
 import {
   ChatMessage,
   ChatSource,
@@ -27,12 +28,21 @@ import {
   TeamMetrics,
   TrelloConnectionStatus,
   UserRole,
+  UserSession,
   TrelloCard,
 } from './types';
+import {
+  fetchWithAuth,
+  getCurrentUserSession,
+  getSupabaseBrowserClient,
+  initSupabaseClient,
+} from './lib/supabaseClient';
 
 export default function App() {
+  const [user, setUser] = useState<UserSession | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
   const [activeTab, setActiveTab] = useState<'chat' | 'brief' | 'clients' | 'team'>('chat');
-  const [role, setRole] = useState<UserRole>('ADMIN');
   const [connection, setConnection] = useState<TrelloConnectionStatus | null>(null);
   const [metrics, setMetrics] = useState<TeamMetrics | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -46,31 +56,58 @@ export default function App() {
   // UI States
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncPhase, setSyncPhase] = useState<string | undefined>(undefined);
   const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<ChatSource | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  const syncPollInterval = useRef<any>(null);
+
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
-    setTimeout(() => setNotification(null), 4000);
+    setTimeout(() => setNotification(null), 4500);
   };
+
+  // Check auth session
+  const checkAuthAndLoad = async () => {
+    setIsCheckingAuth(true);
+    await initSupabaseClient();
+    const session = await getCurrentUserSession();
+    if (session) {
+      setUser(session);
+      await refreshAllData();
+    } else {
+      setUser(null);
+    }
+    setIsCheckingAuth(false);
+  };
+
+  useEffect(() => {
+    checkAuthAndLoad();
+
+    return () => {
+      if (syncPollInterval.current) {
+        clearInterval(syncPollInterval.current);
+      }
+    };
+  }, []);
 
   // Initial Data Fetch
   const refreshAllData = async () => {
     try {
       const [statusRes, teamRes, clientsRes, listsRes, briefsRes] = await Promise.all([
-        fetch('/api/trello/status').then((r) => r.json()),
-        fetch('/api/team').then((r) => r.json()),
-        fetch('/api/clients').then((r) => r.json()),
-        fetch('/api/lists').then((r) => r.json()),
-        fetch('/api/management-briefs').then((r) => r.json()),
+        fetchWithAuth('/api/trello/status').then((r) => (r.ok ? r.json() : null)),
+        fetchWithAuth('/api/team').then((r) => (r.ok ? r.json() : null)),
+        fetchWithAuth('/api/clients').then((r) => (r.ok ? r.json() : [])),
+        fetchWithAuth('/api/lists').then((r) => (r.ok ? r.json() : [])),
+        fetchWithAuth('/api/management-briefs').then((r) => (r.ok ? r.json() : [])),
       ]);
 
-      setConnection(statusRes);
-      if (teamRes.metrics) setMetrics(teamRes.metrics);
-      if (teamRes.memberOverviews) setMemberOverviews(teamRes.memberOverviews);
-      if (teamRes.activeCards) setAllCards([...teamRes.activeCards, ...(teamRes.recentCompleted || [])]);
+      if (statusRes) setConnection(statusRes);
+      if (teamRes?.metrics) setMetrics(teamRes.metrics);
+      if (teamRes?.memberOverviews) setMemberOverviews(teamRes.memberOverviews);
+      if (teamRes?.activeCards) setAllCards([...teamRes.activeCards, ...(teamRes.recentCompleted || [])]);
       if (Array.isArray(clientsRes)) setClients(clientsRes);
       if (Array.isArray(listsRes)) setLists(listsRes);
       if (Array.isArray(briefsRes)) {
@@ -80,18 +117,27 @@ export default function App() {
         }
       }
     } catch (err) {
-      console.error('Failed to load initial data:', err);
+      console.error('Failed to load application data:', err);
     }
   };
 
-  useEffect(() => {
-    refreshAllData();
-  }, []);
+  // Sign out handler
+  const handleSignOut = async () => {
+    const sb = getSupabaseBrowserClient();
+    if (sb) {
+      await sb.auth.signOut().catch(() => {});
+    }
+    localStorage.removeItem('supabase_auth_token');
+    localStorage.removeItem('demo_auth_token');
+    setUser(null);
+    setConnection(null);
+    setMessages([]);
+    showNotification('success', 'You have been signed out.');
+  };
 
   // Send Chat Message
   const handleSendMessage = async (question: string) => {
     setIsLoadingChat(true);
-    // Optimistic user message
     const tempUserMsg: ChatMessage = {
       id: `usr_${Date.now()}`,
       role: 'user',
@@ -102,30 +148,27 @@ export default function App() {
     setMessages((prev) => [...prev, tempUserMsg]);
 
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetchWithAuth('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question }),
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to process intelligence query');
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to get answer from intelligence engine');
       }
 
       const data = await res.json();
       setMessages((prev) => [...prev, data.message]);
     } catch (err: any) {
-      const errorAssistantMsg: ChatMessage = {
+      const errorMsg: ChatMessage = {
         id: `err_${Date.now()}`,
         role: 'assistant',
-        content: `### Query Processing Notice\n\n${err.message || 'Unable to complete retrieval'}. Please check if Trello synchronization is active or adjust your query.`,
-        evidenceStrength: 'low',
-        sources: [],
+        content: `Error: ${err.message || 'Failed to communicate with intelligence engine'}`,
         createdAt: new Date().toISOString(),
-        timestamp: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, errorAssistantMsg]);
+      setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoadingChat(false);
     }
@@ -135,9 +178,14 @@ export default function App() {
   const handleGenerateBrief = async (
     periodType: 'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month'
   ) => {
+    if (user?.role === 'VIEWER') {
+      showNotification('error', 'Viewers cannot generate management briefs.');
+      return;
+    }
+
     setIsGeneratingBrief(true);
     try {
-      const res = await fetch('/api/management-brief', {
+      const res = await fetchWithAuth('/api/management-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ periodType }),
@@ -159,16 +207,20 @@ export default function App() {
     }
   };
 
-  // Synchronize Trello Data
+  // Asynchronous Job-Based Trello Synchronization with Polling
   const handleSync = async () => {
-    if (role === 'VIEWER') {
+    if (user?.role === 'VIEWER') {
       showNotification('error', 'Viewers cannot trigger synchronizations.');
       return;
     }
 
+    if (isSyncing) return;
+
     setIsSyncing(true);
+    setSyncPhase('Initiating background sync...');
+
     try {
-      const res = await fetch('/api/trello/sync', {
+      const res = await fetchWithAuth('/api/trello/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ boardId: connection?.boardId }),
@@ -176,27 +228,65 @@ export default function App() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Sync failed');
+        throw new Error(data.error || 'Sync request rejected');
       }
 
-      await refreshAllData();
-      showNotification('success', data.message || 'Trello data synchronized successfully.');
+      setSyncPhase(data.syncRun?.phase || 'Background job running...');
+      showNotification('success', 'Synchronization job dispatched. Polling progress...');
+
+      // Start polling status endpoint
+      if (syncPollInterval.current) clearInterval(syncPollInterval.current);
+
+      syncPollInterval.current = setInterval(async () => {
+        try {
+          const pollRes = await fetchWithAuth('/api/trello/sync/status');
+          if (!pollRes.ok) return;
+
+          const pollData = await pollRes.json();
+          if (pollData.phase) {
+            setSyncPhase(pollData.phase);
+          }
+
+          if (pollData.status === 'success') {
+            clearInterval(syncPollInterval.current);
+            syncPollInterval.current = null;
+            setIsSyncing(false);
+            setSyncPhase(undefined);
+            await refreshAllData();
+            showNotification(
+              'success',
+              pollData.latestJob?.message || 'Trello board synchronized successfully.'
+            );
+          } else if (pollData.status === 'failed') {
+            clearInterval(syncPollInterval.current);
+            syncPollInterval.current = null;
+            setIsSyncing(false);
+            setSyncPhase(undefined);
+            showNotification(
+              'error',
+              pollData.latestJob?.message || 'Trello synchronization failed.'
+            );
+          }
+        } catch (pollErr) {
+          console.warn('Poll error:', pollErr);
+        }
+      }, 2000);
     } catch (err: any) {
-      showNotification('error', err.message || 'Trello synchronization failed');
-    } finally {
       setIsSyncing(false);
+      setSyncPhase(undefined);
+      showNotification('error', err.message || 'Trello synchronization failed');
     }
   };
 
   // Reset Demo Data
   const handleSeedDemo = async () => {
-    if (role === 'VIEWER') {
-      showNotification('error', 'Viewers cannot reset database records.');
+    if (user?.role !== 'ADMIN') {
+      showNotification('error', 'Only Administrators can reset database records.');
       return;
     }
 
     try {
-      const res = await fetch('/api/trello/seed-demo', { method: 'POST' });
+      const res = await fetchWithAuth('/api/trello/seed-demo', { method: 'POST' });
       const data = await res.json();
       await refreshAllData();
       showNotification('success', data.message || 'Demo workflow loaded successfully.');
@@ -205,45 +295,25 @@ export default function App() {
     }
   };
 
-  // Switch Role
-  const handleRoleChange = async (newRole: UserRole) => {
-    setRole(newRole);
+  // Save Trello Active Board (Zero secrets sent)
+  const handleSaveBoard = async (boardId: string, boardName?: string): Promise<boolean> => {
     try {
-      await fetch('/api/auth/switch-role', {
+      const res = await fetchWithAuth('/api/trello/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: newRole }),
-      });
-      showNotification('success', `Active session role switched to ${newRole}`);
-    } catch (err) {
-      console.warn('Role switch network issue');
-    }
-  };
-
-  // Save Trello Credentials
-  const handleSaveConnection = async (
-    apiKey: string,
-    token: string,
-    boardId?: string,
-    boardName?: string
-  ): Promise<boolean> => {
-    try {
-      const res = await fetch('/api/trello/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, token, boardId, boardName }),
+        body: JSON.stringify({ boardId, boardName }),
       });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Connection failed');
+        throw new Error(errData.error || 'Failed to connect board');
       }
 
       await refreshAllData();
-      showNotification('success', 'Connected to live Trello board!');
+      showNotification('success', 'Trello board linked successfully.');
       return true;
     } catch (err: any) {
-      showNotification('error', err.message || 'Failed to save Trello connection');
+      showNotification('error', err.message || 'Failed to connect board');
       return false;
     }
   };
@@ -251,7 +321,7 @@ export default function App() {
   // Add Client Alias
   const handleAddAlias = async (clientId: string, alias: string) => {
     try {
-      const res = await fetch(`/api/clients/${clientId}/aliases`, {
+      const res = await fetchWithAuth(`/api/clients/${clientId}/aliases`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ alias }),
@@ -273,7 +343,7 @@ export default function App() {
     mappedPerson?: string
   ) => {
     try {
-      const res = await fetch('/api/lists/semantics', {
+      const res = await fetchWithAuth('/api/lists/semantics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ listId, semanticType, mappedStatus, mappedPerson }),
@@ -293,17 +363,34 @@ export default function App() {
     handleSendMessage(prompt);
   };
 
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white space-y-3">
+        <RefreshCw className="w-8 h-8 text-indigo-400 animate-spin" />
+        <div className="text-sm font-medium text-slate-300">
+          Verifying security credentials & session...
+        </div>
+      </div>
+    );
+  }
+
+  // If unauthenticated, display Supabase Auth screen
+  if (!user) {
+    return <AuthScreen onAuthenticated={checkAuthAndLoad} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-100/60 text-slate-900 flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900">
       {/* Top Header */}
       <Header
         connection={connection}
-        role={role}
-        onRoleChange={handleRoleChange}
+        user={user}
+        onSignOut={handleSignOut}
         onSync={handleSync}
         onSeedDemo={handleSeedDemo}
         onOpenSettings={() => setIsSettingsOpen(true)}
         isSyncing={isSyncing}
+        syncPhase={syncPhase}
       />
 
       {/* Global Notification Toast */}
@@ -365,12 +452,7 @@ export default function App() {
             }`}
           >
             <Building2 className="w-4 h-4 text-indigo-500" />
-            <span>Client Accounts</span>
-            {clients.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 rounded-full bg-slate-100 text-[10px] text-slate-600">
-                {clients.length}
-              </span>
-            )}
+            <span>Clients & Initiatives</span>
           </button>
 
           <button
@@ -383,73 +465,98 @@ export default function App() {
             }`}
           >
             <Users className="w-4 h-4 text-indigo-500" />
-            <span>Workstreams & List Semantics</span>
+            <span>Team Overview</span>
           </button>
         </div>
 
-        {/* View Switcher */}
+        {/* Tab Content */}
         <div className="flex-1">
           {activeTab === 'chat' && (
             <ChatView
               messages={messages}
               onSendMessage={handleSendMessage}
               isLoading={isLoadingChat}
-              onSelectSource={(source) => setSelectedSource(source)}
+              onSelectSource={(src) => setSelectedSource(src)}
             />
           )}
 
           {activeTab === 'brief' && (
             <BriefView
-              currentBrief={currentBrief}
+              brief={currentBrief}
               savedBriefs={savedBriefs}
+              onSelectBrief={(b) => setCurrentBrief(b)}
               onGenerateBrief={handleGenerateBrief}
-              onSelectBrief={(brief) => setCurrentBrief(brief)}
               isGenerating={isGeneratingBrief}
-              onSelectSource={(source) => setSelectedSource(source)}
+              onSelectCard={(cardId) => {
+                const found = allCards.find((c) => c.id === cardId);
+                if (found) {
+                  setSelectedSource({
+                    cardId: found.id,
+                    title: found.name,
+                    url: found.url,
+                    relevance: 100,
+                    reason: 'Referenced in executive management brief',
+                    date: found.dateLastActivity,
+                    client: found.clientCanonical,
+                    status: found.statusSemantic,
+                    listName: found.listName,
+                  });
+                }
+              }}
             />
           )}
 
           {activeTab === 'clients' && (
             <ClientsView
               clients={clients}
-              role={role}
+              role={user.role}
               onAddAlias={handleAddAlias}
-              onAskAboutClient={handleSelectFilter}
+              onAskAboutClient={(name) => {
+                setActiveTab('chat');
+                handleSendMessage(`Give me a detailed workstream update for client ${name}`);
+              }}
             />
           )}
 
           {activeTab === 'team' && (
             <TeamView
               memberOverviews={memberOverviews}
-              lists={lists}
-              role={role}
-              onUpdateListSemantics={handleUpdateListSemantics}
-              onAskAboutPerson={handleSelectFilter}
+              onAskAboutMember={(name) => {
+                setActiveTab('chat');
+                handleSendMessage(`What is ${name} currently working on and what was recently completed?`);
+              }}
+              onSelectCard={(card) => {
+                setSelectedSource({
+                  cardId: card.id,
+                  title: card.name,
+                  url: card.url,
+                  relevance: 100,
+                  reason: 'Inspected from Team Overview',
+                  date: new Date().toISOString(),
+                  status: card.status,
+                  listName: card.listName,
+                });
+              }}
             />
           )}
         </div>
       </main>
 
-      {/* Settings Modal */}
+      {/* Trello Settings Modal (Admin only) */}
       <TrelloSettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         connection={connection}
-        role={role}
-        onSaveConnection={handleSaveConnection}
+        role={user.role}
+        onSaveBoard={handleSaveBoard}
         onSync={handleSync}
         isSyncing={isSyncing}
         onRefreshStatus={refreshAllData}
       />
 
-      {/* Source Detail Modal */}
+      {/* Source Card Modal */}
       <SourceCardModal
         source={selectedSource}
-        cardDetail={
-          selectedSource
-            ? allCards.find((c) => c.id === selectedSource.cardId)
-            : null
-        }
         onClose={() => setSelectedSource(null)}
       />
     </div>

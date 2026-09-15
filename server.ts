@@ -6,9 +6,13 @@ import { getSeedData } from './server/trello/seed';
 import { TrelloClient } from './server/trello/client';
 import { normalizeTrelloPayload } from './server/trello/normalizer';
 import { extractQueryIntent } from './server/ai/intent';
-import { hybridRetrieve, formatSources } from './server/ai/retrieval';
+import { hybridRetrieve } from './server/ai/retrieval';
 import { generateEvidenceAnswer } from './server/ai/answering';
 import { generateManagementBrief } from './server/ai/brief';
+import { requireAuth, requireRole } from './server/auth/supabase';
+import { userRegistry, ADMIN_EMAIL } from './server/auth/users';
+import { startSyncJob, getActiveJob, getLatestJob } from './server/trello/syncJob';
+import { createRateLimiter } from './server/middleware/rateLimiter';
 import { UserRole } from './src/types';
 
 // Enforce TRELLO_MODE
@@ -33,30 +37,22 @@ if (configuredMode === 'demo' && Object.keys(db.getCards()).length === 0) {
     lastSyncStatus: 'success',
   });
 } else if (configuredMode === 'real') {
-  // Real mode: do not fabricate cards
-  const existingConn = db.getConnection();
-  const apiKey = process.env.TRELLO_API_KEY || existingConn.apiKey || '';
-  const token = process.env.TRELLO_TOKEN || existingConn.token || '';
   db.updateConnection({
-    apiKey,
-    token,
     mode: 'real',
     isDemoData: false,
   });
 }
 
-const app = express();
+export const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
-// Session state (role-based access)
-let currentUser = {
-  id: 'user_awais_manager',
-  email: 'awais7475@prgmd.com',
-  name: 'Awais (SEO Lead)',
-  role: 'ADMIN' as UserRole,
-};
+// Apply rate limiting
+const generalLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 150 });
+const syncLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 15, message: 'Too many sync requests. Please wait.' });
+
+app.use('/api', generalLimiter);
 
 // -------------------------------------------------------------
 // 1. HEALTH & OBSERVABILITY ENDPOINTS
@@ -66,50 +62,153 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     trello: status.connected ? 'connected' : 'disconnected',
-    database: 'connected',
+    database: pgStore.isConfigured() ? 'postgresql_configured' : 'in_memory_store',
     mode: status.mode,
     board: status.boardName || undefined,
     lastSyncAt: status.lastSyncAt,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    version: '2.0.0',
+    version: '2.1.0',
   });
 });
 
 // -------------------------------------------------------------
-// 2. AUTHENTICATION & ROLE MANAGEMENT
+// 2. AUTHENTICATION & SESSION
 // -------------------------------------------------------------
-app.get('/api/auth/session', (req, res) => {
-  res.json(currentUser);
+// Public endpoint to inform the frontend of available Supabase config
+app.get('/api/auth/config', (req, res) => {
+  res.json({
+    supabaseUrl: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '',
+    configured: Boolean(
+      (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL) &&
+      (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY)
+    ),
+    adminEmail: ADMIN_EMAIL,
+  });
 });
 
-app.post('/api/auth/switch-role', (req, res) => {
-  const { role } = req.body;
-  if (['ADMIN', 'MANAGER', 'VIEWER'].includes(role)) {
-    currentUser.role = role as UserRole;
-    res.json(currentUser);
-  } else {
-    res.status(400).json({ error: 'Invalid role. Must be ADMIN, MANAGER, or VIEWER.' });
+// User Sign In Endpoint (Enforces awais7475@prgmd.com / PDS@Mkt7475! for Admin)
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' });
   }
+
+  try {
+    const result = userRegistry.authenticate(email, password);
+    res.json({
+      success: true,
+      token: result.token,
+      user: result.user,
+    });
+  } catch (err: any) {
+    res.status(401).json({ error: err.message || 'Authentication failed' });
+  }
+});
+
+// User Sign Up Endpoint (For Manager and Viewer with email auth)
+app.post('/api/auth/signup', (req, res) => {
+  const { email, password, name, role } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' });
+  }
+
+  // Admin cannot be signed up via registration form
+  if (role === 'ADMIN' || (email && email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase())) {
+    return res.status(403).json({
+      error: 'Admin role is restricted. Only awais7475@prgmd.com with the authorized master password can access Admin.',
+    });
+  }
+
+  const selectedRole = role === 'VIEWER' ? 'VIEWER' : 'MANAGER';
+
+  try {
+    const result = userRegistry.register({
+      email,
+      password,
+      name,
+      role: selectedRole,
+    });
+    res.json({
+      success: true,
+      token: result.token,
+      user: result.user,
+    });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Registration failed' });
+  }
+});
+
+// Logout endpoint
+app.post('/api/auth/logout', (req, res) => {
+  res.json({ success: true, message: 'Logged out successfully' });
+});
+
+// Authenticated session endpoint
+app.get('/api/auth/session', requireAuth, (req, res) => {
+  res.json(req.user);
 });
 
 // -------------------------------------------------------------
 // 3. TRELLO CONFIGURATION & SYNCHRONIZATION
 // -------------------------------------------------------------
-app.get('/api/trello/status', (req, res) => {
+app.get('/api/trello/status', requireAuth, (req, res) => {
   res.json(db.getConnectionStatus());
 });
 
-// Connection test endpoint
-app.all('/api/trello/test', async (req, res) => {
-  const conn = db.getConnection();
-  const apiKey = (req.body?.apiKey || conn.apiKey || process.env.TRELLO_API_KEY || '').trim();
-  const token = (req.body?.token || conn.token || process.env.TRELLO_TOKEN || '').trim();
+// Configure Trello API Key and Token (ADMIN only)
+app.post('/api/trello/credentials', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  const { apiKey, token } = req.body || {};
+  if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) {
+    return res.status(400).json({ error: 'Valid Trello API Key is required.' });
+  }
+  if (!token || typeof token !== 'string' || !token.trim()) {
+    return res.status(400).json({ error: 'Valid Trello Member Token is required.' });
+  }
+
+  const cleanKey = apiKey.trim();
+  const cleanToken = token.trim();
+
+  try {
+    const client = new TrelloClient({ apiKey: cleanKey, token: cleanToken });
+    const test = await client.testConnection();
+
+    if (!test.success) {
+      return res.status(400).json({
+        error: test.error || 'Failed to authenticate with Trello API using the provided credentials.',
+      });
+    }
+
+    db.setTrelloCredentials(cleanKey, cleanToken);
+
+    res.json({
+      success: true,
+      message: `Trello credentials verified and saved for member ${test.fullName} (@${test.username}).`,
+      user: {
+        username: test.username,
+        fullName: test.fullName,
+      },
+      boardsCount: test.boardsCount || 0,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to verify Trello credentials' });
+  }
+});
+
+// Connection test endpoint - tests provided or stored credentials
+app.all('/api/trello/test', requireAuth, async (req, res) => {
+  const bodyKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+  const bodyToken = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+
+  const creds = db.getTrelloCredentials();
+  const apiKey = bodyKey || creds.apiKey;
+  const token = bodyToken || creds.token;
 
   if (!apiKey || !token) {
     return res.status(400).json({
       success: false,
-      error: 'Trello API Key and Token are required to test the connection.',
+      error: 'Trello API Key and Token are not configured. Please enter them in Settings.',
     });
   }
 
@@ -126,7 +225,7 @@ app.all('/api/trello/test', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Connected successfully',
+      message: 'Connected successfully to Trello API',
       user: {
         username: test.username,
         fullName: test.fullName,
@@ -141,29 +240,35 @@ app.all('/api/trello/test', async (req, res) => {
   }
 });
 
-app.post('/api/trello/connect', async (req, res) => {
-  if (currentUser.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Admin permissions required to modify Trello credentials' });
+// Connect to a specific board (ADMIN only)
+app.post('/api/trello/connect', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+  const { boardId, boardName, apiKey: bodyKey, token: bodyToken } = req.body || {};
+
+  if (bodyKey && bodyToken) {
+    db.setTrelloCredentials(bodyKey, bodyToken);
   }
 
-  const { apiKey, token, boardId, boardName } = req.body;
+  const creds = db.getTrelloCredentials();
+  const apiKey = creds.apiKey;
+  const token = creds.token;
+
   if (!apiKey || !token) {
-    return res.status(400).json({ error: 'API Key and Token are required' });
+    return res.status(400).json({
+      error: 'Trello API credentials are missing. Please provide API Key and Token in Settings.',
+    });
+  }
+
+  if (!boardId || typeof boardId !== 'string') {
+    return res.status(400).json({ error: 'Valid boardId is required.' });
   }
 
   try {
     const client = new TrelloClient({ apiKey, token });
-    const test = await client.testConnection();
-
-    if (!test.success) {
-      return res.status(401).json({ error: test.error || 'Failed to authenticate with Trello API' });
-    }
+    const board = await client.getBoard(boardId);
 
     db.updateConnection({
-      apiKey: apiKey.trim(),
-      token: token.trim(),
-      boardId: boardId || '',
-      boardName: boardName || '',
+      boardId: board.id,
+      boardName: boardName || board.name,
       connected: true,
       isDemoData: false,
       mode: 'real',
@@ -171,28 +276,21 @@ app.post('/api/trello/connect', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Successfully connected to Trello as ${test.fullName} (@${test.username})`,
-      username: test.username,
-      fullName: test.fullName,
-      boardsCount: test.boardsCount || 0,
+      message: `Successfully connected to board "${board.name}"`,
+      boardId: board.id,
+      boardName: board.name,
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Internal Trello connection error' });
+    res.status(500).json({ error: err.message || 'Failed to connect to Trello board' });
   }
 });
 
-app.post('/api/trello/disconnect', (req, res) => {
-  if (currentUser.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Admin permissions required to disconnect Trello' });
-  }
+app.post('/api/trello/disconnect', requireAuth, requireRole(['ADMIN']), (req, res) => {
   db.disconnect();
-  res.json({ success: true, message: 'Disconnected from Trello successfully.' });
+  res.json({ success: true, message: 'Disconnected from Trello board successfully.' });
 });
 
-app.post('/api/trello/mode', (req, res) => {
-  if (currentUser.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Admin permissions required to change mode' });
-  }
+app.post('/api/trello/mode', requireAuth, requireRole(['ADMIN']), (req, res) => {
   const { mode } = req.body;
   if (mode !== 'real' && mode !== 'demo') {
     return res.status(400).json({ error: 'Mode must be "real" or "demo"' });
@@ -201,10 +299,11 @@ app.post('/api/trello/mode', (req, res) => {
   res.json({ success: true, mode, message: `Switched mode to ${mode}` });
 });
 
-app.get('/api/trello/boards', async (req, res) => {
+app.get('/api/trello/boards', requireAuth, async (req, res) => {
   const conn = db.getConnection();
-  const apiKey = (conn.apiKey || process.env.TRELLO_API_KEY || '').trim();
-  const token = (conn.token || process.env.TRELLO_TOKEN || '').trim();
+  const creds = db.getTrelloCredentials();
+  const apiKey = creds.apiKey;
+  const token = creds.token;
 
   if (!apiKey || !token) {
     if (conn.isDemoData || conn.mode === 'demo') {
@@ -218,7 +317,7 @@ app.get('/api/trello/boards', async (req, res) => {
       ]);
     }
     return res.status(400).json({
-      error: 'Trello API Key and Token are required to list real boards. Please configure them in Settings.',
+      error: 'Trello API credentials are missing. Please enter your Trello API Key and Token.',
     });
   }
 
@@ -231,11 +330,19 @@ app.get('/api/trello/boards', async (req, res) => {
   }
 });
 
-app.get('/api/trello/sync/status', (req, res) => {
+// Asynchronous Job Status Endpoint
+app.get('/api/trello/sync/status', requireAuth, (req, res) => {
+  const activeJob = getActiveJob();
+  const latestJob = getLatestJob();
   const status = db.getConnectionStatus();
   const lastRun = db.getLastSyncRun();
+
   res.json({
-    status: status.lastSyncStatus || 'idle',
+    inProgress: Boolean(activeJob),
+    activeJob: activeJob || undefined,
+    latestJob: latestJob || undefined,
+    status: activeJob ? 'in_progress' : (status.lastSyncStatus || 'idle'),
+    phase: activeJob?.phase,
     lastSyncAt: status.lastSyncAt,
     lastRun,
     totalCards: status.totalCards,
@@ -245,158 +352,33 @@ app.get('/api/trello/sync/status', (req, res) => {
   });
 });
 
-app.post('/api/trello/sync', async (req, res) => {
-  if (currentUser.role === 'VIEWER') {
-    return res.status(403).json({ error: 'Viewers cannot trigger synchronizations' });
-  }
+// Asynchronous Job-Based Trello Synchronization (ADMIN & MANAGER)
+app.post('/api/trello/sync', requireAuth, requireRole(['ADMIN', 'MANAGER']), syncLimiter, (req, res) => {
+  const { boardId, mode } = req.body;
 
-  const conn = db.getConnection();
-  const startTime = new Date();
-  const mode = conn.mode || (conn.isDemoData ? 'demo' : 'real');
-  const apiKey = (conn.apiKey || process.env.TRELLO_API_KEY || '').trim();
-  const token = (conn.token || process.env.TRELLO_TOKEN || '').trim();
-  const boardId = req.body.boardId || conn.boardId;
+  const result = startSyncJob({
+    boardId,
+    mode,
+    triggeredBy: req.user?.name,
+  });
 
-  // If in demo mode
-  if (mode === 'demo') {
-    const seed = getSeedData();
-    db.upsertBoard(seed.board);
-    db.upsertLists(seed.lists);
-    db.upsertMembers(seed.members);
-    db.upsertLabels(seed.labels);
-    seed.clients.forEach((c) => db.upsertClient(c));
-    db.upsertCards(seed.cards);
-
-    const run = {
-      id: `sync_${Date.now()}`,
-      startedAt: startTime.toISOString(),
-      completedAt: new Date().toISOString(),
-      status: 'success' as const,
-      recordsProcessed: seed.cards.length + seed.lists.length,
-      recordsCreated: 0,
-      recordsUpdated: seed.cards.length,
-      errors: [],
-    };
-    db.recordSyncRun(run);
-    db.updateConnection({
-      lastSyncAt: new Date().toISOString(),
-      lastSyncStatus: 'success',
-      isDemoData: true,
-      mode: 'demo',
-      connected: true,
-    });
-
-    return res.json({
-      success: true,
-      message: 'Demo dataset synchronized and refreshed successfully.',
-      run,
+  if (result.alreadyRunning) {
+    return res.status(409).json({
+      success: false,
+      error: 'A synchronization job is already in progress. Please poll /api/trello/sync/status for progress.',
+      syncRun: result.syncRun,
     });
   }
 
-  // REAL TRELLO MODE: MUST NOT FABRICATE CARDS
-  if (!apiKey || !token) {
-    return res.status(400).json({
-      error:
-        'Trello credentials not configured. Please provide TRELLO_API_KEY and TRELLO_TOKEN in Settings or the environment to sync real data.',
-    });
-  }
-
-  if (!boardId) {
-    return res.status(400).json({
-      error: 'Please select a Trello board to synchronize in Settings.',
-    });
-  }
-
-  try {
-    const client = new TrelloClient({ apiKey, token });
-
-    const [rawBoard, rawLists, rawMembers, rawLabels, rawCards, rawBoardChecklists, rawBoardActions] = await Promise.all([
-      client.getBoard(boardId),
-      client.getLists(boardId),
-      client.getMembers(boardId),
-      client.getLabels(boardId),
-      client.getCardsWithDetails(boardId),
-      client.getBoardChecklists(boardId),
-      client.getBoardActions(boardId, 1000).catch((err) => {
-        console.warn('Could not fetch board actions (fallback to empty):', err.message);
-        return [];
-      }),
-    ]);
-
-    const existingClients = db.getClients();
-    const normalized = normalizeTrelloPayload(
-      {
-        board: rawBoard,
-        lists: rawLists,
-        members: rawMembers,
-        labels: rawLabels,
-        cards: rawCards,
-        boardChecklists: rawBoardChecklists,
-        boardActions: rawBoardActions,
-      },
-      existingClients
-    );
-
-    // Completely replace with clean board data and remove any old demo records
-    db.replaceBoardData(normalized);
-
-    // Auto-generate fresh real management brief
-    try {
-      await generateManagementBrief({ periodType: 'this_month' });
-    } catch (bErr: any) {
-      console.warn('Auto-brief generation notice:', bErr.message);
-    }
-
-    const run = {
-      id: `sync_${Date.now()}`,
-      startedAt: startTime.toISOString(),
-      completedAt: new Date().toISOString(),
-      status: 'success' as const,
-      recordsProcessed: rawCards.length + rawLists.length,
-      recordsCreated: rawCards.length,
-      recordsUpdated: 0,
-      errors: [],
-    };
-    db.recordSyncRun(run);
-
-    db.updateConnection({
-      boardId: rawBoard.id,
-      boardName: rawBoard.name,
-      connected: true,
-      isDemoData: false,
-      mode: 'real',
-      lastSyncAt: new Date().toISOString(),
-      lastSyncStatus: 'success',
-    });
-
-    res.json({
-      success: true,
-      message: `Synchronized ${rawCards.length} cards, ${rawBoardChecklists.length} checklists, and ${normalized.clients.length} clients from real Trello board "${rawBoard.name}".`,
-      cardsCount: rawCards.length,
-      listsCount: rawLists.length,
-      clientsCount: normalized.clients.length,
-      run,
-    });
-  } catch (err: any) {
-    const run = {
-      id: `sync_${Date.now()}`,
-      startedAt: startTime.toISOString(),
-      completedAt: new Date().toISOString(),
-      status: 'failed' as const,
-      recordsProcessed: 0,
-      recordsCreated: 0,
-      recordsUpdated: 0,
-      errors: [err.message || 'Unknown sync failure'],
-    };
-    db.recordSyncRun(run);
-    db.updateConnection({
-      lastSyncStatus: 'failed',
-    });
-    res.status(500).json({ error: err.message || 'Synchronization failed', run });
-  }
+  // Return immediately with 202 Accepted and job handle
+  res.status(202).json({
+    success: true,
+    message: 'Trello synchronization initiated in background.',
+    syncRun: result.syncRun,
+  });
 });
 
-app.post('/api/trello/seed-demo', (req, res) => {
+app.post('/api/trello/seed-demo', requireAuth, requireRole(['ADMIN']), (req, res) => {
   const seed = getSeedData();
   db.clearAll();
   db.upsertBoard(seed.board);
@@ -411,6 +393,7 @@ app.post('/api/trello/seed-demo', (req, res) => {
     boardName: seed.board.name,
     connected: true,
     isDemoData: true,
+    mode: 'demo',
     lastSyncAt: new Date().toISOString(),
     lastSyncStatus: 'success',
   });
@@ -426,50 +409,53 @@ app.post('/api/trello/seed-demo', (req, res) => {
 // -------------------------------------------------------------
 // 4. LIST SEMANTICS CONFIGURATION
 // -------------------------------------------------------------
-app.get('/api/lists', (req, res) => {
+app.get('/api/lists', requireAuth, (req, res) => {
   res.json(db.getLists());
 });
 
-app.post('/api/lists/semantics', (req, res) => {
-  if (currentUser.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Admin permissions required to modify list semantics' });
-  }
-
+app.post('/api/lists/semantics', requireAuth, requireRole(['ADMIN']), (req, res) => {
   const { listId, semanticType, mappedStatus, mappedPerson } = req.body;
-  if (!listId || !semanticType) {
-    return res.status(400).json({ error: 'listId and semanticType are required' });
+  if (!listId || typeof listId !== 'string' || !semanticType || typeof semanticType !== 'string') {
+    return res.status(400).json({ error: 'listId and valid semanticType are required' });
   }
 
-  db.updateListSemantics(listId, semanticType, mappedStatus, mappedPerson);
+  const validTypes = ['status', 'person', 'resources', 'client', 'adhoc', 'other'];
+  if (!validTypes.includes(semanticType)) {
+    return res.status(400).json({ error: `semanticType must be one of: ${validTypes.join(', ')}` });
+  }
+
+  db.updateListSemantics(listId, semanticType as any, mappedStatus, mappedPerson);
   res.json({ success: true, list: db.getLists().find((l) => l.id === listId) });
 });
 
 // -------------------------------------------------------------
 // 5. CHAT & INTELLIGENCE RETRIEVAL
 // -------------------------------------------------------------
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', requireAuth, async (req, res) => {
   const { question, sessionId } = req.body;
   if (!question || typeof question !== 'string' || !question.trim()) {
     return res.status(400).json({ error: 'Question is required' });
   }
 
+  const sanitizedQuestion = question.trim().slice(0, 1500);
+
   try {
     // 1. Audit / Session
     let activeSession = sessionId ? db.getChatSession(sessionId) : null;
     if (!activeSession) {
-      activeSession = db.createChatSession(question.slice(0, 50));
+      activeSession = db.createChatSession(sanitizedQuestion.slice(0, 50));
     }
 
     // Add user message
     db.addChatMessage(activeSession.id, {
       role: 'user',
-      content: question,
+      content: sanitizedQuestion,
     });
 
     // 2. Query Understanding & Intent Extraction
     const knownClients = db.getClients();
     const knownMembers = db.getMembers();
-    const intent = extractQueryIntent(question, knownClients, knownMembers);
+    const intent = extractQueryIntent(sanitizedQuestion, knownClients, knownMembers);
 
     // 3. Hybrid Retrieval & Relevance Scoring
     const scoredCards = hybridRetrieve(intent, 30);
@@ -524,11 +510,11 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-app.get('/api/chat/sessions', (req, res) => {
+app.get('/api/chat/sessions', requireAuth, (req, res) => {
   res.json(db.getChatSessions());
 });
 
-app.get('/api/chat/sessions/:id', (req, res) => {
+app.get('/api/chat/sessions/:id', requireAuth, (req, res) => {
   const session = db.getChatSession(req.params.id);
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
@@ -539,11 +525,11 @@ app.get('/api/chat/sessions/:id', (req, res) => {
 // -------------------------------------------------------------
 // 6. CLIENT INTELLIGENCE ENDPOINTS
 // -------------------------------------------------------------
-app.get('/api/clients', (req, res) => {
+app.get('/api/clients', requireAuth, (req, res) => {
   res.json(db.getClients());
 });
 
-app.get('/api/clients/:id', (req, res) => {
+app.get('/api/clients/:id', requireAuth, (req, res) => {
   const client = db.getClientById(req.params.id);
   if (!client) {
     return res.status(404).json({ error: 'Client not found' });
@@ -551,14 +537,10 @@ app.get('/api/clients/:id', (req, res) => {
   res.json(client);
 });
 
-app.post('/api/clients/:id/aliases', (req, res) => {
-  if (currentUser.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Admin permissions required to modify client aliases' });
-  }
-
+app.post('/api/clients/:id/aliases', requireAuth, requireRole(['ADMIN']), (req, res) => {
   const { alias } = req.body;
-  if (!alias || !alias.trim()) {
-    return res.status(400).json({ error: 'Alias is required' });
+  if (!alias || typeof alias !== 'string' || !alias.trim()) {
+    return res.status(400).json({ error: 'Valid alias string is required' });
   }
 
   const client = db.getClientById(req.params.id);
@@ -566,8 +548,9 @@ app.post('/api/clients/:id/aliases', (req, res) => {
     return res.status(404).json({ error: 'Client not found' });
   }
 
-  if (!client.aliases.includes(alias.trim())) {
-    client.aliases.push(alias.trim());
+  const cleanAlias = alias.trim().slice(0, 100);
+  if (!client.aliases.includes(cleanAlias)) {
+    client.aliases.push(cleanAlias);
     db.upsertClient(client);
   }
 
@@ -577,7 +560,7 @@ app.post('/api/clients/:id/aliases', (req, res) => {
 // -------------------------------------------------------------
 // 7. TEAM OVERVIEW (NON-SURVEILLANCE)
 // -------------------------------------------------------------
-app.get('/api/team', (req, res) => {
+app.get('/api/team', requireAuth, (req, res) => {
   const cards = db.getCards();
   const members = db.getMembers();
   const activities = db.getActivities();
@@ -671,8 +654,13 @@ app.get('/api/team', (req, res) => {
 // -------------------------------------------------------------
 // 8. MANAGEMENT BRIEFS
 // -------------------------------------------------------------
-app.post('/api/management-brief', async (req, res) => {
+app.post('/api/management-brief', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res) => {
   const { periodType = 'this_month', dateFrom, dateTo } = req.body;
+  const allowed = ['overall', 'this_week', 'last_week', 'this_month', 'last_month'];
+  if (!allowed.includes(periodType)) {
+    return res.status(400).json({ error: `periodType must be one of: ${allowed.join(', ')}` });
+  }
+
   try {
     const brief = await generateManagementBrief({
       periodType,
@@ -685,11 +673,11 @@ app.post('/api/management-brief', async (req, res) => {
   }
 });
 
-app.get('/api/management-briefs', (req, res) => {
+app.get('/api/management-briefs', requireAuth, (req, res) => {
   res.json(db.getManagementBriefs());
 });
 
-app.get('/api/management-briefs/:id', (req, res) => {
+app.get('/api/management-briefs/:id', requireAuth, (req, res) => {
   const brief = db.getManagementBriefById(req.params.id);
   if (!brief) {
     return res.status(404).json({ error: 'Brief not found' });
@@ -702,44 +690,18 @@ app.get('/api/management-briefs/:id', (req, res) => {
 // -------------------------------------------------------------
 async function setupViteMiddleware() {
   if (pgStore.isConfigured()) {
-    pgStore.initSchema().catch((err) => console.warn('Database initialization warning:', err.message));
+    try {
+      await pgStore.initSchema();
+      await db.loadFromPostgres();
+    } catch (err: any) {
+      console.warn('PostgreSQL initialization notice:', err.message);
+    }
   }
 
-  // Ensure clean state and auto-generate real brief if real data exists
   try {
     db.cleanDemoDataIfReal();
-    const isReal = db.getConnectionStatus().mode === 'real';
-    const existingCards = db.getCards();
-    const existingClients = db.getClients();
-
-    if (isReal && existingCards.length > 0 && existingClients.length <= 1) {
-      const boards = db.getBoards();
-      const board = boards[0] || {
-        id: db.getConnectionStatus().boardId || '68114872282c6eabcdad8400',
-        name: db.getConnectionStatus().boardName || 'PDS/GFM-SEO',
-        url: '',
-        closed: false,
-      };
-      const normalized = normalizeTrelloPayload(
-        {
-          board: { id: board.id, name: board.name, url: board.url || '', closed: false },
-          lists: db.getLists(),
-          members: db.getMembers(),
-          labels: db.getLabels(),
-          cards: existingCards,
-          boardChecklists: Object.values((db as any).state.checklists || {}),
-        },
-        []
-      );
-      db.replaceBoardData(normalized);
-    }
-
-    const briefs = db.getManagementBriefs();
-    if (isReal && briefs.length === 0) {
-      await generateManagementBrief({ periodType: 'this_month' });
-    }
   } catch (initErr: any) {
-    console.warn('Initial real data setup notice:', initErr.message);
+    console.warn('Initial clean demo check notice:', initErr.message);
   }
 
   if (process.env.NODE_ENV !== 'production') {
@@ -757,9 +719,14 @@ async function setupViteMiddleware() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`SEO & Content Team Intelligence Server listening on port ${PORT}`);
-  });
+  // Only start listening if not running in a Vercel serverless environment
+  if (!process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`SEO & Content Team Intelligence Server listening on port ${PORT}`);
+    });
+  }
 }
 
 setupViteMiddleware();
+
+export default app;

@@ -29,14 +29,13 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Trello Connections & Configuration
+-- 2. Trello Connections & Configuration (NO SECRETS STORED IN DB)
 CREATE TABLE IF NOT EXISTS trello_connections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  api_key_encrypted TEXT,
-  token_encrypted TEXT,
   board_id VARCHAR(100),
   board_name VARCHAR(255),
   status VARCHAR(50) DEFAULT 'disconnected',
+  mode VARCHAR(50) DEFAULT 'real',
   is_demo_data BOOLEAN DEFAULT FALSE,
   last_sync_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -112,12 +111,18 @@ CREATE TABLE IF NOT EXISTS trello_cards (
   date_last_activity TIMESTAMPTZ,
   closed BOOLEAN DEFAULT FALSE,
   status_semantic VARCHAR(50) DEFAULT 'To Do',
+  is_completed BOOLEAN DEFAULT FALSE,
+  is_under_progress BOOLEAN DEFAULT FALSE,
+  completed_at TIMESTAMPTZ,
+  completed_at_verified BOOLEAN DEFAULT FALSE,
+  completed_by VARCHAR(255),
   client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
   client_canonical VARCHAR(255),
   raw_labels JSONB DEFAULT '[]',
   raw_members JSONB DEFAULT '[]',
   content_hash VARCHAR(64),
   embedding vector(768),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
   synced_at TIMESTAMPTZ DEFAULT NOW()
 );
 

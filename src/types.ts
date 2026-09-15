@@ -174,6 +174,8 @@ export interface TrelloConnectionStatus {
   totalClients: number;
   apiKeyConfigured: boolean;
   tokenConfigured: boolean;
+  maskedApiKey?: string;
+  hasCustomCredentials?: boolean;
 }
 
 export interface ChatSource {
@@ -223,6 +225,7 @@ export interface ChatMessage {
 
 export interface ChatSession {
   id: string;
+  userId?: string;
   title: string;
   messages: ChatMessage[];
   createdAt: string;

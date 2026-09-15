@@ -186,10 +186,10 @@ export function hybridRetrieve(intent: QueryIntent, threshold = 35): ScoredCard[
       const from = intent.dateFrom;
       const to = intent.dateTo;
 
-      const isCreatedInWindow = card.createdAt >= from && card.createdAt <= to;
+      const isCreatedInWindow = Boolean(card.createdAt && card.createdAt >= from && card.createdAt <= to);
       const isCompletedInWindow = Boolean(
+        (card.isCompleted || card.statusSemantic === 'Completed') &&
         card.completedAt &&
-        card.completedAtVerified &&
         card.completedAt >= from &&
         card.completedAt <= to
       );
@@ -198,7 +198,7 @@ export function hybridRetrieve(intent: QueryIntent, threshold = 35): ScoredCard[
       );
 
       if (isCreatedInWindow || isCompletedInWindow || hasChecklistCompletedInWindow) {
-        score += 45;
+        score += 55;
         if (isCompletedInWindow) {
           reasons.push(`Card marked complete in ${intent.timeRangeDescription || 'period'}`);
         } else if (isCreatedInWindow) {
@@ -208,7 +208,7 @@ export function hybridRetrieve(intent: QueryIntent, threshold = 35): ScoredCard[
         }
       } else {
         // Exclude older completed or inactive cards that had no creation or completion in this window
-        score -= 50;
+        score -= 60;
       }
     }
 
