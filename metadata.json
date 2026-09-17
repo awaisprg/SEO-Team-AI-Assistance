@@ -1,6 +1,6 @@
 {
   "name": "SEO & Content Team Intelligence",
-  "description": "Internal management intelligence assistant for SEO and Content teams to query Trello work, track AI & client initiatives, and generate executive briefs with evidence.",
+  "description": "Internal management intelligence assistant for GoldFlex Marketing SEO and Content teams to query Trello work, track AI & client initiatives, and generate executive briefs with evidence.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

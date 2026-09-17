@@ -1,6 +1,16 @@
 import React from 'react';
-import { Sparkles, RefreshCw, Database, Settings, ShieldCheck, User, Eye, LogOut } from 'lucide-react';
-import { UserRole, TrelloConnectionStatus, UserSession } from '../types';
+import {
+  Sparkles,
+  RefreshCw,
+  Database,
+  Settings,
+  ShieldCheck,
+  Eye,
+  LogOut,
+  Layers,
+  ChevronRight,
+} from 'lucide-react';
+import { TrelloConnectionStatus, UserSession } from '../types';
 
 interface HeaderProps {
   connection: TrelloConnectionStatus | null;
@@ -24,146 +34,203 @@ export const Header: React.FC<HeaderProps> = ({
   syncPhase,
 }) => {
   const role = user?.role || 'VIEWER';
+  const isAdmin = role === 'ADMIN';
 
   return (
-    <header id="app-header" className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <header
+      id="app-header"
+      className="bg-white/95 backdrop-blur-md border-b border-[#EAEAEC] sticky top-0 z-40 transition-colors shadow-2xs"
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo & Title */}
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg bg-slate-900 flex items-center justify-center text-white shadow-xs">
-              <Sparkles className="w-5 h-5 text-indigo-400" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-lg font-semibold text-slate-900 tracking-tight leading-tight">
-                  SEO & Content Team Intelligence
-                </h1>
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-indigo-50 text-indigo-700 border border-indigo-200/60">
-                  Management Assistant
-                </span>
+        <div className="flex items-center justify-between h-16 gap-4">
+          {/* Left: Brand & Product Identity */}
+          <div className="flex items-center space-x-3.5 shrink-0">
+            <a
+              href="https://goldflexmarketing.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center group transition-opacity hover:opacity-90"
+              title="Gold Flex Marketing Home"
+            >
+              <img
+                src="https://goldflexmarketing.com/wp-content/uploads/2026/01/Gold-Flex-Marketing-Dark-1024x260.png"
+                alt="Gold Flex Marketing"
+                className="h-7 sm:h-8 w-auto object-contain shrink-0"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                  const fallback = document.getElementById('gfm-logo-fallback');
+                  if (fallback) fallback.style.display = 'flex';
+                }}
+              />
+              <div
+                id="gfm-logo-fallback"
+                style={{ display: 'none' }}
+                className="items-center space-x-2 font-bold tracking-tight text-[#27272B] text-base"
+              >
+                <div className="w-8 h-8 rounded-xl bg-[#8963FB] flex items-center justify-center text-white font-bold text-sm shadow-xs">
+                  GF
+                </div>
+                <span className="hidden sm:inline">Gold Flex Marketing</span>
               </div>
-              <p className="text-xs text-slate-500 hidden sm:block">
-                Trello workstream retrieval, AI initiative tracking & executive briefs
-              </p>
+            </a>
+
+            <div className="h-5 w-px bg-[#EAEAEC] hidden md:block" />
+
+            <div className="hidden md:flex items-center space-x-2">
+              <span className="text-xs font-bold text-[#27272B] tracking-tight">
+                SEO & Content Intelligence
+              </span>
+              <span className="px-2 py-0.5 text-[10px] font-semibold bg-[#F2F2FD] text-[#2F20A2] rounded-md border border-[#C6C1F3]">
+                Executive Hub
+              </span>
             </div>
           </div>
 
-          {/* Center: Board Status indicator (clickable to open settings) */}
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="hidden md:flex items-center space-x-2 text-xs bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
-            title="Click to view Trello integration settings & connection status"
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                connection?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-              }`}
-            />
-            {connection?.isDemoData ? (
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-                Demo Mode
-              </span>
-            ) : (
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                Real Trello
-              </span>
-            )}
-            <span className="text-slate-500 font-medium">Board:</span>
-            <span className="font-semibold text-slate-800 truncate max-w-[160px]" title={connection?.boardName || 'Not Connected'}>
-              {connection?.boardName || (connection?.connected ? 'Connected' : 'Configure Board')}
-            </span>
-            {connection?.lastSyncAt && (
-              <span className="text-slate-400 text-[11px]">
-                • Synced {new Date(connection.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            )}
-          </button>
+          {/* Center: Live Board Connection Status */}
+          <div className="hidden lg:flex items-center">
+            {isAdmin ? (
+              <button
+                type="button"
+                id="header-board-status-btn"
+                onClick={onOpenSettings}
+                className="group flex items-center space-x-2 px-3 py-1.5 rounded-full bg-[#F8F8FC] hover:bg-[#F2F2FD] border border-[#EAEAEC] hover:border-[#C6C1F3] text-xs transition-all cursor-pointer shadow-2xs"
+                title="Click to manage Trello API credentials & board mapping"
+              >
+                <span className="relative flex h-2 w-2">
+                  {connection?.connected && (
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#198754] opacity-75" />
+                  )}
+                  <span
+                    className={`relative inline-flex rounded-full h-2 w-2 ${
+                      connection?.connected ? 'bg-[#198754]' : 'bg-[#FFBE00]'
+                    }`}
+                  />
+                </span>
 
-          {/* Right Controls */}
-          <div className="flex items-center space-x-2">
-            {/* Sync Now Button */}
-            {role !== 'VIEWER' && (
+                <span className="font-medium text-[#5D5C68] group-hover:text-[#2F20A2] transition-colors">
+                  {connection?.isDemoData ? 'Demo Dataset' : 'Trello Board'}:
+                </span>
+
+                <span
+                  className="font-semibold text-[#27272B] truncate max-w-[140px] xl:max-w-[180px]"
+                  title={connection?.boardName || 'Not Connected'}
+                >
+                  {connection?.boardName || (connection?.connected ? 'Connected' : 'Configure Board')}
+                </span>
+
+                {connection?.lastSyncAt && (
+                  <span className="text-[11px] text-[#6E6D7B] font-normal border-l border-[#EAEAEC] pl-2 ml-1">
+                    {new Date(connection.lastSyncAt).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                )}
+                <ChevronRight className="w-3 h-3 text-[#6E6D7B] group-hover:text-[#2F20A2] transition-transform group-hover:translate-x-0.5" />
+              </button>
+            ) : (
+              <div
+                className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-[#F8F8FC] border border-[#EAEAEC] text-xs shadow-2xs"
+                title="Trello connection status"
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    connection?.connected ? 'bg-[#198754]' : 'bg-[#FFBE00]'
+                  }`}
+                />
+                <span className="font-medium text-[#5D5C68]">Board:</span>
+                <span className="font-semibold text-[#27272B] truncate max-w-[160px]">
+                  {connection?.boardName || 'Active Board'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Actions, User & Settings Cluster */}
+          <div className="flex items-center space-x-2 sm:space-x-2.5 shrink-0">
+            {/* Admin Action: Sync Trello */}
+            {isAdmin && (
               <button
                 id="header-sync-btn"
                 onClick={onSync}
                 disabled={isSyncing}
-                className="inline-flex items-center space-x-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 focus:outline-hidden disabled:opacity-60 transition-colors shadow-2xs cursor-pointer"
-                title={syncPhase || 'Synchronize Trello cards, checklists, and activities'}
+                className="inline-flex items-center space-x-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl bg-[#8963FB] hover:bg-[#7852E8] active:bg-[#683EE6] text-white focus:outline-hidden disabled:opacity-60 transition-all shadow-xs cursor-pointer group"
+                title={syncPhase || 'Synchronize cards, checklists, activities, and client initiatives'}
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-indigo-600' : 'text-slate-500'}`} />
-                <span className="hidden sm:inline">{isSyncing ? (syncPhase ? `${syncPhase.slice(0, 16)}...` : 'Syncing...') : 'Sync Trello'}</span>
+                <RefreshCw
+                  className={`w-3.5 h-3.5 text-white ${
+                    isSyncing ? 'animate-spin' : 'group-hover:rotate-45 transition-transform'
+                  }`}
+                />
+                <span className="hidden sm:inline">
+                  {isSyncing ? (syncPhase ? `${syncPhase.slice(0, 14)}...` : 'Syncing...') : 'Sync Trello'}
+                </span>
               </button>
             )}
 
-            {/* Seed Demo Data Button (Admin only) */}
-            {role === 'ADMIN' && (
+            {/* Admin Action: Reset Demo */}
+            {isAdmin && (
               <button
                 id="header-seed-demo-btn"
                 onClick={onSeedDemo}
-                className="inline-flex items-center space-x-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
-                title="Reset to rich demo dataset (AI Overviews, clients, checklists)"
+                className="inline-flex items-center space-x-1.5 text-xs font-medium px-3 py-2 rounded-xl bg-white text-[#5D5C68] border border-[#EAEAEC] hover:bg-[#F8F8FC] hover:text-[#27272B] hover:border-[#8963FB]/30 transition-all shadow-2xs cursor-pointer"
+                title="Reset to pre-loaded rich demo dataset"
               >
-                <Database className="w-3.5 h-3.5 text-slate-400" />
-                <span className="hidden lg:inline">Reset Demo</span>
+                <Database className="w-3.5 h-3.5 text-[#6E6D7B]" />
+                <span className="hidden xl:inline">Reset Demo</span>
               </button>
             )}
 
-            {/* Authenticated User Profile & Role Badge */}
-            {user && (
-              <div className="flex items-center space-x-2 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200">
-                <div className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-bold uppercase">
-                  {user.name.slice(0, 2)}
-                </div>
-                <div className="hidden sm:block text-left">
-                  <div className="text-xs font-semibold text-slate-800 leading-none truncate max-w-[110px]">
-                    {user.name}
-                  </div>
-                  <div className="text-[10px] text-slate-500 leading-tight truncate max-w-[110px]">
-                    {user.email}
-                  </div>
-                </div>
-
-                {/* Server-verified role badge */}
-                <span
-                  className={`inline-flex items-center space-x-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                    role === 'ADMIN'
-                      ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                      : role === 'MANAGER'
-                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                      : 'bg-slate-100 text-slate-700 border border-slate-200'
-                  }`}
-                  title={`Role: ${role} (verified server-side)`}
-                >
-                  {role === 'ADMIN' ? (
-                    <ShieldCheck className="w-2.5 h-2.5" />
-                  ) : role === 'MANAGER' ? (
-                    <User className="w-2.5 h-2.5" />
-                  ) : (
-                    <Eye className="w-2.5 h-2.5" />
-                  )}
-                  <span>{role}</span>
-                </span>
-              </div>
+            {/* Admin Action: Settings Gear */}
+            {isAdmin && (
+              <button
+                id="header-settings-btn"
+                onClick={onOpenSettings}
+                className="p-2 rounded-xl text-[#5D5C68] hover:text-[#27272B] hover:bg-[#F2F2FD] border border-transparent hover:border-[#C6C1F3] transition-all cursor-pointer"
+                title="Configure Trello integration, API keys & custom credentials"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
             )}
 
-            {/* Settings Trigger */}
-            <button
-              id="header-settings-btn"
-              onClick={onOpenSettings}
-              className="p-1.5 rounded-md text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
-              title={role === 'ADMIN' ? 'Configure Trello API Key, Token & Board' : 'View Trello Integration Status'}
-            >
-              <Settings className="w-4 h-4" />
-            </button>
+            <div className="h-5 w-px bg-[#EAEAEC]" />
+
+            {/* User Profile Block */}
+            {user && (
+              <div className="flex items-center space-x-2 pl-1">
+                <div
+                  className="w-8 h-8 rounded-xl bg-[#27272B] text-white flex items-center justify-center text-xs font-bold tracking-tight shadow-xs shrink-0"
+                  title={`${user.name} (${user.email})`}
+                >
+                  {user.name.slice(0, 2).toUpperCase()}
+                </div>
+
+                <div className="hidden sm:block text-left">
+                  <div className="text-xs font-semibold text-[#27272B] leading-snug truncate max-w-[120px]">
+                    {user.name}
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span
+                      className={`inline-flex items-center text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider ${
+                        isAdmin
+                          ? 'bg-[#0C0528] text-white'
+                          : 'bg-[#F2F2FD] text-[#2F20A2] border border-[#C6C1F3]'
+                      }`}
+                    >
+                      {isAdmin && <ShieldCheck className="w-2.5 h-2.5 mr-0.5 text-[#A78AFD]" />}
+                      {role}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Sign Out Button */}
             <button
               id="header-signout-btn"
               onClick={onSignOut}
-              className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-              title="Sign Out"
+              className="p-2 rounded-xl text-[#6E6D7B] hover:text-[#BC2D3B] hover:bg-rose-50 hover:border-rose-200 border border-transparent transition-all cursor-pointer"
+              title="Sign Out of Session"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -173,3 +240,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

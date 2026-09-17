@@ -20,6 +20,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { pgStore } from './postgres';
+import { getSeedChatSessions } from '../trello/seedSessions';
 
 export interface TrelloConnectionConfig {
   boardId: string;
@@ -846,6 +847,16 @@ class Store {
   }
 
   getChatSessions(): ChatSession[] {
+    if (!this.state.chatSessions) {
+      this.state.chatSessions = {};
+    }
+    if (Object.keys(this.state.chatSessions).length === 0) {
+      const seedSessions = getSeedChatSessions();
+      for (const s of seedSessions) {
+        this.state.chatSessions[s.id] = s;
+      }
+      this.persist();
+    }
     return Object.values(this.state.chatSessions).sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
@@ -853,6 +864,20 @@ class Store {
 
   getChatSession(id: string): ChatSession | null {
     return this.state.chatSessions[id] || null;
+  }
+
+  deleteChatSession(id: string): boolean {
+    if (this.state.chatSessions[id]) {
+      delete this.state.chatSessions[id];
+      this.persist();
+      return true;
+    }
+    return false;
+  }
+
+  clearChatSessions(): void {
+    this.state.chatSessions = {};
+    this.persist();
   }
 
   addChatMessage(sessionId: string, message: Omit<ChatMessage, 'id' | 'createdAt'>): ChatMessage {

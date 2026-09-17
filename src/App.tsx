@@ -22,6 +22,7 @@ import { AuthScreen } from './components/AuthScreen';
 import {
   ChatMessage,
   ChatSource,
+  ChatSession,
   ManagementBrief,
   ClientEntity,
   TrelloList,
@@ -46,6 +47,8 @@ export default function App() {
   const [connection, setConnection] = useState<TrelloConnectionStatus | null>(null);
   const [metrics, setMetrics] = useState<TeamMetrics | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [currentBrief, setCurrentBrief] = useState<ManagementBrief | null>(null);
   const [savedBriefs, setSavedBriefs] = useState<ManagementBrief[]>([]);
   const [clients, setClients] = useState<ClientEntity[]>([]);
@@ -96,12 +99,13 @@ export default function App() {
   // Initial Data Fetch
   const refreshAllData = async () => {
     try {
-      const [statusRes, teamRes, clientsRes, listsRes, briefsRes] = await Promise.all([
+      const [statusRes, teamRes, clientsRes, listsRes, briefsRes, sessionsRes] = await Promise.all([
         fetchWithAuth('/api/trello/status').then((r) => (r.ok ? r.json() : null)),
         fetchWithAuth('/api/team').then((r) => (r.ok ? r.json() : null)),
         fetchWithAuth('/api/clients').then((r) => (r.ok ? r.json() : [])),
         fetchWithAuth('/api/lists').then((r) => (r.ok ? r.json() : [])),
         fetchWithAuth('/api/management-briefs').then((r) => (r.ok ? r.json() : [])),
+        fetchWithAuth('/api/chat/sessions').then((r) => (r.ok ? r.json() : [])),
       ]);
 
       if (statusRes) setConnection(statusRes);
@@ -110,6 +114,13 @@ export default function App() {
       if (teamRes?.activeCards) setAllCards([...teamRes.activeCards, ...(teamRes.recentCompleted || [])]);
       if (Array.isArray(clientsRes)) setClients(clientsRes);
       if (Array.isArray(listsRes)) setLists(listsRes);
+      if (Array.isArray(sessionsRes)) {
+        setChatSessions(sessionsRes);
+        if (sessionsRes.length > 0 && !currentSessionId && messages.length === 0) {
+          setCurrentSessionId(sessionsRes[0].id);
+          setMessages(sessionsRes[0].messages || []);
+        }
+      }
       if (Array.isArray(briefsRes)) {
         setSavedBriefs(briefsRes);
         if (briefsRes.length > 0 && !currentBrief) {
@@ -151,7 +162,7 @@ export default function App() {
       const res = await fetchWithAuth('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, sessionId: currentSessionId }),
       });
 
       if (!res.ok) {
@@ -161,6 +172,16 @@ export default function App() {
 
       const data = await res.json();
       setMessages((prev) => [...prev, data.message]);
+      if (data.sessionId) {
+        setCurrentSessionId(data.sessionId);
+      }
+      // Re-fetch sessions in background to update history sidebar list & timestamps
+      fetchWithAuth('/api/chat/sessions')
+        .then((r) => (r.ok ? r.json() : []))
+        .then((updated) => {
+          if (Array.isArray(updated)) setChatSessions(updated);
+        })
+        .catch(() => {});
     } catch (err: any) {
       const errorMsg: ChatMessage = {
         id: `err_${Date.now()}`,
@@ -174,15 +195,44 @@ export default function App() {
     }
   };
 
+  // Select a session from history
+  const handleSelectSession = (sessionId: string) => {
+    const session = chatSessions.find((s) => s.id === sessionId);
+    if (session) {
+      setCurrentSessionId(session.id);
+      setMessages(session.messages || []);
+      setActiveTab('chat');
+    }
+  };
+
+  // Start a fresh intelligence query
+  const handleNewSession = () => {
+    setCurrentSessionId(null);
+    setMessages([]);
+    setActiveTab('chat');
+  };
+
+  // Delete a session from history archive
+  const handleDeleteSession = async (sessionId: string) => {
+    try {
+      const res = await fetchWithAuth(`/api/chat/sessions/${sessionId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setChatSessions((prev) => prev.filter((s) => s.id !== sessionId));
+        if (currentSessionId === sessionId) {
+          setCurrentSessionId(null);
+          setMessages([]);
+        }
+        showNotification('success', 'Query removed from archive.');
+      }
+    } catch (err) {
+      showNotification('error', 'Failed to remove query session.');
+    }
+  };
+
   // Generate Executive Brief
   const handleGenerateBrief = async (
     periodType: 'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month'
   ) => {
-    if (user?.role === 'VIEWER') {
-      showNotification('error', 'Viewers cannot generate management briefs.');
-      return;
-    }
-
     setIsGeneratingBrief(true);
     try {
       const res = await fetchWithAuth('/api/management-brief', {
@@ -207,10 +257,10 @@ export default function App() {
     }
   };
 
-  // Asynchronous Job-Based Trello Synchronization with Polling
+  // Asynchronous Job-Based Trello Synchronization with Polling (Admin only)
   const handleSync = async () => {
-    if (user?.role === 'VIEWER') {
-      showNotification('error', 'Viewers cannot trigger synchronizations.');
+    if (user?.role !== 'ADMIN') {
+      showNotification('error', 'Only Administrators can trigger synchronizations.');
       return;
     }
 
@@ -365,10 +415,10 @@ export default function App() {
 
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white space-y-3">
-        <RefreshCw className="w-8 h-8 text-indigo-400 animate-spin" />
-        <div className="text-sm font-medium text-slate-300">
-          Verifying security credentials & session...
+      <div className="min-h-screen bg-[#0C0528] flex flex-col items-center justify-center text-white space-y-3">
+        <RefreshCw className="w-8 h-8 text-[#8963FB] animate-spin" />
+        <div className="text-sm font-semibold text-[#A78AFD] tracking-wide">
+          Verifying Gold Flex security credentials & session...
         </div>
       </div>
     );
@@ -380,7 +430,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100/60 text-slate-900 flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="min-h-screen bg-[#F8F8FC] text-[#27272B] flex flex-col font-sans selection:bg-[#8963FB]/20 selection:text-[#2F20A2]">
       {/* Top Header */}
       <Header
         connection={connection}
@@ -388,7 +438,9 @@ export default function App() {
         onSignOut={handleSignOut}
         onSync={handleSync}
         onSeedDemo={handleSeedDemo}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSettings={() => {
+          if (user?.role === 'ADMIN') setIsSettingsOpen(true);
+        }}
         isSyncing={isSyncing}
         syncPhase={syncPhase}
       />
@@ -397,10 +449,10 @@ export default function App() {
       {notification && (
         <div className="fixed top-20 right-6 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
           <div
-            className={`px-4 py-2.5 rounded-lg text-xs font-medium shadow-lg flex items-center space-x-2 ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xl flex items-center space-x-2 ${
               notification.type === 'success'
-                ? 'bg-emerald-900 text-white'
-                : 'bg-rose-900 text-white'
+                ? 'bg-[#198754] text-white'
+                : 'bg-[#BC2D3B] text-white'
             }`}
           >
             <AlertCircle className="w-4 h-4" />
@@ -414,59 +466,100 @@ export default function App() {
         {/* KPI Strip */}
         <MetricsBar metrics={metrics} onSelectFilter={handleSelectFilter} />
 
-        {/* View Navigation Tabs */}
-        <div className="flex items-center space-x-1 border-b border-slate-200 mb-6 overflow-x-auto pb-px">
-          <button
-            id="tab-chat-btn"
-            onClick={() => setActiveTab('chat')}
-            className={`flex items-center space-x-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all cursor-pointer ${
-              activeTab === 'chat'
-                ? 'bg-white text-indigo-700 border-t-2 border-indigo-600 border-x border-slate-200 shadow-2xs -mb-px'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-indigo-500" />
-            <span>Management Assistant</span>
-          </button>
+        {/* View Navigation Tabs & Live Engine Status */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+          <nav className="inline-flex p-1.5 rounded-2xl bg-white border border-[#EAEAEC] shadow-2xs space-x-1 overflow-x-auto max-w-full">
+            <button
+              id="tab-chat-btn"
+              onClick={() => setActiveTab('chat')}
+              className={`flex items-center space-x-2 px-4 py-2 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                activeTab === 'chat'
+                  ? 'bg-[#1A1A1E] text-white shadow-xs'
+                  : 'text-[#5D5C68] hover:text-[#1A1A1E] hover:bg-[#F8F8FC]'
+              }`}
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${activeTab === 'chat' ? 'text-[#A78AFD]' : 'text-[#8963FB]'}`} />
+              <span>Management Assistant</span>
+              <span
+                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
+                  activeTab === 'chat' ? 'bg-white/20 text-white' : 'bg-[#F2F2FD] text-[#2F20A2]'
+                }`}
+              >
+                AI
+              </span>
+            </button>
 
-          <button
-            id="tab-brief-btn"
-            onClick={() => setActiveTab('brief')}
-            className={`flex items-center space-x-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all cursor-pointer ${
-              activeTab === 'brief'
-                ? 'bg-white text-indigo-700 border-t-2 border-indigo-600 border-x border-slate-200 shadow-2xs -mb-px'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-            }`}
-          >
-            <FileText className="w-4 h-4 text-indigo-500" />
-            <span>Executive Briefs</span>
-          </button>
+            <button
+              id="tab-brief-btn"
+              onClick={() => setActiveTab('brief')}
+              className={`flex items-center space-x-2 px-4 py-2 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                activeTab === 'brief'
+                  ? 'bg-[#1A1A1E] text-white shadow-xs'
+                  : 'text-[#5D5C68] hover:text-[#1A1A1E] hover:bg-[#F8F8FC]'
+              }`}
+            >
+              <FileText className={`w-3.5 h-3.5 ${activeTab === 'brief' ? 'text-[#A78AFD]' : 'text-[#8963FB]'}`} />
+              <span>Executive Briefs</span>
+              <span
+                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
+                  activeTab === 'brief' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-700'
+                }`}
+              >
+                PDF
+              </span>
+            </button>
 
-          <button
-            id="tab-clients-btn"
-            onClick={() => setActiveTab('clients')}
-            className={`flex items-center space-x-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all cursor-pointer ${
-              activeTab === 'clients'
-                ? 'bg-white text-indigo-700 border-t-2 border-indigo-600 border-x border-slate-200 shadow-2xs -mb-px'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-            }`}
-          >
-            <Building2 className="w-4 h-4 text-indigo-500" />
-            <span>Clients & Initiatives</span>
-          </button>
+            <button
+              id="tab-clients-btn"
+              onClick={() => setActiveTab('clients')}
+              className={`flex items-center space-x-2 px-4 py-2 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                activeTab === 'clients'
+                  ? 'bg-[#1A1A1E] text-white shadow-xs'
+                  : 'text-[#5D5C68] hover:text-[#1A1A1E] hover:bg-[#F8F8FC]'
+              }`}
+            >
+              <Building2 className={`w-3.5 h-3.5 ${activeTab === 'clients' ? 'text-[#A78AFD]' : 'text-[#8963FB]'}`} />
+              <span>Clients & Initiatives</span>
+              <span
+                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
+                  activeTab === 'clients' ? 'bg-white/20 text-white' : 'bg-[#F2F2FD] text-[#2F20A2]'
+                }`}
+              >
+                {clients.length}
+              </span>
+            </button>
 
-          <button
-            id="tab-team-btn"
-            onClick={() => setActiveTab('team')}
-            className={`flex items-center space-x-2 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all cursor-pointer ${
-              activeTab === 'team'
-                ? 'bg-white text-indigo-700 border-t-2 border-indigo-600 border-x border-slate-200 shadow-2xs -mb-px'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
-            }`}
-          >
-            <Users className="w-4 h-4 text-indigo-500" />
-            <span>Team Overview</span>
-          </button>
+            <button
+              id="tab-team-btn"
+              onClick={() => setActiveTab('team')}
+              className={`flex items-center space-x-2 px-4 py-2 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                activeTab === 'team'
+                  ? 'bg-[#1A1A1E] text-white shadow-xs'
+                  : 'text-[#5D5C68] hover:text-[#1A1A1E] hover:bg-[#F8F8FC]'
+              }`}
+            >
+              <Users className={`w-3.5 h-3.5 ${activeTab === 'team' ? 'text-[#A78AFD]' : 'text-[#8963FB]'}`} />
+              <span>Team Overview</span>
+              <span
+                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
+                  activeTab === 'team' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                {memberOverviews.length || '3'}
+              </span>
+            </button>
+          </nav>
+
+          {/* Right Status Indicator */}
+          <div className="hidden sm:flex items-center space-x-2 text-xs text-[#6E6D7B] px-3.5 py-2 rounded-2xl bg-white border border-[#EAEAEC] shadow-2xs">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="font-semibold text-[#1A1A1E]">Evidence Grounded</span>
+            <span className="text-[#C6C1F3]">•</span>
+            <span className="text-[11px]">Zero-Hallucination Retrieval</span>
+          </div>
         </div>
 
         {/* Tab Content */}
@@ -477,32 +570,22 @@ export default function App() {
               onSendMessage={handleSendMessage}
               isLoading={isLoadingChat}
               onSelectSource={(src) => setSelectedSource(src)}
+              sessions={chatSessions}
+              currentSessionId={currentSessionId}
+              onSelectSession={handleSelectSession}
+              onNewSession={handleNewSession}
+              onDeleteSession={handleDeleteSession}
             />
           )}
 
           {activeTab === 'brief' && (
             <BriefView
-              brief={currentBrief}
+              currentBrief={currentBrief}
               savedBriefs={savedBriefs}
               onSelectBrief={(b) => setCurrentBrief(b)}
               onGenerateBrief={handleGenerateBrief}
               isGenerating={isGeneratingBrief}
-              onSelectCard={(cardId) => {
-                const found = allCards.find((c) => c.id === cardId);
-                if (found) {
-                  setSelectedSource({
-                    cardId: found.id,
-                    title: found.name,
-                    url: found.url,
-                    relevance: 100,
-                    reason: 'Referenced in executive management brief',
-                    date: found.dateLastActivity,
-                    client: found.clientCanonical,
-                    status: found.statusSemantic,
-                    listName: found.listName,
-                  });
-                }
-              }}
+              onSelectSource={(source) => setSelectedSource(source)}
             />
           )}
 
@@ -521,6 +604,9 @@ export default function App() {
           {activeTab === 'team' && (
             <TeamView
               memberOverviews={memberOverviews}
+              lists={lists}
+              role={user.role}
+              onUpdateListSemantics={handleUpdateListSemantics}
               onAskAboutMember={(name) => {
                 setActiveTab('chat');
                 handleSendMessage(`What is ${name} currently working on and what was recently completed?`);
@@ -543,22 +629,26 @@ export default function App() {
       </main>
 
       {/* Trello Settings Modal (Admin only) */}
-      <TrelloSettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        connection={connection}
-        role={user.role}
-        onSaveBoard={handleSaveBoard}
-        onSync={handleSync}
-        isSyncing={isSyncing}
-        onRefreshStatus={refreshAllData}
-      />
+      {isSettingsOpen && user?.role === 'ADMIN' && (
+        <TrelloSettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          connection={connection}
+          role={user.role}
+          onSaveBoard={handleSaveBoard}
+          onSync={handleSync}
+          isSyncing={isSyncing}
+          onRefreshStatus={refreshAllData}
+        />
+      )}
 
       {/* Source Card Modal */}
-      <SourceCardModal
-        source={selectedSource}
-        onClose={() => setSelectedSource(null)}
-      />
+      {selectedSource && (
+        <SourceCardModal
+          source={selectedSource}
+          onClose={() => setSelectedSource(null)}
+        />
+      )}
     </div>
   );
 }

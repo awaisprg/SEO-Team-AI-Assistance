@@ -1,1 +1,66 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-goldflex-primary: #1A1A1E;
+  --color-goldflex-secondary: #EAEAEC;
+  --color-goldflex-text: #4B4A54;
+  --color-goldflex-muted: #6E6D7B;
+  --color-goldflex-violet: #7C52F5;
+  --color-goldflex-lavender: #A78AFD;
+  --color-goldflex-deep: #2A1C94;
+  --color-goldflex-night: #09061A;
+  --color-goldflex-navy: #151932;
+  --color-goldflex-darkblue: #1E2346;
+  --color-goldflex-canvas: #F7F8FA;
+  --color-goldflex-tint: #F3F3FE;
+  --color-goldflex-accent: #EBEBFB;
+  --color-goldflex-border: #E5E7EB;
+  --color-goldflex-border-strong: #D1D5DB;
+  --color-goldflex-gold: #F59E0B;
+  --color-goldflex-emerald: #10B981;
+  --color-goldflex-crimson: #EF4444;
+  --color-goldflex-cyan: #06B6D4;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: #1A1A1E;
+  background-color: #F8F9FC;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(124, 82, 245, 0.03) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(42, 28, 148, 0.02) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(124, 82, 245, 0.02) 0px, transparent 50%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D5D7E1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #A8AAB8;
+}
+
+/* Smooth tab and button focus rings */
+button:focus-visible, a:focus-visible, input:focus-visible {
+  outline: 2px solid #7C52F5;
+  outline-offset: 2px;
+}
+

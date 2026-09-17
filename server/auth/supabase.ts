@@ -51,8 +51,8 @@ export async function resolveUserRole(
   if (pgStore.isConfigured()) {
     try {
       const dbUser = await pgStore.getUserByEmail(normalizedEmail);
-      if (dbUser && (dbUser.role === 'MANAGER' || dbUser.role === 'VIEWER')) {
-        return dbUser.role as UserRole;
+      if (dbUser && dbUser.role === 'VIEWER') {
+        return 'VIEWER';
       }
     } catch (err) {
       // ignore db query error
@@ -61,12 +61,12 @@ export async function resolveUserRole(
 
   // Check Supabase metadata
   const metaRole = appMetadata?.role || userMetadata?.role;
-  if (metaRole === 'MANAGER' || metaRole === 'VIEWER') {
-    return metaRole as UserRole;
+  if (metaRole === 'VIEWER') {
+    return 'VIEWER';
   }
 
-  // Default authenticated non-admin role is MANAGER
-  return (process.env.DEFAULT_USER_ROLE as UserRole) || 'MANAGER';
+  // Default authenticated non-admin role is VIEWER
+  return (process.env.DEFAULT_USER_ROLE as UserRole) || 'VIEWER';
 }
 
 /**
@@ -90,15 +90,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       email: ADMIN_EMAIL,
       name: 'Awais (Admin)',
       role: 'ADMIN',
-    };
-    return next();
-  }
-  if (token === 'test-manager-token') {
-    req.user = {
-      id: 'usr_test_manager',
-      email: 'manager@agency.com',
-      name: 'Test Manager',
-      role: 'MANAGER',
     };
     return next();
   }

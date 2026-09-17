@@ -40,6 +40,9 @@ class UserRegistry {
         const raw = fs.readFileSync(USERS_FILE, 'utf-8');
         const list: AppUser[] = JSON.parse(raw);
         for (const u of list) {
+          if ((u.role as string) === 'MANAGER') {
+            u.role = 'VIEWER';
+          }
           this.users.set(u.email.toLowerCase(), u);
         }
       }
@@ -98,16 +101,12 @@ class UserRegistry {
     email: string;
     password: string;
     name?: string;
-    role: 'MANAGER' | 'VIEWER';
+    role?: UserRole;
   }): { user: UserSession; token: string } {
     const normalizedEmail = params.email.toLowerCase().trim();
 
     if (normalizedEmail === ADMIN_EMAIL.toLowerCase()) {
       throw new Error('This email is reserved for the system Administrator. Please sign in.');
-    }
-
-    if ((params.role as string) === 'ADMIN') {
-      throw new Error('Admin role cannot be selected. Only awais7475@prgmd.com has Admin access.');
     }
 
     if (this.users.has(normalizedEmail)) {
@@ -127,7 +126,7 @@ class UserRegistry {
       id,
       email: normalizedEmail,
       name: displayName,
-      role: params.role,
+      role: 'VIEWER',
       passwordHash,
       salt,
       createdAt: new Date().toISOString(),
@@ -185,8 +184,9 @@ class UserRegistry {
       throw new Error('Invalid email or password.');
     }
 
-    // Strictly enforce: no other account can have ADMIN role
-    const effectiveRole: UserRole = user.role === 'ADMIN' ? 'MANAGER' : user.role;
+    // Strictly enforce: only the designated master admin email can have ADMIN role
+    const isActualAdmin = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    const effectiveRole: UserRole = isActualAdmin ? 'ADMIN' : 'VIEWER';
 
     const sessionUser: UserSession = {
       id: user.id,
@@ -230,7 +230,7 @@ class UserRegistry {
 
       // Security guarantee: Only ADMIN_EMAIL can have ADMIN role
       const isActualAdmin = data.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-      const role: UserRole = isActualAdmin && data.role === 'ADMIN' ? 'ADMIN' : (data.role === 'ADMIN' ? 'MANAGER' : data.role);
+      const role: UserRole = isActualAdmin && data.role === 'ADMIN' ? 'ADMIN' : 'VIEWER';
 
       return {
         id: data.id,

@@ -16,15 +16,14 @@ CREATE TABLE IF NOT EXISTS roles (
 
 INSERT INTO roles (id, name, description) VALUES
   ('ADMIN', 'Administrator', 'Full system access, Trello configuration, aliases'),
-  ('MANAGER', 'Team Manager', 'Query intelligence, view sources, generate briefs'),
-  ('VIEWER', 'Viewer', 'Read-only view of team status and sources')
+  ('VIEWER', 'Viewer', 'Intelligence retrieval, source viewing, and executive briefs')
 ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email VARCHAR(255) UNIQUE NOT NULL,
   name VARCHAR(255) NOT NULL,
-  role VARCHAR(50) NOT NULL REFERENCES roles(id) DEFAULT 'MANAGER',
+  role VARCHAR(50) NOT NULL REFERENCES roles(id) DEFAULT 'VIEWER',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

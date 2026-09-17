@@ -47,8 +47,6 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
   isSyncing,
   onRefreshStatus,
 }) => {
-  if (!isOpen) return null;
-
   // Credential fields
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [tokenInput, setTokenInput] = useState('');
@@ -74,10 +72,12 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
     }
   }, [connection]);
 
-  // Fetch real boards when opening modal
+  // Fetch real boards when opening modal as admin
   useEffect(() => {
-    fetchBoards();
-  }, []);
+    if (isOpen && role === 'ADMIN') {
+      fetchBoards();
+    }
+  }, [isOpen, role]);
 
   // Save and verify Trello credentials
   const handleSaveCredentials = async (e: React.FormEvent) => {
@@ -266,6 +266,10 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
       setIsDisconnecting(false);
     }
   };
+
+  if (!isOpen || role !== 'ADMIN') {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">

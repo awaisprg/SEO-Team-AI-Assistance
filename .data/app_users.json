@@ -1,0 +1,29 @@
+[
+  {
+    "id": "usr_admin_awais",
+    "email": "awais7475@prgmd.com",
+    "name": "Awais (Admin)",
+    "role": "ADMIN",
+    "passwordHash": "7e5d85cc876df2d4903130945faadda6f364fd64b7a116df056bf34d9520fffa5d1cf391a71016745e9d5984d6615f8f38ffa274b9317bba7887a64ef5c6379f",
+    "salt": "4a8363ea4863482aac524f34c9e7ae4f",
+    "createdAt": "2026-09-17T13:02:52.056Z"
+  },
+  {
+    "id": "usr_1789653119353_46h4y",
+    "email": "sarah@prgmd.com",
+    "name": "Sarah Connor",
+    "role": "VIEWER",
+    "passwordHash": "1f088bc1faa1f44b3775117a00c4b9837d51db9a2db94d96881e9387a7986fe01cdabed5e2ad21a0083b6434c38af04fb511835bc9b09d415828b39dd4453118",
+    "salt": "40e39638cfde31bf90afa456f8a9fa71",
+    "createdAt": "2026-09-17T13:51:59.353Z"
+  },
+  {
+    "id": "usr_1789657151192_30pmu",
+    "email": "test@gmail.com",
+    "name": "test",
+    "role": "VIEWER",
+    "passwordHash": "8f562f27bd4dff3b714fb0892b829d9dce000ee393b4ba20d8bdb61e5be707079f35328297d810590241d396dd2efbbb36b5a0be20fbf726cff8ff06df94b28a",
+    "salt": "801a203ad99a7ef0f34dc30259ad4349",
+    "createdAt": "2026-09-17T14:59:11.193Z"
+  }
+]

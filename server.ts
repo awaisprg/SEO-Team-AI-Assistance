@@ -107,28 +107,26 @@ app.post('/api/auth/login', (req, res) => {
   }
 });
 
-// User Sign Up Endpoint (For Manager and Viewer with email auth)
+// User Sign Up Endpoint (Creates user account with email, name, password)
 app.post('/api/auth/signup', (req, res) => {
-  const { email, password, name, role } = req.body || {};
+  const { email, password, name } = req.body || {};
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
   }
 
   // Admin cannot be signed up via registration form
-  if (role === 'ADMIN' || (email && email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase())) {
+  if (email && email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase()) {
     return res.status(403).json({
-      error: 'Admin role is restricted. Only awais7475@prgmd.com with the authorized master password can access Admin.',
+      error: 'Admin account already exists. Please sign in.',
     });
   }
-
-  const selectedRole = role === 'VIEWER' ? 'VIEWER' : 'MANAGER';
 
   try {
     const result = userRegistry.register({
       email,
       password,
       name,
-      role: selectedRole,
+      role: 'VIEWER',
     });
     res.json({
       success: true,
@@ -352,8 +350,8 @@ app.get('/api/trello/sync/status', requireAuth, (req, res) => {
   });
 });
 
-// Asynchronous Job-Based Trello Synchronization (ADMIN & MANAGER)
-app.post('/api/trello/sync', requireAuth, requireRole(['ADMIN', 'MANAGER']), syncLimiter, (req, res) => {
+// Asynchronous Job-Based Trello Synchronization (ADMIN only)
+app.post('/api/trello/sync', requireAuth, requireRole(['ADMIN']), syncLimiter, (req, res) => {
   const { boardId, mode } = req.body;
 
   const result = startSyncJob({
@@ -522,6 +520,19 @@ app.get('/api/chat/sessions/:id', requireAuth, (req, res) => {
   res.json(session);
 });
 
+app.delete('/api/chat/sessions/:id', requireAuth, (req, res) => {
+  const deleted = db.deleteChatSession(req.params.id);
+  if (!deleted) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  res.json({ success: true });
+});
+
+app.delete('/api/chat/sessions', requireAuth, (req, res) => {
+  db.clearChatSessions();
+  res.json({ success: true });
+});
+
 // -------------------------------------------------------------
 // 6. CLIENT INTELLIGENCE ENDPOINTS
 // -------------------------------------------------------------
@@ -654,7 +665,7 @@ app.get('/api/team', requireAuth, (req, res) => {
 // -------------------------------------------------------------
 // 8. MANAGEMENT BRIEFS
 // -------------------------------------------------------------
-app.post('/api/management-brief', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res) => {
+app.post('/api/management-brief', requireAuth, requireRole(['ADMIN', 'VIEWER']), async (req, res) => {
   const { periodType = 'this_month', dateFrom, dateTo } = req.body;
   const allowed = ['overall', 'this_week', 'last_week', 'this_month', 'last_month'];
   if (!allowed.includes(periodType)) {
