@@ -2,7 +2,7 @@
  * Core type definitions for SEO & Content Team Intelligence
  */
 
-export type UserRole = 'ADMIN' | 'VIEWER';
+export type UserRole = 'ADMIN' | 'MANAGER';
 
 export interface UserSession {
   id: string;

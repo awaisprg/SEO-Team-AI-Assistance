@@ -107,34 +107,65 @@ app.post('/api/auth/login', (req, res) => {
   }
 });
 
-// User Sign Up Endpoint (Creates user account with email, name, password)
+// User Sign Up Endpoint (Disabled for public self-registration: only Admin can create accounts)
 app.post('/api/auth/signup', (req, res) => {
-  const { email, password, name } = req.body || {};
+  return res.status(403).json({
+    error: 'Public registration is disabled. Only administrators can create new user accounts.',
+  });
+});
+
+// Admin User Management Endpoints (ADMIN only)
+app.get('/api/admin/users', requireAuth, requireRole(['ADMIN']), (req, res) => {
+  res.json(userRegistry.getAllUsers());
+});
+
+app.post('/api/admin/users', requireAuth, requireRole(['ADMIN']), (req, res) => {
+  const { email, password, name, role = 'MANAGER' } = req.body || {};
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required.' });
   }
-
-  // Admin cannot be signed up via registration form
-  if (email && email.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase()) {
-    return res.status(403).json({
-      error: 'Admin account already exists. Please sign in.',
-    });
+  if (role !== 'ADMIN' && role !== 'MANAGER') {
+    return res.status(400).json({ error: 'Role must be either ADMIN or MANAGER.' });
   }
 
   try {
-    const result = userRegistry.register({
+    const newUser = userRegistry.createUser({
       email,
       password,
       name,
-      role: 'VIEWER',
+      role,
     });
-    res.json({
-      success: true,
-      token: result.token,
-      user: result.user,
-    });
+    res.json({ success: true, user: newUser });
   } catch (err: any) {
-    res.status(400).json({ error: err.message || 'Registration failed' });
+    res.status(400).json({ error: err.message || 'Failed to create user' });
+  }
+});
+
+app.put('/api/admin/users/:id/role', requireAuth, requireRole(['ADMIN']), (req, res) => {
+  const { role } = req.body || {};
+  if (role !== 'ADMIN' && role !== 'MANAGER') {
+    return res.status(400).json({ error: 'Role must be ADMIN or MANAGER.' });
+  }
+  try {
+    const updated = userRegistry.updateUserRole(req.params.id, role);
+    if (!updated) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ success: true, user: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Failed to update role' });
+  }
+});
+
+app.delete('/api/admin/users/:id', requireAuth, requireRole(['ADMIN']), (req, res) => {
+  try {
+    const success = userRegistry.deleteUser(req.params.id);
+    if (!success) {
+      return res.status(404).json({ error: 'User not found or cannot delete master admin.' });
+    }
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Failed to delete user' });
   }
 });
 
@@ -192,6 +223,24 @@ app.post('/api/trello/credentials', requireAuth, requireRole(['ADMIN']), async (
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to verify Trello credentials' });
   }
+});
+
+// Direct authorization link helper for generating a member token
+app.get('/api/trello/token-auth-url', requireAuth, (req, res) => {
+  const queryKey = typeof req.query.apiKey === 'string' ? req.query.apiKey.trim() : '';
+  const creds = db.getTrelloCredentials();
+  const apiKey = queryKey || creds.apiKey;
+  if (!apiKey) {
+    return res.json({
+      authUrl: 'https://trello.com/power-ups/admin',
+      hasKey: false,
+    });
+  }
+  const authUrl = `https://trello.com/1/authorize?expiration=never&name=TrelloIntelligence&scope=read,write&response_type=token&key=${encodeURIComponent(apiKey)}`;
+  res.json({
+    authUrl,
+    hasKey: true,
+  });
 });
 
 // Connection test endpoint - tests provided or stored credentials
@@ -350,8 +399,8 @@ app.get('/api/trello/sync/status', requireAuth, (req, res) => {
   });
 });
 
-// Asynchronous Job-Based Trello Synchronization (ADMIN only)
-app.post('/api/trello/sync', requireAuth, requireRole(['ADMIN']), syncLimiter, (req, res) => {
+// Asynchronous Job-Based Trello Synchronization (ADMIN and MANAGER)
+app.post('/api/trello/sync', requireAuth, requireRole(['ADMIN', 'MANAGER']), syncLimiter, (req, res) => {
   const { boardId, mode } = req.body;
 
   const result = startSyncJob({
@@ -438,22 +487,25 @@ app.post('/api/chat', requireAuth, async (req, res) => {
   const sanitizedQuestion = question.trim().slice(0, 1500);
 
   try {
-    // 1. Audit / Session
-    let activeSession = sessionId ? db.getChatSession(sessionId) : null;
+    const userId = req.user?.id || 'usr_admin_awais';
+
+    // 1. Audit / Session isolated per user account
+    let activeSession = sessionId ? db.getChatSession(sessionId, userId) : null;
     if (!activeSession) {
-      activeSession = db.createChatSession(sanitizedQuestion.slice(0, 50));
+      activeSession = db.createChatSession(sanitizedQuestion.slice(0, 50), userId);
     }
 
     // Add user message
     db.addChatMessage(activeSession.id, {
       role: 'user',
       content: sanitizedQuestion,
-    });
+    }, userId);
 
     // 2. Query Understanding & Intent Extraction
     const knownClients = db.getClients();
     const knownMembers = db.getMembers();
-    const intent = extractQueryIntent(sanitizedQuestion, knownClients, knownMembers);
+    const knownLists = db.getLists();
+    const intent = extractQueryIntent(sanitizedQuestion, knownClients, knownMembers, knownLists);
 
     // 3. Hybrid Retrieval & Relevance Scoring
     const scoredCards = hybridRetrieve(intent, 30);
@@ -485,7 +537,7 @@ app.post('/api/chat', requireAuth, async (req, res) => {
           dateRange: intent.timeRangeDescription,
         },
       },
-    });
+    }, userId);
 
     res.json({
       sessionId: activeSession.id,
@@ -509,11 +561,13 @@ app.post('/api/chat', requireAuth, async (req, res) => {
 });
 
 app.get('/api/chat/sessions', requireAuth, (req, res) => {
-  res.json(db.getChatSessions());
+  const userId = req.user?.id;
+  res.json(db.getChatSessions(userId));
 });
 
 app.get('/api/chat/sessions/:id', requireAuth, (req, res) => {
-  const session = db.getChatSession(req.params.id);
+  const userId = req.user?.id;
+  const session = db.getChatSession(req.params.id, userId);
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
   }
@@ -521,7 +575,8 @@ app.get('/api/chat/sessions/:id', requireAuth, (req, res) => {
 });
 
 app.delete('/api/chat/sessions/:id', requireAuth, (req, res) => {
-  const deleted = db.deleteChatSession(req.params.id);
+  const userId = req.user?.id;
+  const deleted = db.deleteChatSession(req.params.id, userId);
   if (!deleted) {
     return res.status(404).json({ error: 'Session not found' });
   }
@@ -529,7 +584,8 @@ app.delete('/api/chat/sessions/:id', requireAuth, (req, res) => {
 });
 
 app.delete('/api/chat/sessions', requireAuth, (req, res) => {
-  db.clearChatSessions();
+  const userId = req.user?.id;
+  db.clearChatSessions(userId);
   res.json({ success: true });
 });
 
@@ -665,7 +721,7 @@ app.get('/api/team', requireAuth, (req, res) => {
 // -------------------------------------------------------------
 // 8. MANAGEMENT BRIEFS
 // -------------------------------------------------------------
-app.post('/api/management-brief', requireAuth, requireRole(['ADMIN', 'VIEWER']), async (req, res) => {
+app.post('/api/management-brief', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res) => {
   const { periodType = 'this_month', dateFrom, dateTo } = req.body;
   const allowed = ['overall', 'this_week', 'last_week', 'this_month', 'last_month'];
   if (!allowed.includes(periodType)) {

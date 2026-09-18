@@ -468,21 +468,21 @@ export default function App() {
 
         {/* View Navigation Tabs & Live Engine Status */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-          <nav className="inline-flex p-1.5 rounded-2xl bg-white border border-[#EAEAEC] shadow-2xs space-x-1 overflow-x-auto max-w-full">
+          <nav className="inline-flex p-1 rounded-xl bg-slate-200/60 border border-slate-200/80 shadow-2xs gap-1 overflow-x-auto max-w-full">
             <button
               id="tab-chat-btn"
               onClick={() => setActiveTab('chat')}
-              className={`flex items-center space-x-2 px-4 py-2 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap ${
                 activeTab === 'chat'
-                  ? 'bg-[#1A1A1E] text-white shadow-xs'
-                  : 'text-[#5D5C68] hover:text-[#1A1A1E] hover:bg-[#F8F8FC]'
+                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/70'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
-              <Sparkles className={`w-3.5 h-3.5 ${activeTab === 'chat' ? 'text-[#A78AFD]' : 'text-[#8963FB]'}`} />
+              <Sparkles className={`w-3.5 h-3.5 ${activeTab === 'chat' ? 'text-[#7C52F5]' : 'text-slate-400'}`} />
               <span>Management Assistant</span>
               <span
                 className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
-                  activeTab === 'chat' ? 'bg-white/20 text-white' : 'bg-[#F2F2FD] text-[#2F20A2]'
+                  activeTab === 'chat' ? 'bg-violet-50 text-violet-700 border border-violet-200/60' : 'bg-slate-200 text-slate-600'
                 }`}
               >
                 AI
@@ -492,17 +492,17 @@ export default function App() {
             <button
               id="tab-brief-btn"
               onClick={() => setActiveTab('brief')}
-              className={`flex items-center space-x-2 px-4 py-2 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap ${
                 activeTab === 'brief'
-                  ? 'bg-[#1A1A1E] text-white shadow-xs'
-                  : 'text-[#5D5C68] hover:text-[#1A1A1E] hover:bg-[#F8F8FC]'
+                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/70'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
-              <FileText className={`w-3.5 h-3.5 ${activeTab === 'brief' ? 'text-[#A78AFD]' : 'text-[#8963FB]'}`} />
+              <FileText className={`w-3.5 h-3.5 ${activeTab === 'brief' ? 'text-[#7C52F5]' : 'text-slate-400'}`} />
               <span>Executive Briefs</span>
               <span
                 className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
-                  activeTab === 'brief' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-700'
+                  activeTab === 'brief' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-slate-200 text-slate-600'
                 }`}
               >
                 PDF
@@ -512,17 +512,17 @@ export default function App() {
             <button
               id="tab-clients-btn"
               onClick={() => setActiveTab('clients')}
-              className={`flex items-center space-x-2 px-4 py-2 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap ${
                 activeTab === 'clients'
-                  ? 'bg-[#1A1A1E] text-white shadow-xs'
-                  : 'text-[#5D5C68] hover:text-[#1A1A1E] hover:bg-[#F8F8FC]'
+                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/70'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
-              <Building2 className={`w-3.5 h-3.5 ${activeTab === 'clients' ? 'text-[#A78AFD]' : 'text-[#8963FB]'}`} />
+              <Building2 className={`w-3.5 h-3.5 ${activeTab === 'clients' ? 'text-[#7C52F5]' : 'text-slate-400'}`} />
               <span>Clients & Initiatives</span>
               <span
                 className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
-                  activeTab === 'clients' ? 'bg-white/20 text-white' : 'bg-[#F2F2FD] text-[#2F20A2]'
+                  activeTab === 'clients' ? 'bg-violet-50 text-violet-700 border border-violet-200/60' : 'bg-slate-200 text-slate-600'
                 }`}
               >
                 {clients.length}
@@ -532,17 +532,17 @@ export default function App() {
             <button
               id="tab-team-btn"
               onClick={() => setActiveTab('team')}
-              className={`flex items-center space-x-2 px-4 py-2 text-xs font-semibold rounded-xl transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap ${
                 activeTab === 'team'
-                  ? 'bg-[#1A1A1E] text-white shadow-xs'
-                  : 'text-[#5D5C68] hover:text-[#1A1A1E] hover:bg-[#F8F8FC]'
+                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/70'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
-              <Users className={`w-3.5 h-3.5 ${activeTab === 'team' ? 'text-[#A78AFD]' : 'text-[#8963FB]'}`} />
+              <Users className={`w-3.5 h-3.5 ${activeTab === 'team' ? 'text-[#7C52F5]' : 'text-slate-400'}`} />
               <span>Team Overview</span>
               <span
                 className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
-                  activeTab === 'team' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                  activeTab === 'team' ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-600'
                 }`}
               >
                 {memberOverviews.length || '3'}
@@ -551,14 +551,14 @@ export default function App() {
           </nav>
 
           {/* Right Status Indicator */}
-          <div className="hidden sm:flex items-center space-x-2 text-xs text-[#6E6D7B] px-3.5 py-2 rounded-2xl bg-white border border-[#EAEAEC] shadow-2xs">
+          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 px-3 py-1.5 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            <span className="font-semibold text-[#1A1A1E]">Evidence Grounded</span>
-            <span className="text-[#C6C1F3]">•</span>
-            <span className="text-[11px]">Zero-Hallucination Retrieval</span>
+            <span className="font-semibold text-slate-800">Evidence Grounded</span>
+            <span className="text-slate-300">•</span>
+            <span className="text-[11px] text-slate-500">639 Cards & 515 Comments Indexed</span>
           </div>
         </div>
 

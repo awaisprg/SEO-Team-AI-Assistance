@@ -439,9 +439,18 @@ export function normalizeTrelloPayload(
 
   const cardCompletionMap = new Map<string, { date: string; actor: string; reason: string }>();
   const itemCompletionMap = new Map<string, { date: string; actor: string }>();
+  const boardActionsByCard = new Map<string, any[]>();
 
   for (const action of allActions) {
     const cardId = action.data?.card?.id;
+    if (cardId) {
+      let bList = boardActionsByCard.get(cardId);
+      if (!bList) {
+        bList = [];
+        boardActionsByCard.set(cardId, bList);
+      }
+      bList.push(action);
+    }
     const actionDate = action.date;
     const actorName = action.memberCreator?.fullName || action.memberCreator?.username || 'Team Member';
 
@@ -618,7 +627,18 @@ export function normalizeTrelloPayload(
     const cardComments: TrelloComment[] = [];
     const cardActivities: TrelloActivity[] = [];
 
-    for (const action of rawCard.actions || []) {
+    const combinedCardActions = [
+      ...(rawCard.actions || []),
+      ...(boardActionsByCard.get(rawCard.id) || []),
+    ];
+    const seenActionIds = new Set<string>();
+    const uniqueCardActions = combinedCardActions.filter((a) => {
+      if (!a || !a.id || seenActionIds.has(a.id)) return false;
+      seenActionIds.add(a.id);
+      return true;
+    });
+
+    for (const action of uniqueCardActions) {
       if (action.type === 'commentCard') {
         const commentObj: TrelloComment = {
           id: action.id,

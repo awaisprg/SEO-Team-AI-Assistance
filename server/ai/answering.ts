@@ -35,7 +35,14 @@ export async function generateEvidenceAnswer(
   scoredCards: ScoredCard[],
   conversationHistory: { role: string; content: string }[] = []
 ): Promise<AnswerResult> {
-  const topCards = scoredCards.slice(0, 8);
+  const isBroadQuery = Boolean(
+    intent.targetList ||
+    intent.isBoardAnalysis ||
+    intent.intent === 'list_analysis' ||
+    intent.intent === 'board_analysis' ||
+    intent.isDeepInspection
+  );
+  const topCards = isBroadQuery ? scoredCards.slice(0, 30) : scoredCards.slice(0, 10);
 
   // Calculate status breakdown
   const statusBreakdown: Record<string, number> = {};
@@ -46,9 +53,9 @@ export async function generateEvidenceAnswer(
 
   // Determine evidence strength
   let evidenceStrength: 'high' | 'medium' | 'low' = 'low';
-  if (topCards.length >= 3 && topCards[0].relevance >= 70) {
+  if (topCards.length >= 3 && topCards[0].relevance >= 60) {
     evidenceStrength = 'high';
-  } else if (topCards.length >= 1 && topCards[0].relevance >= 45) {
+  } else if (topCards.length >= 1 && topCards[0].relevance >= 35) {
     evidenceStrength = 'medium';
   }
 
@@ -67,22 +74,23 @@ No active or completed cards matched your query regarding "${intent.rawQuestion}
     };
   }
 
-  // Format evidence block for AI
+  // Format evidence block for AI with rich descriptions, all comments, and full checklists
   const evidenceText = topCards
     .map((sc, i) => {
       const c = sc.card;
-      const completedItems = c.checklists
-        .flatMap((cl) => cl.items)
-        .filter((it) => it.state === 'complete')
-        .map((it) => it.name);
+      const allChecklistItems = c.checklists.flatMap((cl) =>
+        cl.items.map((it) => `[${it.state === 'complete' ? '✓' : ' '}] ${it.name}${it.completedBy ? ` (by ${it.completedBy})` : ''}`)
+      );
       const recentActivities = c.activities
-        .slice(0, 3)
+        .slice(0, 4)
         .map((a) => `${a.timestamp.slice(0, 10)}: ${a.details}`)
         .join('; ');
-      const recentComments = c.comments
-        .slice(0, 2)
-        .map((cm) => `"${cm.text}" by ${cm.authorName}`)
-        .join('; ');
+      const commentsText = c.comments && c.comments.length > 0
+        ? c.comments.map((cm) => `[${cm.authorName} on ${cm.createdAt.slice(0, 10)}]: "${cm.text}"`).join('\n   ')
+        : 'No comments logged';
+      const attachmentsText = c.attachments && c.attachments.length > 0
+        ? c.attachments.map((att) => `${att.name} (${att.url})`).join(', ')
+        : 'None';
 
       return `[EVIDENCE #${i + 1}]
 Card Title: ${c.name}
@@ -92,10 +100,11 @@ Status: ${c.statusSemantic}
 Client: ${c.clientCanonical || 'Internal / None'}
 Assigned Members: ${c.members.map((m) => m.fullName).join(', ') || 'None'}
 Last Activity Date: ${c.dateLastActivity.slice(0, 10)}
-Description: ${c.desc || 'No description'}
-Completed Checklist Tasks: ${completedItems.join(', ') || 'None'}
-Recent Activities: ${recentActivities || 'None'}
-Comments: ${recentComments || 'None'}
+Description: ${c.desc ? c.desc.trim() : 'No description'}
+Checklist Items: ${allChecklistItems.join(' | ') || 'None'}
+Attachments: ${attachmentsText}
+Recent Comments:
+   ${commentsText}
 Relevance Score: ${sc.relevance}% (${sc.reason})
 `;
     })
@@ -119,19 +128,44 @@ Relevance Score: ${sc.relevance}% (${sc.reason})
 
   if (aiProvider.isAvailable()) {
     try {
+      let personContext = '';
+      if (intent.person) {
+        personContext = `
+SPECIAL PERSON FOCUS:
+The manager is asking specifically about team member: ${intent.person} (also referenced in Trello as: ${(intent.personAliases || [intent.person]).join(', ')}).
+Trello context:
+- In Trello, this person's member username or full name may be abbreviated (e.g., Azeem Ahmad is mapped to "aahmad10287", Adil Rehman to "adilrehman22", Haseeb Afzal to "muhammadhaseebafzal").
+- Tasks located in the "${intent.person}" list, tasks assigned to their username, and tasks where they are titled or logged activities belong to them.
+- Provide a clear, comprehensive summary of what ${intent.person} is currently doing:
+  1. Active and in-progress deliverables (e.g. in "In Process", their personal list, or client lists)
+  2. QA/In Review deliverables
+  3. Client accounts they are actively contributing to (e.g. Capital Allergy, Haven Health)
+  4. Checklist milestones completed and latest discussions/comments
+`;
+      }
+
       const userPrompt = `
 Manager's Question: "${intent.rawQuestion}"
-
-Retrieved Trello Evidence (${topCards.length} cards):
+${personContext}
+Retrieved Trello Evidence (${topCards.length} cards across lists, including full descriptions, comments, and checklists):
 ${evidenceText}
 
-Provide an executive answer based STRICTLY on the above data.
-Format your answer with clear markdown headings or bullet points:
-- Executive Summary
-- Key Findings
-- Current Status & Activities
-- Evidence References
-Do not fabricate information.
+Provide an executive, comprehensive answer based STRICTLY on the retrieved Trello data.
+If the manager asks about a specific person (e.g. "What is Azeem doing?"):
+- Provide an Executive Summary highlighting their immediate focus and overall workload.
+- Detail their Active & In-Progress tasks, what client they belong to, list location, and checklist status.
+- Detail any cards in QA/Review or completed recently.
+- Mention recent discussions or comments logged on their deliverables.
+
+If the manager asks about a specific list (e.g. "In Process") or asks about all lists and cards:
+- Provide an Executive Summary covering overall operational throughput and list counts.
+- For every relevant card, detail its name, list, assigned team member(s), description, comments/discussions, and checklist progress.
+- Include direct quotes or citations from comments and task checklists where available.
+- Structure clearly with markdown sections:
+  ### Executive Summary
+  ### Card & Task Breakdown (with list name, description, comments, and status)
+  ### Discussions & Updates (highlighting key comments and blockers)
+  ### Next Steps & Recommendations
 `;
 
       const aiText = await aiProvider.generateAnswer(SYSTEM_PROMPT, userPrompt);
@@ -170,6 +204,132 @@ function generateDeterministicAnswer(
   let summary = '';
   const keyPoints: string[] = [];
 
+  // Case 1: Specific List Analysis (e.g., "In Process")
+  if (intent.targetList || intent.intent === 'list_analysis') {
+    const listName = intent.targetList || topCards[0]?.card.listName || 'Target List';
+    const listCards = topCards.filter((sc) =>
+      sc.card.listName.toLowerCase() === listName.toLowerCase() ||
+      sc.card.listName.toLowerCase().includes(listName.toLowerCase()) ||
+      listName.toLowerCase().includes(sc.card.listName.toLowerCase())
+    );
+    const displayCards = listCards.length > 0 ? listCards : topCards;
+
+    summary = `List "${listName}" Analysis: Found ${displayCards.length} cards currently residing in "${listName}". All cards, full descriptions, comments, and checklists have been thoroughly analyzed below.`;
+    
+    displayCards.forEach((sc) => {
+      const c = sc.card;
+      const commentsCount = c.comments?.length || 0;
+      const checklistsCount = c.checklists?.reduce((acc, cl) => acc + cl.items.length, 0) || 0;
+      const members = c.members.map((m) => m.fullName).join(', ') || 'Unassigned';
+      keyPoints.push(`**${c.name}** (${members}): ${commentsCount} comments, ${checklistsCount} checklist items. ${c.desc ? c.desc.slice(0, 100) + '...' : 'No description provided.'}`);
+    });
+
+    const cardDetailsMarkdown = displayCards
+      .map((sc, i) => {
+        const c = sc.card;
+        const members = c.members.map((m) => m.fullName).join(', ') || 'Unassigned';
+        const commentsList = (c.comments && c.comments.length > 0)
+          ? c.comments.map((cm) => `   - **${cm.authorName}** (${cm.createdAt.slice(0, 10)}): "${cm.text}"`).join('\n')
+          : '   *No comments posted yet.*';
+        
+        const checklistsList = (c.checklists && c.checklists.length > 0)
+          ? c.checklists.map((cl) => {
+              const items = cl.items.map((it) => `     - [${it.state === 'complete' ? '✓' : ' '}] ${it.name}`).join('\n');
+              return `   - **${cl.name}**:\n${items}`;
+            }).join('\n')
+          : '   *No checklists attached.*';
+
+        return `#### ${i + 1}. [${c.name}](${c.url})
+- **Status / List:** ${c.listName} (${c.statusSemantic})
+- **Client:** ${c.clientCanonical || 'Internal / None'}
+- **Assigned:** ${members}
+- **Last Active:** ${c.dateLastActivity.slice(0, 10)}
+- **Description:** ${c.desc ? c.desc.trim() : '*No description provided on card.*'}
+
+**Comments & Discussion (${c.comments?.length || 0}):**
+${commentsList}
+
+**Checklists & Deliverable Tasks:**
+${checklistsList}
+`;
+      })
+      .join('\n---\n');
+
+    const answerMarkdown = `### Executive Summary: "${listName}" List
+${summary}
+
+### Key Deliverables Overview
+${keyPoints.map((kp) => `- ${kp}`).join('\n')}
+
+### Detailed Breakdown of All Cards & Discussions in "${listName}"
+${cardDetailsMarkdown}
+`;
+
+    return {
+      answer: answerMarkdown,
+      summary,
+      keyPoints,
+      statusBreakdown,
+      sources,
+      evidenceStrength,
+    };
+  }
+
+  // Case 2: Board-Wide Comprehensive Analysis
+  if (intent.isBoardAnalysis || intent.intent === 'board_analysis') {
+    const listMap = new Map<string, ScoredCard[]>();
+    for (const sc of topCards) {
+      const lName = sc.card.listName || 'General';
+      let lList = listMap.get(lName);
+      if (!lList) {
+        lList = [];
+        listMap.set(lName, lList);
+      }
+      lList.push(sc);
+    }
+
+    summary = `Comprehensive Board Analysis: Analyzed ${topCards.length} active deliverables across ${listMap.size} distinct Trello lists, including full card descriptions, team comments, and checklist progress.`;
+
+    const sections: string[] = [];
+    listMap.forEach((cards, lName) => {
+      keyPoints.push(`**${lName}**: ${cards.length} cards (${cards.map((c) => c.card.name).slice(0, 3).join(', ')}${cards.length > 3 ? '...' : ''})`);
+
+      const cardLines = cards.map((sc, idx) => {
+        const c = sc.card;
+        const members = c.members.map((m) => m.fullName).join(', ') || 'Team';
+        const commentNote = c.comments && c.comments.length > 0
+          ? `\n    - *Latest Comment*: "${c.comments[0].text.slice(0, 100)}..." (${c.comments[0].authorName})`
+          : '';
+        const descNote = c.desc && c.desc.trim().length > 0
+          ? `\n    - *Description*: ${c.desc.slice(0, 120)}...`
+          : '';
+        return `  ${idx + 1}. **[${c.name}](${c.url})** (${members}) - ${c.statusSemantic}${descNote}${commentNote}`;
+      }).join('\n');
+
+      sections.push(`#### List: ${lName} (${cards.length} Cards)\n${cardLines}`);
+    });
+
+    const answerMarkdown = `### Executive Board Overview
+${summary}
+
+### Operational List Summary
+${keyPoints.map((kp) => `- ${kp}`).join('\n')}
+
+### Detailed List-by-List Breakdown
+${sections.join('\n\n')}
+`;
+
+    return {
+      answer: answerMarkdown,
+      summary,
+      keyPoints,
+      statusBreakdown,
+      sources,
+      evidenceStrength,
+    };
+  }
+
+  // Case 3: Overall Agency Pipeline
   if (intent.isOverall) {
     const uncompletedCards = topCards.filter((sc) => sc.card.isUnderProgress);
     summary = `Overall Agency Pipeline: There are currently ${uncompletedCards.length} active deliverables underway that are under progress (not completed).`;
@@ -178,7 +338,7 @@ function generateDeterministicAnswer(
       `Client requests in To Do Clients are prioritized to ensure dates are assigned and deliverables do not become overdue.`,
       `Specialist queues cover recurring SEO audits, schema markup deployments, and medical content optimizations.`
     );
-    uncompletedCards.slice(0, 4).forEach((sc) => {
+    uncompletedCards.slice(0, 6).forEach((sc) => {
       keyPoints.push(`Active deliverable: "${sc.card.name}" (${sc.card.listName}) for ${sc.card.clientCanonical || 'Internal'}.`);
     });
   } else if (intent.dateFrom && intent.dateTo) {
@@ -217,18 +377,35 @@ function generateDeterministicAnswer(
       keyPoints.push(`Recent update: "${primary.comments[primary.comments.length - 1].text}"`);
     }
   } else if (intent.person) {
-    summary = `Retrieved work associated with ${intent.person} across ${topCards.length} cards and activities.`;
-    topCards.forEach((c) => {
-      const pActs = c.card.activities.filter((a) => a.person.toLowerCase().includes(intent.person!.toLowerCase()));
-      if (pActs.length > 0) {
-        keyPoints.push(`${c.card.name}: ${pActs[0].details}`);
-      } else {
-        keyPoints.push(`${c.card.name} (${c.card.statusSemantic})`);
-      }
-    });
+    const activeTasks = topCards.filter((c) => c.card.statusSemantic === 'In Process' || c.card.isUnderProgress);
+    const reviewTasks = topCards.filter((c) => c.card.statusSemantic === 'In Review');
+    const completedTasks = topCards.filter((c) => c.card.statusSemantic === 'Completed');
+
+    summary = `${intent.person} currently has ${topCards.length} deliverables tracked across the board (${activeTasks.length} in progress, ${reviewTasks.length} in review, ${completedTasks.length} completed).`;
+
+    if (activeTasks.length > 0) {
+      keyPoints.push(`**Active Deliverables**: ${activeTasks.map((c) => `"${c.card.name}" [List: ${c.card.listName}]`).slice(0, 4).join(', ')}.`);
+    }
+    if (reviewTasks.length > 0) {
+      keyPoints.push(`**In Review**: ${reviewTasks.map((c) => `"${c.card.name}"`).slice(0, 3).join(', ')}.`);
+    }
+
+    // Check for comments / updates
+    const commentedCards = topCards.filter((c) => c.card.comments && c.card.comments.length > 0);
+    if (commentedCards.length > 0) {
+      const topComm = commentedCards[0].card.comments[0];
+      keyPoints.push(`**Latest Discussion**: "${topComm.text.slice(0, 100)}..." on *${commentedCards[0].card.name}* (${topComm.authorName}).`);
+    }
+
+    // Check checklists
+    const allChecklistItems = topCards.flatMap((c) => c.card.checklists.flatMap((cl) => cl.items));
+    const completedItems = allChecklistItems.filter((it) => it.state === 'complete');
+    if (allChecklistItems.length > 0) {
+      keyPoints.push(`**Checklist Milestones**: ${completedItems.length}/${allChecklistItems.length} tasks completed across assigned cards.`);
+    }
   } else {
     summary = `The team has ${topCards.length} relevant projects across active boards, with ${completedCount} completed and ${inProcessCount} currently in process.`;
-    topCards.slice(0, 3).forEach((sc) => {
+    topCards.slice(0, 5).forEach((sc) => {
       keyPoints.push(`${sc.card.name} (${sc.card.statusSemantic}): ${sc.card.desc.slice(0, 100)}...`);
     });
   }
@@ -248,12 +425,12 @@ ${keyPoints.map((kp) => `- ${kp}`).join('\n')}
 
 ### Recent Trello Evidence
 ${topCards
-  .slice(0, 4)
+  .slice(0, 8)
   .map(
     (sc, i) =>
-      `${i + 1}. **${sc.card.name}** (${sc.card.statusSemantic})
-   *Last activity: ${sc.card.dateLastActivity.slice(0, 10)} by ${sc.card.members.map((m) => m.fullName).join(', ') || 'Team'}*
-   ${sc.snippet || sc.card.desc}`
+      `${i + 1}. **[${sc.card.name}](${sc.card.url})** (${sc.card.statusSemantic})
+   *List: ${sc.card.listName} | Last activity: ${sc.card.dateLastActivity.slice(0, 10)} by ${sc.card.members.map((m) => m.fullName).join(', ') || 'Team'}*
+   ${sc.snippet || sc.card.desc || 'No description'}`
   )
   .join('\n\n')}
 `;

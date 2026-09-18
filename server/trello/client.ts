@@ -211,14 +211,6 @@ export class TrelloClient {
     return this.fetchTrello(`/checklists/${checklistId}/checkItems`);
   }
 
-  // 11. getCardComments(cardId)
-  async getCardComments(cardId: string): Promise<any[]> {
-    return this.fetchTrello(`/cards/${cardId}/actions`, {
-      filter: 'commentCard',
-      limit: 50,
-    });
-  }
-
   // 12. getCardActions(cardId)
   async getCardActions(cardId: string): Promise<any[]> {
     return this.fetchTrello(`/cards/${cardId}/actions`, {
@@ -234,19 +226,49 @@ export class TrelloClient {
     });
   }
 
-  // 14. getBoardActions(boardId, limit, since)
-  // Official Atlassian recommended pattern to avoid API_TOO_MANY_CARDS_REQUESTED (403)
-  async getBoardActions(boardId: string, limit = 1000, since?: string): Promise<any[]> {
-    const params: Record<string, string | number | boolean> = {
-      filter: 'commentCard,updateCard:idList,updateCheckItemStateOnCard',
-      limit: Math.min(limit, 1000),
-      fields: 'id,idMemberCreator,data,type,date,memberCreator',
-    };
-    if (since) {
-      params.since = since;
-    }
+  // Fetch comments directly for an individual card
+  async getCardComments(cardId: string): Promise<any[]> {
     try {
-      return await this.fetchTrello<any[]>(`/boards/${boardId}/actions`, params);
+      return await this.fetchTrello<any[]>(`/cards/${cardId}/actions`, {
+        filter: 'commentCard',
+        limit: 100,
+        fields: 'id,idMemberCreator,data,type,date,memberCreator',
+      });
+    } catch (err: any) {
+      console.warn(`Failed to fetch comments for card ${cardId}:`, err.message);
+      return [];
+    }
+  }
+
+  // 14. getBoardActions(boardId, limit, since)
+  // Fetches comments, list moves, and checkItem actions across the board in dedicated streams
+  // to ensure comments are never crowded out by high-frequency check items.
+  async getBoardActions(boardId: string, limit = 1000, since?: string): Promise<any[]> {
+    const makeParams = (filter: string) => {
+      const p: Record<string, string | number | boolean> = {
+        filter,
+        limit: Math.min(limit, 1000),
+        fields: 'id,idMemberCreator,data,type,date,memberCreator',
+      };
+      if (since) p.since = since;
+      return p;
+    };
+
+    try {
+      // Fetch comments, moves, and check items in parallel so comments get full 1000 action headroom
+      const [comments, moves, checkItems] = await Promise.all([
+        this.fetchTrello<any[]>(`/boards/${boardId}/actions`, makeParams('commentCard')).catch(() => []),
+        this.fetchTrello<any[]>(`/boards/${boardId}/actions`, makeParams('updateCard:idList')).catch(() => []),
+        this.fetchTrello<any[]>(`/boards/${boardId}/actions`, makeParams('updateCheckItemStateOnCard')).catch(() => []),
+      ]);
+
+      const actionMap = new Map<string, any>();
+      for (const a of [...(comments || []), ...(moves || []), ...(checkItems || [])]) {
+        if (a && a.id) {
+          actionMap.set(a.id, a);
+        }
+      }
+      return Array.from(actionMap.values());
     } catch (err: any) {
       console.warn('Failed to fetch board actions (proceeding without board actions):', err.message);
       return [];
@@ -287,14 +309,14 @@ export class TrelloClient {
       checklists: 'all',
       attachments: 'true',
       attachment_fields: 'id,name,url,mimeType,date',
-      fields: 'id,idBoard,idList,name,desc,url,due,dateLastActivity,closed,idLabels,idMembers,labels',
+      fields: 'id,idBoard,idList,name,desc,url,due,dateLastActivity,closed,idLabels,idMembers,labels,badges',
     };
 
     if (since) {
       cardParams.since = since;
     }
 
-    // 1. Fetch cards and board actions concurrently without overloading the cards endpoint
+    // 1. Fetch cards and board actions concurrently
     const [rawCards, boardActions] = await Promise.all([
       this.fetchTrello<any[]>(`/boards/${boardId}/cards`, cardParams).catch(async (cardErr: any) => {
         // Fallback for gigantic boards if attachments or checklists ever hit memory or payload limits
@@ -302,7 +324,7 @@ export class TrelloClient {
           console.warn('Retrying /cards with minimal core fields due to board size limit:', cardErr.message);
           return await this.fetchTrello<any[]>(`/boards/${boardId}/cards`, {
             filter: 'all',
-            fields: 'id,idBoard,idList,name,desc,url,due,dateLastActivity,closed,idLabels,idMembers,labels',
+            fields: 'id,idBoard,idList,name,desc,url,due,dateLastActivity,closed,idLabels,idMembers,labels,badges',
           });
         }
         throw cardErr;
@@ -327,6 +349,37 @@ export class TrelloClient {
     // 3. Attach mapped actions to each card
     for (const card of rawCards || []) {
       card.actions = actionsByCardId.get(card.id) || [];
+    }
+
+    // 4. For active/open cards where badges indicate comments exist, fetch comments directly if missing
+    const cardsNeedingComments = (rawCards || []).filter((c: any) => {
+      if (c.closed) return false;
+      const existingComments = (c.actions || []).filter((a: any) => a.type === 'commentCard');
+      const badgeComments = c.badges?.comments || 0;
+      // If badge indicates more comments than we found in board actions, or if card is in progress
+      return badgeComments > existingComments.length;
+    });
+
+    if (cardsNeedingComments.length > 0) {
+      console.log(`Deep fetching comments for ${cardsNeedingComments.length} active cards with comments...`);
+      // Batch execute with concurrency limit of 6 to be gentle with rate limits
+      const batchSize = 6;
+      for (let i = 0; i < cardsNeedingComments.length; i += batchSize) {
+        const batch = cardsNeedingComments.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async (card: any) => {
+            const cardComments = await this.getCardComments(card.id);
+            if (cardComments && cardComments.length > 0) {
+              const existingIds = new Set((card.actions || []).map((a: any) => a.id));
+              for (const cm of cardComments) {
+                if (!existingIds.has(cm.id)) {
+                  card.actions.push(cm);
+                }
+              }
+            }
+          })
+        );
+      }
     }
 
     return rawCards || [];

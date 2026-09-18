@@ -833,9 +833,10 @@ class Store {
   }
 
   // --- Chat Sessions & Messages ---
-  createChatSession(title = 'Intelligence Session'): ChatSession {
+  createChatSession(title = 'Intelligence Session', userId?: string): ChatSession {
     const session: ChatSession = {
       id: `chat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      userId: userId || 'usr_admin_awais',
       title,
       messages: [],
       createdAt: new Date().toISOString(),
@@ -843,47 +844,72 @@ class Store {
     };
     this.state.chatSessions[session.id] = session;
     this.persist();
+    if (pgStore.isConfigured()) {
+      pgStore.createChatSession(session.id, session.userId, title).catch(() => {});
+    }
     return session;
   }
 
-  getChatSessions(): ChatSession[] {
+  getChatSessions(userId?: string): ChatSession[] {
     if (!this.state.chatSessions) {
       this.state.chatSessions = {};
     }
-    if (Object.keys(this.state.chatSessions).length === 0) {
-      const seedSessions = getSeedChatSessions();
-      for (const s of seedSessions) {
-        this.state.chatSessions[s.id] = s;
+    
+    // Assign any legacy unassigned sessions to primary admin
+    for (const session of Object.values(this.state.chatSessions)) {
+      if (!session.userId) {
+        session.userId = 'usr_admin_awais';
       }
-      this.persist();
     }
-    return Object.values(this.state.chatSessions).sort(
+
+    let sessions = Object.values(this.state.chatSessions);
+
+    if (userId) {
+      sessions = sessions.filter((s) => s.userId === userId);
+    }
+
+    return sessions.sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
   }
 
-  getChatSession(id: string): ChatSession | null {
-    return this.state.chatSessions[id] || null;
-  }
-
-  deleteChatSession(id: string): boolean {
-    if (this.state.chatSessions[id]) {
-      delete this.state.chatSessions[id];
-      this.persist();
-      return true;
+  getChatSession(id: string, userId?: string): ChatSession | null {
+    const session = this.state.chatSessions[id];
+    if (!session) return null;
+    if (userId && session.userId && session.userId !== userId) {
+      return null;
     }
-    return false;
+    return session;
   }
 
-  clearChatSessions(): void {
-    this.state.chatSessions = {};
+  deleteChatSession(id: string, userId?: string): boolean {
+    const session = this.state.chatSessions[id];
+    if (!session) return false;
+    if (userId && session.userId && session.userId !== userId) {
+      return false;
+    }
+    delete this.state.chatSessions[id];
+    this.persist();
+    return true;
+  }
+
+  clearChatSessions(userId?: string): void {
+    if (!userId) {
+      this.state.chatSessions = {};
+    } else {
+      for (const [id, s] of Object.entries(this.state.chatSessions)) {
+        if (s.userId === userId) {
+          delete this.state.chatSessions[id];
+        }
+      }
+    }
     this.persist();
   }
 
-  addChatMessage(sessionId: string, message: Omit<ChatMessage, 'id' | 'createdAt'>): ChatMessage {
+  addChatMessage(sessionId: string, message: Omit<ChatMessage, 'id' | 'createdAt'>, userId?: string): ChatMessage {
     let session = this.state.chatSessions[sessionId];
     if (!session) {
-      session = this.createChatSession();
+      session = this.createChatSession(message.content?.slice(0, 40) || 'Intelligence Session', userId);
       sessionId = session.id;
     }
 

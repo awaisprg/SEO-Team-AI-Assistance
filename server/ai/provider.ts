@@ -18,7 +18,7 @@ export class GeminiProvider implements AIProvider {
 
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY || '';
-    this.modelName = process.env.AI_MODEL || 'gemini-3.6-flash';
+    this.modelName = process.env.AI_MODEL || 'gemini-3.8-flash';
     if (this.apiKey) {
       try {
         this.client = new GoogleGenAI({
@@ -44,16 +44,38 @@ export class GeminiProvider implements AIProvider {
       throw new Error('Gemini API key is not configured');
     }
 
-    const response = await this.client.models.generateContent({
-      model: this.modelName,
-      contents: userPrompt,
-      config: {
-        systemInstruction: systemPrompt,
-        temperature: 0.2, // Low temperature for high factual accuracy and strict evidence adherence
-      },
-    });
+    try {
+      const response = await this.client.models.generateContent({
+        model: this.modelName,
+        contents: userPrompt,
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.2, // Low temperature for high factual accuracy and strict evidence adherence
+        },
+      });
 
-    return response.text || 'No response generated.';
+      return response.text || 'No response generated.';
+    } catch (primaryErr: any) {
+      // If resource exhausted or model unavailable, try flash-lite
+      if (this.modelName !== 'gemini-3.1-flash-lite') {
+        console.warn(`Primary model ${this.modelName} error (${primaryErr.message}), retrying with gemini-3.1-flash-lite...`);
+        try {
+          const fallbackResponse = await this.client.models.generateContent({
+            model: 'gemini-3.1-flash-lite',
+            contents: userPrompt,
+            config: {
+              systemInstruction: systemPrompt,
+              temperature: 0.2,
+            },
+          });
+          return fallbackResponse.text || 'No response generated.';
+        } catch (secondaryErr: any) {
+          console.warn('Fallback model also encountered error:', secondaryErr.message);
+          throw secondaryErr;
+        }
+      }
+      throw primaryErr;
+    }
   }
 
   async generateEmbedding(text: string): Promise<number[]> {

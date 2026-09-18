@@ -107,13 +107,13 @@ export const SourceCardModal: React.FC<SourceCardModalProps> = ({
                 <span>Checklists & Workflows</span>
               </h4>
               <div className="space-y-3">
-                {cardDetail.checklists.map((cl) => (
+                {(cardDetail.checklists || []).map((cl) => (
                   <div key={cl.id} className="p-3 rounded-lg border border-slate-200 bg-white">
                     <span className="text-xs font-semibold text-slate-900 block mb-2">
                       {cl.name}
                     </span>
                     <div className="space-y-1.5">
-                      {cl.items.map((it) => (
+                      {(cl.items || []).map((it) => (
                         <div key={it.id} className="flex items-center text-xs text-slate-700">
                           <input
                             type="checkbox"
@@ -145,7 +145,7 @@ export const SourceCardModal: React.FC<SourceCardModalProps> = ({
                 <span>Card Comments & Updates</span>
               </h4>
               <div className="space-y-2">
-                {cardDetail.comments.map((cm) => (
+                {(cardDetail.comments || []).map((cm) => (
                   <div key={cm.id} className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs">
                     <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
                       <span className="font-semibold text-slate-800">{cm.authorName}</span>

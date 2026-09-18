@@ -41,34 +41,34 @@ export const BriefView: React.FC<BriefViewProps> = ({
   };
 
   return (
-    <div id="brief-view" className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <div id="brief-view" className="grid grid-cols-1 lg:grid-cols-4 gap-5">
       {/* Left Sidebar: Controls & Saved Briefs */}
       <div className="lg:col-span-1 space-y-4">
         {/* Generator Card */}
-        <div className="bg-white p-5 rounded-2xl border border-[#EAEAEC] shadow-xs">
-          <div className="flex items-center space-x-2 text-[#1A1A1E] font-bold mb-2">
-            <div className="w-7 h-7 rounded-xl bg-[#F2F2FD] border border-[#C6C1F3] flex items-center justify-center text-[#8963FB]">
+        <div className="bg-white p-4.5 rounded-xl border border-slate-200/90 shadow-2xs">
+          <div className="flex items-center space-x-2 text-slate-900 font-bold mb-1.5">
+            <div className="w-6 h-6 rounded-lg bg-violet-50 border border-violet-100 flex items-center justify-center text-[#7C52F5]">
               <Sparkles className="w-3.5 h-3.5" />
             </div>
-            <span className="text-sm">Synthesize Brief</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-800">Synthesize Dossier</span>
           </div>
-          <p className="text-xs text-[#5D5C68] mb-4 leading-relaxed">
+          <p className="text-xs text-slate-500 mb-4 leading-relaxed">
             Generate an executive-level status report with verified accomplishments, AI/GEO updates, client progress, and doctor review gates.
           </p>
 
           <div className="space-y-3">
             <div>
-              <label className="block text-[11px] font-bold text-[#5D5C68] mb-2 uppercase tracking-wider">
+              <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wider">
                 Reporting Window
               </label>
               <div className="space-y-1.5">
                 <button
                   id="period-btn-overall"
                   onClick={() => setSelectedPeriod('overall')}
-                  className={`w-full px-3 py-2.5 text-xs rounded-xl border font-semibold transition-all cursor-pointer text-center ${
+                  className={`w-full px-3 py-2 text-xs rounded-lg border font-semibold transition-all cursor-pointer text-center ${
                     selectedPeriod === 'overall'
-                      ? 'bg-[#1A1A1E] text-white border-[#1A1A1E] shadow-xs'
-                      : 'bg-white text-[#5D5C68] border-[#EAEAEC] hover:bg-[#F8F8FC] hover:text-[#1A1A1E]'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
                   Overall Summary (Active Pipeline)
@@ -84,10 +84,10 @@ export const BriefView: React.FC<BriefViewProps> = ({
                       key={item.id}
                       id={`period-btn-${item.id}`}
                       onClick={() => setSelectedPeriod(item.id as any)}
-                      className={`px-2.5 py-2 text-xs rounded-xl border font-semibold transition-all cursor-pointer text-center ${
+                      className={`px-2.5 py-1.5 text-xs rounded-lg border font-semibold transition-all cursor-pointer text-center ${
                         selectedPeriod === item.id
-                          ? 'bg-[#1A1A1E] text-white border-[#1A1A1E] shadow-xs'
-                          : 'bg-white text-[#5D5C68] border-[#EAEAEC] hover:bg-[#F8F8FC] hover:text-[#1A1A1E]'
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
                       {item.label}
@@ -101,44 +101,44 @@ export const BriefView: React.FC<BriefViewProps> = ({
               id="generate-brief-btn"
               onClick={() => onGenerateBrief(selectedPeriod)}
               disabled={isGenerating}
-              className="w-full mt-3 py-2.5 px-4 rounded-xl bg-[#8963FB] hover:bg-[#7852E8] active:bg-[#683EE6] text-white text-xs font-semibold flex items-center justify-center space-x-2 transition-all shadow-xs hover:shadow-md disabled:opacity-60 cursor-pointer group"
+              className="w-full mt-2 py-2 px-3 rounded-lg bg-gradient-to-r from-[#7C52F5] to-[#683EE6] hover:from-[#6D42E6] hover:to-[#572FD6] active:from-[#572FD6] active:to-[#461EC6] text-white text-xs font-semibold flex items-center justify-center space-x-2 transition-all shadow-xs hover:shadow-md disabled:opacity-60 cursor-pointer group"
             >
-              <FileText className="w-4 h-4 group-hover:scale-105 transition-transform" />
-              <span>{isGenerating ? 'Synthesizing Brief...' : 'Generate Executive Brief'}</span>
+              <FileText className="w-3.5 h-3.5 group-hover:scale-105 transition-transform" />
+              <span>{isGenerating ? 'Synthesizing Dossier...' : 'Generate Executive Brief'}</span>
             </button>
           </div>
         </div>
 
         {/* Saved Briefs History */}
-        <div className="bg-white p-5 rounded-2xl border border-[#EAEAEC] shadow-xs">
+        <div className="bg-white p-4.5 rounded-xl border border-slate-200/90 shadow-2xs">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-[#1A1A1E] uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
               Brief Archive
             </span>
-            <span className="text-[11px] text-[#6E6D7B] font-medium bg-[#F8F8FC] px-2 py-0.5 rounded-full border border-[#EAEAEC]">
-              {savedBriefs.length} saved
+            <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+              {(savedBriefs || []).length} saved
             </span>
           </div>
 
-          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-            {savedBriefs.length === 0 ? (
-              <p className="text-xs text-[#6E6D7B] italic">No saved briefs yet.</p>
+          <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+            {(!savedBriefs || savedBriefs.length === 0) ? (
+              <p className="text-xs text-slate-400 italic">No saved briefs yet.</p>
             ) : (
-              savedBriefs.map((brief) => (
+              (savedBriefs || []).map((brief) => (
                 <button
                   key={brief.id}
                   id={`saved-brief-${brief.id}`}
                   onClick={() => onSelectBrief(brief)}
-                  className={`w-full text-left p-3 rounded-xl border transition-all text-xs cursor-pointer ${
+                  className={`w-full text-left p-2.5 rounded-lg border transition-all text-xs cursor-pointer ${
                     currentBrief?.id === brief.id
-                      ? 'bg-[#F2F2FD] border-[#C6C1F3] text-[#2F20A2] font-semibold shadow-2xs'
-                      : 'bg-white border-[#EAEAEC] hover:border-[#8963FB]/40 text-[#5D5C68]'
+                      ? 'bg-violet-50/80 border-violet-200 text-[#7C52F5] font-semibold shadow-2xs ring-1 ring-violet-500/20'
+                      : 'bg-white border-slate-200 hover:border-violet-200 text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  <div className="font-semibold line-clamp-1 text-[#1A1A1E]">{brief.title}</div>
-                  <div className="text-[10px] text-[#6E6D7B] mt-1.5 flex items-center justify-between">
+                  <div className="font-semibold line-clamp-1 text-slate-900">{brief.title}</div>
+                  <div className="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
                     <span>{new Date(brief.createdAt).toLocaleDateString()}</span>
-                    <ChevronRight className="w-3 h-3 text-[#6E6D7B]" />
+                    <ChevronRight className="w-3 h-3 text-slate-400" />
                   </div>
                 </button>
               ))
@@ -152,28 +152,28 @@ export const BriefView: React.FC<BriefViewProps> = ({
         {currentBrief ? (
           <div
             id="brief-document"
-            className="bg-white rounded-3xl border border-[#EAEAEC] p-6 sm:p-8 shadow-xs space-y-6 relative overflow-hidden"
+            className="bg-white rounded-2xl border border-slate-200/90 p-6 sm:p-7 shadow-xs space-y-5 relative overflow-hidden"
           >
             {/* Top Decorative Brand Bar */}
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#8963FB] via-[#A78AFD] to-[#2F20A2]" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#09061A] via-[#7C52F5] to-[#683EE6]" />
 
             {/* Document Header & Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-[#EAEAEC] pb-5 pt-2">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-100 pb-4 pt-1">
               <div>
-                <div className="inline-flex items-center space-x-2 text-[11px] font-bold uppercase tracking-wider text-[#8963FB] bg-[#F2F2FD] px-3 py-1 rounded-full border border-[#C6C1F3]">
+                <div className="inline-flex items-center space-x-1.5 text-[10px] font-bold uppercase tracking-wider text-[#7C52F5] bg-violet-50 px-2.5 py-0.5 rounded-md border border-violet-100">
                   <Sparkles className="w-3 h-3" />
-                  <span>Gold Flex Marketing • Executive Management Dossier</span>
+                  <span>Executive Management Dossier</span>
                 </div>
-                <h2 className="text-2xl sm:text-[26px] font-extrabold text-[#1A1A1E] mt-2.5 tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2 tracking-tight">
                   {currentBrief.title}
                 </h2>
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-[#5D5C68] mt-2 font-medium">
-                  <span className="flex items-center bg-[#F8F8FC] px-2.5 py-1 rounded-md border border-[#EAEAEC]">
-                    <Calendar className="w-3.5 h-3.5 mr-1.5 text-[#8963FB]" />
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-1.5 font-medium">
+                  <span className="flex items-center bg-slate-50 px-2 py-0.5 rounded border border-slate-200 text-[11px]">
+                    <Calendar className="w-3 h-3 mr-1 text-[#7C52F5]" />
                     Window: {currentBrief.dateFrom} to {currentBrief.dateTo}
                   </span>
-                  <span className="text-[#C6C1F3] hidden sm:inline">•</span>
-                  <span className="text-[11px] text-[#6E6D7B]">
+                  <span className="text-slate-300 hidden sm:inline">•</span>
+                  <span className="text-[11px] text-slate-400">
                     Compiled: {new Date(currentBrief.createdAt).toLocaleString()}
                   </span>
                 </div>
@@ -183,103 +183,103 @@ export const BriefView: React.FC<BriefViewProps> = ({
                 <button
                   id="brief-download-pdf-btn"
                   onClick={handleDownloadPDF}
-                  className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-[#8963FB] hover:bg-[#7852E8] active:bg-[#683EE6] text-white text-xs font-semibold transition-all shadow-xs hover:shadow-md cursor-pointer group"
+                  className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-gradient-to-r from-[#7C52F5] to-[#683EE6] hover:from-[#6D42E6] hover:to-[#572FD6] text-white text-xs font-semibold transition-all shadow-xs hover:shadow-md cursor-pointer group"
                   title="Download executive brief as a formatted vector PDF"
                 >
-                  <Download className="w-4 h-4 group-hover:translate-y-0.5 transition-transform" />
+                  <Download className="w-3.5 h-3.5 group-hover:translate-y-0.5 transition-transform" />
                   <span>Download PDF</span>
                 </button>
               </div>
             </div>
 
             {/* Metrics Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {currentBrief.periodType === 'overall' ? (
                 <>
-                  <div className="bg-[#F8F8FC] border border-[#EAEAEC] rounded-2xl p-4 col-span-2 shadow-2xs">
-                    <span className="text-[11px] font-semibold text-[#5D5C68] block uppercase tracking-wider">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 col-span-2 shadow-2xs">
+                    <span className="text-[10px] font-semibold text-slate-500 block uppercase tracking-wider">
                       Total Active Deliverables
                     </span>
-                    <span className="text-2xl sm:text-3xl font-extrabold text-[#1A1A1E] mt-1 block tabular-nums">
+                    <span className="text-2xl sm:text-3xl font-bold text-slate-900 mt-0.5 block tabular-nums">
                       {currentBrief.activePipelineCount ?? 0}
                     </span>
-                    <span className="text-[11px] text-[#6E6D7B]">All uncompleted cards across board</span>
+                    <span className="text-[11px] text-slate-400">Active board pipeline items</span>
                   </div>
-                  <div className="bg-[#EAF6EE] border border-[#198754]/30 rounded-2xl p-4 col-span-2 shadow-2xs">
-                    <span className="text-[11px] font-semibold text-[#198754] block uppercase tracking-wider">
+                  <div className="bg-emerald-50/60 border border-emerald-200/70 rounded-xl p-3.5 col-span-2 shadow-2xs">
+                    <span className="text-[10px] font-semibold text-emerald-700 block uppercase tracking-wider">
                       Quality Review Gate
                     </span>
-                    <span className="text-2xl sm:text-3xl font-extrabold text-[#198754] mt-1 block tabular-nums">
-                      {currentBrief.sourceCards.filter((s) => s.status === 'In Review').length || 'Active'}
+                    <span className="text-2xl sm:text-3xl font-bold text-emerald-700 mt-0.5 block tabular-nums">
+                      {(currentBrief.sourceCards || []).filter((s) => s.status === 'In Review').length || 'Active'}
                     </span>
-                    <span className="text-[11px] text-[#198754]/80">Completed by team, pending review</span>
+                    <span className="text-[11px] text-emerald-600/80">Completed by team, pending review</span>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="bg-[#EAF6EE] border border-[#198754]/30 rounded-2xl p-4 shadow-2xs">
-                    <span className="text-[11px] font-semibold text-[#198754] block uppercase tracking-wider">
+                  <div className="bg-emerald-50/60 border border-emerald-200/70 rounded-xl p-3 shadow-2xs">
+                    <span className="text-[10px] font-semibold text-emerald-700 block uppercase tracking-wider">
                       Cards Completed
                     </span>
-                    <span className="text-2xl sm:text-3xl font-extrabold text-[#198754] mt-1 block tabular-nums">
+                    <span className="text-2xl font-bold text-emerald-700 mt-0.5 block tabular-nums">
                       {currentBrief.cardsCompletedCount ?? 0}
                     </span>
-                    <span className="text-[10px] text-[#198754]/80">Marked complete in period</span>
+                    <span className="text-[10px] text-emerald-600/80">Delivered in period</span>
                   </div>
-                  <div className="bg-[#F2F2FD] border border-[#C6C1F3] rounded-2xl p-4 shadow-2xs">
-                    <span className="text-[11px] font-semibold text-[#2F20A2] block uppercase tracking-wider">
-                      Checklist Items
+                  <div className="bg-violet-50/60 border border-violet-200/70 rounded-xl p-3 shadow-2xs">
+                    <span className="text-[10px] font-semibold text-violet-700 block uppercase tracking-wider">
+                      Tasks Completed
                     </span>
-                    <span className="text-2xl sm:text-3xl font-extrabold text-[#2F20A2] mt-1 block tabular-nums">
+                    <span className="text-2xl font-bold text-violet-700 mt-0.5 block tabular-nums">
                       {currentBrief.checklistTasksCompletedCount ?? 0}
                     </span>
-                    <span className="text-[10px] text-[#2F20A2]/80">Finalized deliverables</span>
+                    <span className="text-[10px] text-violet-600/80">Checklists finalized</span>
                   </div>
-                  <div className="bg-[#F8F8FC] border border-[#C6C1F3] rounded-2xl p-4 shadow-2xs">
-                    <span className="text-[11px] font-semibold text-[#8963FB] block uppercase tracking-wider">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-2xs">
+                    <span className="text-[10px] font-semibold text-slate-600 block uppercase tracking-wider">
                       Cards Created
                     </span>
-                    <span className="text-2xl sm:text-3xl font-extrabold text-[#1A1A1E] mt-1 block tabular-nums">
+                    <span className="text-2xl font-bold text-slate-900 mt-0.5 block tabular-nums">
                       {currentBrief.cardsCreatedCount ?? 0}
                     </span>
-                    <span className="text-[10px] text-[#8963FB]">Initiated in period</span>
+                    <span className="text-[10px] text-slate-400">Initiated in window</span>
                   </div>
-                  <div className="bg-[#F8F8FC] border border-[#EAEAEC] rounded-2xl p-4 shadow-2xs">
-                    <span className="text-[11px] font-semibold text-[#5D5C68] block uppercase tracking-wider">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-2xs">
+                    <span className="text-[10px] font-semibold text-slate-600 block uppercase tracking-wider">
                       Active Pipeline
                     </span>
-                    <span className="text-2xl sm:text-3xl font-extrabold text-[#1A1A1E] mt-1 block tabular-nums">
+                    <span className="text-2xl font-bold text-slate-900 mt-0.5 block tabular-nums">
                       {currentBrief.activePipelineCount ?? 0}
                     </span>
-                    <span className="text-[10px] text-[#6E6D7B]">Currently in progress</span>
+                    <span className="text-[10px] text-slate-400">Currently in progress</span>
                   </div>
                 </>
               )}
             </div>
 
             {/* Executive Summary */}
-            <div className="bg-gradient-to-r from-[#FAF8FF] to-white border-l-4 border-[#8963FB] border-y border-r border-[#EAEAEC] rounded-r-2xl p-5 shadow-2xs">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#2F20A2] mb-2 flex items-center space-x-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#8963FB]" />
+            <div className="bg-slate-50/80 border border-slate-200/90 rounded-xl p-4.5 shadow-2xs">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-2 flex items-center space-x-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#7C52F5]" />
                 <span>Executive Summary</span>
               </h3>
-              <p className="text-sm text-[#1A1A1E] leading-relaxed font-normal">
+              <p className="text-sm text-slate-800 leading-relaxed font-normal">
                 {currentBrief.executiveSummary}
               </p>
             </div>
 
             {/* Major Accomplishments */}
-            <div className="bg-white rounded-2xl border border-[#EAEAEC] p-5 shadow-2xs">
-              <h3 className="text-sm font-bold text-[#1A1A1E] mb-3 flex items-center space-x-2">
-                <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <ShieldCheck className="w-4 h-4" />
+            <div className="bg-white rounded-xl border border-slate-200/90 p-4.5 shadow-2xs">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-3 flex items-center space-x-2">
+                <div className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <ShieldCheck className="w-3.5 h-3.5" />
                 </div>
-                <span>Major Accomplishments & Key Milestones</span>
+                <span>Major Accomplishments & Milestones</span>
               </h3>
-              <ul className="space-y-2.5">
-                {currentBrief.majorAccomplishments.map((item, idx) => (
-                  <li key={idx} className="flex items-start text-xs sm:text-sm text-[#27272B]">
-                    <span className="w-2 h-2 rounded-full bg-[#198754] mt-1.5 mr-2.5 shrink-0" />
+              <ul className="space-y-2">
+                {(currentBrief.majorAccomplishments || []).map((item, idx) => (
+                  <li key={idx} className="flex items-start text-xs sm:text-sm text-slate-800">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mt-2 mr-2.5 shrink-0" />
                     <span className="leading-snug">{item}</span>
                   </li>
                 ))}
@@ -287,31 +287,31 @@ export const BriefView: React.FC<BriefViewProps> = ({
             </div>
 
             {/* SEO & Content Activities (2 cols) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-[#F8F8FC] border border-[#EAEAEC] rounded-2xl p-5 shadow-2xs">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#1A1A1E] mb-3 flex items-center space-x-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#8963FB]" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-4 shadow-2xs">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 mb-2.5 flex items-center space-x-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#7C52F5]" />
                   <span>Technical SEO & Infrastructure</span>
                 </h4>
-                <ul className="space-y-2">
-                  {currentBrief.seoActivity.map((item, idx) => (
-                    <li key={idx} className="flex items-start text-xs text-[#5D5C68]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#8963FB] mt-1.5 mr-2 shrink-0" />
+                <ul className="space-y-1.5">
+                  {(currentBrief.seoActivity || []).map((item, idx) => (
+                    <li key={idx} className="flex items-start text-xs text-slate-600">
+                      <span className="w-1 h-1 rounded-full bg-[#7C52F5] mt-1.5 mr-2 shrink-0" />
                       <span>{item}</span>
                     </li>
                   ))}
                 </ul>
               </div>
 
-              <div className="bg-[#F8F8FC] border border-[#EAEAEC] rounded-2xl p-5 shadow-2xs">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#1A1A1E] mb-3 flex items-center space-x-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#2F20A2]" />
+              <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-4 shadow-2xs">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 mb-2.5 flex items-center space-x-1.5">
+                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
                   <span>Content & Medical E-E-A-T</span>
                 </h4>
-                <ul className="space-y-2">
-                  {currentBrief.contentActivity.map((item, idx) => (
-                    <li key={idx} className="flex items-start text-xs text-[#5D5C68]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#2F20A2] mt-1.5 mr-2 shrink-0" />
+                <ul className="space-y-1.5">
+                  {(currentBrief.contentActivity || []).map((item, idx) => (
+                    <li key={idx} className="flex items-start text-xs text-slate-600">
+                      <span className="w-1 h-1 rounded-full bg-indigo-600 mt-1.5 mr-2 shrink-0" />
                       <span>{item}</span>
                     </li>
                   ))}
@@ -320,15 +320,15 @@ export const BriefView: React.FC<BriefViewProps> = ({
             </div>
 
             {/* AI Overview & GEO Initiatives */}
-            <div className="bg-gradient-to-b from-[#F2F2FD] to-white border border-[#C6C1F3] rounded-2xl p-5 sm:p-6 shadow-2xs">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#2F20A2] mb-3 flex items-center space-x-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#8963FB]" />
+            <div className="bg-gradient-to-b from-violet-50/30 to-white border border-violet-200/80 rounded-xl p-4.5 shadow-2xs">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-violet-950 mb-2.5 flex items-center space-x-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#7C52F5]" />
                 <span>AI Overviews & Generative Engine Optimization (GEO)</span>
               </h3>
-              <ul className="space-y-2.5">
-                {currentBrief.aiOverviewGeoActivity.map((item, idx) => (
-                  <li key={idx} className="flex items-start text-xs sm:text-sm text-[#1A1A1E]">
-                    <span className="w-2 h-2 rounded-full bg-[#8963FB] mt-1.5 mr-2.5 shrink-0" />
+              <ul className="space-y-2">
+                {(currentBrief.aiOverviewGeoActivity || []).map((item, idx) => (
+                  <li key={idx} className="flex items-start text-xs sm:text-sm text-slate-800">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#7C52F5] mt-2 mr-2.5 shrink-0" />
                     <span className="leading-snug">{item}</span>
                   </li>
                 ))}
@@ -337,50 +337,50 @@ export const BriefView: React.FC<BriefViewProps> = ({
 
             {/* Client Progress */}
             <div>
-              <h3 className="text-sm font-bold text-[#1A1A1E] mb-3">Client Progress Matrix</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {currentBrief.clientProgress.map((cp, idx) => (
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-2.5">Client Progress Matrix</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {(currentBrief.clientProgress || []).map((cp, idx) => (
                   <div
                     key={idx}
-                    className="p-4 rounded-2xl border border-[#EAEAEC] bg-white text-xs shadow-2xs hover:border-[#C6C1F3] transition-colors"
+                    className="p-3.5 rounded-xl border border-slate-200 bg-white text-xs shadow-2xs hover:border-violet-200 transition-colors"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold text-[#1A1A1E] text-sm">{cp.client}</span>
-                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-[#F2F2FD] border border-[#C6C1F3] text-[#2F20A2]">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-semibold text-slate-900 text-xs">{cp.client}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-violet-50 border border-violet-100 text-violet-700">
                         {cp.status}
                       </span>
                     </div>
-                    <p className="text-[#5D5C68] text-xs leading-relaxed">{cp.summary}</p>
+                    <p className="text-slate-600 text-xs leading-relaxed">{cp.summary}</p>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Current Priorities & Blocked Items */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <div className="bg-white border border-[#EAEAEC] rounded-2xl p-5 shadow-2xs">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#1A1A1E] mb-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 mb-2.5">
                   Immediate Priorities
                 </h4>
-                <ul className="space-y-2">
-                  {currentBrief.currentPriorities.map((item, idx) => (
-                    <li key={idx} className="flex items-start text-xs text-[#5D5C68]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#6E6D7B] mt-1.5 mr-2 shrink-0" />
+                <ul className="space-y-1.5">
+                  {(currentBrief.currentPriorities || []).map((item, idx) => (
+                    <li key={idx} className="flex items-start text-xs text-slate-600">
+                      <span className="w-1 h-1 rounded-full bg-slate-400 mt-1.5 mr-2 shrink-0" />
                       <span>{item}</span>
                     </li>
                   ))}
                 </ul>
               </div>
 
-              <div className="bg-amber-50/50 border border-amber-200/70 rounded-2xl p-5 shadow-2xs">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#946200] mb-3 flex items-center space-x-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 text-[#FFBE00]" />
+              <div className="bg-amber-50/50 border border-amber-200/70 rounded-xl p-4 shadow-2xs">
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-amber-800 mb-2.5 flex items-center space-x-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
                   <span>Blocked / Awaiting Doctor Approval</span>
                 </h4>
-                <ul className="space-y-2">
-                  {currentBrief.blockedWork.map((item, idx) => (
-                    <li key={idx} className="flex items-start text-xs text-[#946200]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#FFBE00] mt-1.5 mr-2 shrink-0" />
+                <ul className="space-y-1.5">
+                  {(currentBrief.blockedWork || (currentBrief as any).blockedItems || []).map((item: string, idx: number) => (
+                    <li key={idx} className="flex items-start text-xs text-amber-900 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 mr-2 shrink-0" />
                       <span>{item}</span>
                     </li>
                   ))}
@@ -388,56 +388,58 @@ export const BriefView: React.FC<BriefViewProps> = ({
               </div>
             </div>
 
-            {/* Senior Management Talking Points */}
-            <div className="bg-[#151932] text-white rounded-2xl p-6 sm:p-7 shadow-md border border-[#272D56]">
-              <div className="flex items-center space-x-2 mb-3.5">
-                <div className="w-6 h-6 rounded-lg bg-[#8963FB]/20 border border-[#8963FB]/40 flex items-center justify-center text-[#A78AFD]">
-                  <Sparkles className="w-3.5 h-3.5" />
-                </div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#A78AFD]">
-                  Key Senior Management Talking Points
-                </h3>
-              </div>
-              <ul className="space-y-3">
-                {currentBrief.talkingPoints.map((tp, idx) => (
-                  <li key={idx} className="flex items-start text-xs sm:text-sm text-[#EAEAEC] leading-relaxed">
-                    <span className="w-2 h-2 rounded-full bg-[#8963FB] mt-1.5 mr-3 shrink-0" />
-                    <span>{tp}</span>
-                  </li>
+            {/* Grounding Source Cards */}
+            <div className="pt-3 border-t border-slate-100">
+              <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-800 mb-2 flex items-center space-x-1.5">
+                <Layers className="w-3.5 h-3.5 text-[#7C52F5]" />
+                <span>Connected Trello Cards ({(currentBrief.sourceCards || []).length} Verified Sources)</span>
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {(currentBrief.sourceCards || []).map((card, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => onSelectSource(card)}
+                    className="p-2.5 rounded-lg border border-slate-200 bg-slate-50/70 hover:bg-violet-50/30 hover:border-violet-300 transition-all text-xs cursor-pointer group shadow-2xs"
+                  >
+                    <div className="flex items-start justify-between gap-1.5 mb-1">
+                      <span className="font-medium text-slate-900 group-hover:text-[#7C52F5] line-clamp-1">
+                        {card.title}
+                      </span>
+                      <a
+                        href={card.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-slate-400 hover:text-[#7C52F5]"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <div className="flex items-center space-x-1 text-[10px] text-slate-400">
+                      <span>{card.listName}</span>
+                      <span>•</span>
+                      <span className="font-semibold text-slate-700">{card.status}</span>
+                    </div>
+                  </div>
                 ))}
-              </ul>
-            </div>
-
-            {/* Source Trello Cards Drawer */}
-            {currentBrief.sourceCards && currentBrief.sourceCards.length > 0 && (
-              <div className="pt-4 border-t border-[#EAEAEC]">
-                <span className="text-xs font-semibold text-[#5D5C68] uppercase tracking-wider block mb-2.5">
-                  Referenced Trello Cards ({currentBrief.sourceCards.length})
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {currentBrief.sourceCards.map((src, i) => (
-                    <button
-                      key={i}
-                      onClick={() => onSelectSource(src)}
-                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#F8F8FC] hover:bg-[#F2F2FD] border border-[#EAEAEC] hover:border-[#8963FB] text-[#5D5C68] hover:text-[#2F20A2] text-xs font-medium transition-all cursor-pointer shadow-2xs"
-                    >
-                      <span className="line-clamp-1 max-w-[200px]">{src.title}</span>
-                      <ExternalLink className="w-3 h-3 text-[#6E6D7B]" />
-                    </button>
-                  ))}
-                </div>
               </div>
-            )}
+            </div>
           </div>
         ) : (
-          <div className="bg-white rounded-3xl border border-[#EAEAEC] p-12 text-center shadow-xs flex flex-col items-center justify-center min-h-[400px]">
-            <div className="w-16 h-16 rounded-2xl bg-[#F2F2FD] text-[#8963FB] border border-[#C6C1F3] flex items-center justify-center mb-4 shadow-2xs">
-              <FileText className="w-8 h-8" />
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-xs">
+            <div className="w-12 h-12 rounded-xl bg-violet-50 text-[#7C52F5] border border-violet-100 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+              <FileText className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-[#1A1A1E]">No Brief Generated Yet</h3>
-            <p className="text-xs text-[#5D5C68] mt-1.5 max-w-sm mx-auto leading-relaxed">
-              Select a reporting period on the left and click "Generate Executive Brief" to synthesize evidence across all active Trello cards and deliverables.
+            <h3 className="text-base font-bold text-slate-900 mb-1">No Executive Brief Selected</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto mb-4">
+              Select a reporting window on the left and synthesize a brief, or choose an existing document from the archive.
             </p>
+            <button
+              onClick={() => onGenerateBrief(selectedPeriod)}
+              className="px-4 py-2 bg-gradient-to-r from-[#7C52F5] to-[#683EE6] text-white text-xs font-semibold rounded-lg shadow-xs hover:shadow-md cursor-pointer transition-all"
+            >
+              Generate Overall Summary
+            </button>
           </div>
         )}
       </div>

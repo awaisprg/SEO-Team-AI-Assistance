@@ -40,8 +40,8 @@ class UserRegistry {
         const raw = fs.readFileSync(USERS_FILE, 'utf-8');
         const list: AppUser[] = JSON.parse(raw);
         for (const u of list) {
-          if ((u.role as string) === 'MANAGER') {
-            u.role = 'VIEWER';
+          if ((u.role as string) === 'VIEWER') {
+            u.role = 'MANAGER';
           }
           this.users.set(u.email.toLowerCase(), u);
         }
@@ -97,20 +97,34 @@ class UserRegistry {
     return this.users.get(email.toLowerCase().trim()) || null;
   }
 
-  public register(params: {
+  public getAllUsers(): { id: string; email: string; name: string; role: UserRole; createdAt: string }[] {
+    return Array.from(this.users.values()).map((u) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      role: u.role,
+      createdAt: u.createdAt,
+    }));
+  }
+
+  public createUser(params: {
     email: string;
     password: string;
     name?: string;
     role?: UserRole;
-  }): { user: UserSession; token: string } {
+  }): { id: string; email: string; name: string; role: UserRole; createdAt: string } {
     const normalizedEmail = params.email.toLowerCase().trim();
 
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      throw new Error('A valid email address is required.');
+    }
+
     if (normalizedEmail === ADMIN_EMAIL.toLowerCase()) {
-      throw new Error('This email is reserved for the system Administrator. Please sign in.');
+      throw new Error('The primary administrator account already exists.');
     }
 
     if (this.users.has(normalizedEmail)) {
-      throw new Error('An account with this email already exists. Please sign in.');
+      throw new Error('An account with this email address already exists.');
     }
 
     if (!params.password || params.password.length < 6) {
@@ -121,12 +135,13 @@ class UserRegistry {
     const passwordHash = hashPassword(params.password, salt);
     const id = `usr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const displayName = params.name?.trim() || normalizedEmail.split('@')[0];
+    const role: UserRole = params.role === 'ADMIN' ? 'ADMIN' : 'MANAGER';
 
     const newUser: AppUser = {
       id,
       email: normalizedEmail,
       name: displayName,
-      role: 'VIEWER',
+      role,
       passwordHash,
       salt,
       createdAt: new Date().toISOString(),
@@ -144,15 +159,62 @@ class UserRegistry {
       }).catch(() => {});
     }
 
-    const sessionUser: UserSession = {
+    return {
       id: newUser.id,
       email: newUser.email,
       name: newUser.name,
       role: newUser.role,
+      createdAt: newUser.createdAt,
     };
+  }
 
-    const token = this.generateToken(sessionUser);
-    return { user: sessionUser, token };
+  public deleteUser(userId: string): boolean {
+    let targetEmail: string | null = null;
+    for (const [email, u] of this.users.entries()) {
+      if (u.id === userId) {
+        if (email === ADMIN_EMAIL.toLowerCase() || u.id === 'usr_admin_awais') {
+          throw new Error('The primary administrator account cannot be deleted.');
+        }
+        targetEmail = email;
+        break;
+      }
+    }
+
+    if (targetEmail) {
+      this.users.delete(targetEmail);
+      this.persist();
+      return true;
+    }
+    return false;
+  }
+
+  public updateUserRole(userId: string, newRole: UserRole): boolean {
+    for (const [email, u] of this.users.entries()) {
+      if (u.id === userId) {
+        if (email === ADMIN_EMAIL.toLowerCase()) {
+          throw new Error('Primary administrator role cannot be changed.');
+        }
+        u.role = newRole === 'ADMIN' ? 'ADMIN' : 'MANAGER';
+        this.persist();
+        if (pgStore.isConfigured()) {
+          pgStore.updateUserRole(userId, u.role).catch(() => {});
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public register(params: {
+    email: string;
+    password: string;
+    name?: string;
+    role?: UserRole;
+  }): { user: UserSession; token: string } {
+    return {
+      user: this.createUser(params),
+      token: this.generateToken(this.createUser(params)),
+    };
   }
 
   public authenticate(email: string, password: string): { user: UserSession; token: string } {
@@ -170,13 +232,13 @@ class UserRegistry {
         const token = this.generateToken(adminUser);
         return { user: adminUser, token };
       }
-      throw new Error('Invalid email or password for Admin account.');
+      throw new Error('Invalid email or password.');
     }
 
-    // 2. Manager & Viewer accounts
+    // 2. Created Manager & Admin accounts
     const user = this.users.get(normalizedEmail);
     if (!user) {
-      throw new Error('No account found with this email. Please sign up first.');
+      throw new Error('Access restricted. Only users created by the administrator can access this application.');
     }
 
     const testHash = hashPassword(password, user.salt);
@@ -184,9 +246,7 @@ class UserRegistry {
       throw new Error('Invalid email or password.');
     }
 
-    // Strictly enforce: only the designated master admin email can have ADMIN role
-    const isActualAdmin = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-    const effectiveRole: UserRole = isActualAdmin ? 'ADMIN' : 'VIEWER';
+    const effectiveRole: UserRole = user.role === 'ADMIN' ? 'ADMIN' : 'MANAGER';
 
     const sessionUser: UserSession = {
       id: user.id,
@@ -228,9 +288,7 @@ class UserRegistry {
         return null;
       }
 
-      // Security guarantee: Only ADMIN_EMAIL can have ADMIN role
-      const isActualAdmin = data.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-      const role: UserRole = isActualAdmin && data.role === 'ADMIN' ? 'ADMIN' : 'VIEWER';
+      const role: UserRole = data.role === 'ADMIN' ? 'ADMIN' : 'MANAGER';
 
       return {
         id: data.id,

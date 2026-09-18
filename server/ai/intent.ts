@@ -1,4 +1,5 @@
 import { StatusSemantic } from '../../src/types';
+import { resolveTeamMember } from './members';
 
 export interface QueryIntent {
   rawQuestion: string;
@@ -13,11 +14,19 @@ export interface QueryIntent {
     | 'blockers'
     | 'management_brief'
     | 'overall_summary'
+    | 'list_analysis'
+    | 'board_analysis'
     | 'general_team';
   isOverall?: boolean;
+  isBoardAnalysis?: boolean;
+  isDeepInspection?: boolean;
+  targetList?: string;
   topic?: string;
   client?: string;
   person?: string;
+  personAliases?: string[];
+  personMemberIds?: string[];
+  personLists?: string[];
   status?: StatusSemantic | 'all';
   dateFrom?: string; // ISO date string
   dateTo?: string;   // ISO date string
@@ -29,9 +38,72 @@ export interface QueryIntent {
 export function extractQueryIntent(
   question: string,
   knownClients: { canonicalName: string; aliases: string[] }[] = [],
-  knownMembers: { fullName: string; username?: string }[] = []
+  knownMembers: { fullName: string; username?: string }[] = [],
+  knownLists: { id: string; name: string }[] = []
 ): QueryIntent {
   const q = question.toLowerCase().trim();
+
+  // Detect requests to inspect descriptions, comments, or checklists
+  const isDeepInspection = Boolean(
+    q.includes('comment') ||
+    q.includes('description') ||
+    q.includes('checklist') ||
+    q.includes('attachment') ||
+    q.includes('detail')
+  );
+
+  // Detect board-wide analysis intent
+  const isBoardAnalysis = Boolean(
+    q.includes('all lists') ||
+    q.includes('all the lists') ||
+    q.includes('ignoring this list') ||
+    q.includes('not analyzing all') ||
+    q.includes('ignoring list') ||
+    q.includes('every list') ||
+    q.includes('whole board') ||
+    q.includes('entire board') ||
+    (q.includes('lists and cards') && isDeepInspection) ||
+    (q.includes('analyze') && q.includes('lists'))
+  );
+
+  // Detect specific list target
+  let targetList: string | undefined;
+  const standardLists = [
+    'In Process',
+    'To Do GFM/PDS',
+    'To Do Clients',
+    'Haseeb Afzal',
+    'Adil',
+    'Ali Hamza II',
+    'Ali Hamza',
+    'Azeem Ahmad',
+    'Humna Qayyum',
+    'In Review',
+    'Completed',
+    'Ad Hoc Tasks',
+    'GFM Clients',
+    'PDS Resources',
+  ];
+
+  const candidateLists = [
+    ...knownLists.map((l) => l.name),
+    ...standardLists,
+  ];
+
+  for (const listName of candidateLists) {
+    const lLower = listName.toLowerCase();
+    if (
+      q.includes(lLower) ||
+      q.includes(`"${lLower}"`) ||
+      q.includes(`'${lLower}'`) ||
+      q.includes(`list: ${lLower}`) ||
+      q.includes(`${lLower} list`) ||
+      q.includes(`list ${lLower}`)
+    ) {
+      targetList = listName;
+      break;
+    }
+  }
 
   // 1. Topic detection
   let topic: string | undefined;
@@ -70,33 +142,35 @@ export function extractQueryIntent(
     if (matchedClient) break;
   }
 
-  // 3. Person detection
+  // 3. Person detection with first-name, alias & list mapping
   let matchedPerson: string | undefined;
-  for (const m of knownMembers) {
-    if (q.includes(m.fullName.toLowerCase()) || (m.username && q.includes(m.username.toLowerCase()))) {
-      matchedPerson = m.fullName;
-      break;
-    }
-  }
-  if (!matchedPerson) {
-    // Check known team names directly
-    const names = [
-      { name: 'Awais', full: 'Awais' },
-      { name: 'Haseeb', full: 'Haseeb Afzal' },
-      { name: 'Haseeb Afzal', full: 'Haseeb Afzal' },
-      { name: 'Adil', full: 'Adil' },
-      { name: 'Hamza', full: 'Hamza' },
-      { name: 'Azeem', full: 'Azeem Ahmad' },
-      { name: 'Azeem Ahmad', full: 'Azeem Ahmad' },
-      { name: 'Humna', full: 'Humna Qayyum' },
-      { name: 'Humna Qayyum', full: 'Humna Qayyum' },
-    ];
-    for (const item of names) {
-      if (q.includes(item.name.toLowerCase())) {
-        matchedPerson = item.full;
+  let personAliases: string[] | undefined;
+  let personMemberIds: string[] | undefined;
+  let personLists: string[] | undefined;
+
+  const resolvedPerson = resolveTeamMember(question, knownMembers, knownLists);
+  if (resolvedPerson) {
+    matchedPerson = resolvedPerson.canonicalName;
+    personAliases = resolvedPerson.aliases;
+    personMemberIds = resolvedPerson.memberIds;
+    personLists = resolvedPerson.associatedLists;
+  } else {
+    for (const m of knownMembers) {
+      if (q.includes(m.fullName.toLowerCase()) || (m.username && q.includes(m.username.toLowerCase()))) {
+        matchedPerson = m.fullName;
+        personAliases = [m.fullName.toLowerCase(), (m.username || '').toLowerCase()].filter(Boolean);
         break;
       }
     }
+  }
+
+  // If a person's activity is queried directly (e.g. "What is Azeem doing?"),
+  // don't constrain retrieval to just their namesake list if they also work in In Process/In Review
+  if (matchedPerson && targetList && targetList.toLowerCase().includes(matchedPerson.toLowerCase().split(' ')[0])) {
+    // Keep targetList in personLists so it gets boosted, but let intent be person_activity
+    if (!personLists) personLists = [];
+    if (!personLists.includes(targetList)) personLists.push(targetList);
+    targetList = undefined;
   }
 
   // 4. Status detection
@@ -196,7 +270,11 @@ export function extractQueryIntent(
   // 7. Primary Intent classification
   let intent: QueryIntent['intent'] = 'general_team';
 
-  if (isOverall) {
+  if (isBoardAnalysis) {
+    intent = 'board_analysis';
+  } else if (targetList) {
+    intent = 'list_analysis';
+  } else if (isOverall) {
     intent = 'overall_summary';
   } else if (
     q.includes('what can i tell senior management') ||
@@ -227,9 +305,15 @@ export function extractQueryIntent(
     rawQuestion: question,
     intent,
     isOverall,
+    isBoardAnalysis,
+    isDeepInspection,
+    targetList,
     topic,
     client: matchedClient,
     person: matchedPerson,
+    personAliases,
+    personMemberIds,
+    personLists,
     status,
     dateFrom,
     dateTo,
