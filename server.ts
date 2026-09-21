@@ -723,7 +723,7 @@ app.get('/api/team', requireAuth, (req, res) => {
 // -------------------------------------------------------------
 app.post('/api/management-brief', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res) => {
   const { periodType = 'this_month', dateFrom, dateTo } = req.body;
-  const allowed = ['overall', 'this_week', 'last_week', 'this_month', 'last_month'];
+  const allowed = ['overall', 'this_week', 'last_week', 'this_month', 'last_month', 'custom'];
   if (!allowed.includes(periodType)) {
     return res.status(400).json({ error: `periodType must be one of: ${allowed.join(', ')}` });
   }
@@ -750,6 +750,19 @@ app.get('/api/management-briefs/:id', requireAuth, (req, res) => {
     return res.status(404).json({ error: 'Brief not found' });
   }
   res.json(brief);
+});
+
+app.delete('/api/management-briefs/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), (req, res) => {
+  const success = db.deleteManagementBrief(req.params.id);
+  if (!success) {
+    return res.status(404).json({ error: 'Brief not found' });
+  }
+  res.json({ success: true, message: 'Brief deleted from archive' });
+});
+
+app.delete('/api/management-briefs', requireAuth, requireRole(['ADMIN', 'MANAGER']), (req, res) => {
+  db.clearManagementBriefs();
+  res.json({ success: true, message: 'All management briefs cleared' });
 });
 
 // -------------------------------------------------------------

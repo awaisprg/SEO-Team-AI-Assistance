@@ -10,6 +10,10 @@ import {
   AlertTriangle,
   Layers,
   ArrowRight,
+  CalendarRange,
+  Trash2,
+  CheckCircle2,
+  Clock,
 } from 'lucide-react';
 import { ManagementBrief, ChatSource } from '../types';
 import { downloadBriefPDF } from '../utils/pdfGenerator';
@@ -17,8 +21,14 @@ import { downloadBriefPDF } from '../utils/pdfGenerator';
 interface BriefViewProps {
   currentBrief: ManagementBrief | null;
   savedBriefs: ManagementBrief[];
-  onGenerateBrief: (periodType: 'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month') => void;
+  onGenerateBrief: (
+    periodType: 'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'custom',
+    dateFrom?: string,
+    dateTo?: string
+  ) => void;
   onSelectBrief: (brief: ManagementBrief) => void;
+  onDeleteBrief?: (briefId: string) => void;
+  onClearBriefs?: () => void;
   isGenerating: boolean;
   onSelectSource: (source: ChatSource) => void;
 }
@@ -28,12 +38,21 @@ export const BriefView: React.FC<BriefViewProps> = ({
   savedBriefs,
   onGenerateBrief,
   onSelectBrief,
+  onDeleteBrief,
+  onClearBriefs,
   isGenerating,
   onSelectSource,
 }) => {
   const [selectedPeriod, setSelectedPeriod] = useState<
-    'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month'
+    'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'custom'
   >('overall');
+  const [customFrom, setCustomFrom] = useState<string>(() => {
+    const d = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    return d.toISOString().slice(0, 10);
+  });
+  const [customTo, setCustomTo] = useState<string>(() => {
+    return new Date().toISOString().slice(0, 10);
+  });
 
   const handleDownloadPDF = () => {
     if (!currentBrief) return;
@@ -94,12 +113,60 @@ export const BriefView: React.FC<BriefViewProps> = ({
                     </button>
                   ))}
                 </div>
+
+                <button
+                  id="period-btn-custom"
+                  onClick={() => setSelectedPeriod('custom')}
+                  className={`w-full mt-1 px-3 py-2 text-xs rounded-lg border font-semibold transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${
+                    selectedPeriod === 'custom'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  <CalendarRange className="w-3.5 h-3.5" />
+                  <span>Custom Date Window</span>
+                </button>
+
+                {selectedPeriod === 'custom' && (
+                  <div className="p-3 bg-slate-50/90 border border-slate-200 rounded-lg space-y-2 mt-2">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                        Start Date (From)
+                      </label>
+                      <input
+                        type="date"
+                        id="custom-date-from"
+                        value={customFrom}
+                        onChange={(e) => setCustomFrom(e.target.value)}
+                        className="w-full text-xs px-2.5 py-1.5 bg-white border border-slate-200 rounded-md focus:outline-hidden focus:ring-1 focus:ring-[#7C52F5]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                        End Date (To)
+                      </label>
+                      <input
+                        type="date"
+                        id="custom-date-to"
+                        value={customTo}
+                        onChange={(e) => setCustomTo(e.target.value)}
+                        className="w-full text-xs px-2.5 py-1.5 bg-white border border-slate-200 rounded-md focus:outline-hidden focus:ring-1 focus:ring-[#7C52F5]"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             <button
               id="generate-brief-btn"
-              onClick={() => onGenerateBrief(selectedPeriod)}
+              onClick={() =>
+                onGenerateBrief(
+                  selectedPeriod,
+                  selectedPeriod === 'custom' ? customFrom : undefined,
+                  selectedPeriod === 'custom' ? customTo : undefined
+                )
+              }
               disabled={isGenerating}
               className="w-full mt-2 py-2 px-3 rounded-lg bg-gradient-to-r from-[#7C52F5] to-[#683EE6] hover:from-[#6D42E6] hover:to-[#572FD6] active:from-[#572FD6] active:to-[#461EC6] text-white text-xs font-semibold flex items-center justify-center space-x-2 transition-all shadow-xs hover:shadow-md disabled:opacity-60 cursor-pointer group"
             >
@@ -109,15 +176,32 @@ export const BriefView: React.FC<BriefViewProps> = ({
           </div>
         </div>
 
-        {/* Saved Briefs History */}
+        {/* Saved Briefs History & Archive */}
         <div className="bg-white p-4.5 rounded-xl border border-slate-200/90 shadow-2xs">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
-              Brief Archive
-            </span>
-            <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
-              {(savedBriefs || []).length} saved
-            </span>
+            <div className="flex items-center space-x-1.5">
+              <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
+                Brief Archive
+              </span>
+              <span className="text-[10px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                {(savedBriefs || []).length} saved
+              </span>
+            </div>
+            {onClearBriefs && (savedBriefs || []).length > 0 && (
+              <button
+                id="clear-all-briefs-btn"
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to clear all archived executive briefs?')) {
+                    onClearBriefs();
+                  }
+                }}
+                className="text-[10px] text-rose-600 hover:text-rose-700 font-medium flex items-center space-x-1 hover:underline cursor-pointer"
+                title="Clear all archived executive briefs"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Clear All</span>
+              </button>
+            )}
           </div>
 
           <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
@@ -125,22 +209,40 @@ export const BriefView: React.FC<BriefViewProps> = ({
               <p className="text-xs text-slate-400 italic">No saved briefs yet.</p>
             ) : (
               (savedBriefs || []).map((brief) => (
-                <button
+                <div
                   key={brief.id}
-                  id={`saved-brief-${brief.id}`}
-                  onClick={() => onSelectBrief(brief)}
-                  className={`w-full text-left p-2.5 rounded-lg border transition-all text-xs cursor-pointer ${
+                  className={`group flex items-center justify-between p-2 rounded-lg border transition-all text-xs ${
                     currentBrief?.id === brief.id
                       ? 'bg-violet-50/80 border-violet-200 text-[#7C52F5] font-semibold shadow-2xs ring-1 ring-violet-500/20'
                       : 'bg-white border-slate-200 hover:border-violet-200 text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  <div className="font-semibold line-clamp-1 text-slate-900">{brief.title}</div>
-                  <div className="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
-                    <span>{new Date(brief.createdAt).toLocaleDateString()}</span>
-                    <ChevronRight className="w-3 h-3 text-slate-400" />
-                  </div>
-                </button>
+                  <button
+                    id={`saved-brief-${brief.id}`}
+                    onClick={() => onSelectBrief(brief)}
+                    className="flex-1 text-left cursor-pointer min-w-0 pr-2"
+                  >
+                    <div className="font-semibold truncate text-slate-900">{brief.title}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5 flex items-center space-x-1.5">
+                      <span>{new Date(brief.createdAt).toLocaleDateString()}</span>
+                      <span>•</span>
+                      <span className="capitalize">{brief.periodType.replace('_', ' ')}</span>
+                    </div>
+                  </button>
+                  {onDeleteBrief && (
+                    <button
+                      id={`delete-brief-${brief.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteBrief(brief.id);
+                      }}
+                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer shrink-0 opacity-70 group-hover:opacity-100"
+                      title="Delete this brief archive"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               ))
             )}
           </div>
@@ -320,37 +422,139 @@ export const BriefView: React.FC<BriefViewProps> = ({
             </div>
 
             {/* AI Overview & GEO Initiatives */}
-            <div className="bg-gradient-to-b from-violet-50/30 to-white border border-violet-200/80 rounded-xl p-4.5 shadow-2xs">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-violet-950 mb-2.5 flex items-center space-x-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#7C52F5]" />
-                <span>AI Overviews & Generative Engine Optimization (GEO)</span>
-              </h3>
-              <ul className="space-y-2">
-                {(currentBrief.aiOverviewGeoActivity || []).map((item, idx) => (
-                  <li key={idx} className="flex items-start text-xs sm:text-sm text-slate-800">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#7C52F5] mt-2 mr-2.5 shrink-0" />
-                    <span className="leading-snug">{item}</span>
-                  </li>
-                ))}
+            <div className="bg-gradient-to-b from-violet-50/40 via-white to-violet-50/20 border border-violet-200/90 rounded-xl p-4.5 shadow-2xs">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-violet-950 flex items-center space-x-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[#7C52F5]" />
+                  <span>AI Overviews & Generative Engine Optimization (GEO)</span>
+                </h3>
+                <span className="text-[10px] font-semibold text-violet-700 bg-violet-100/80 border border-violet-200/80 px-2.5 py-0.5 rounded-full">
+                  Evidence-Based Strategic Impact
+                </span>
+              </div>
+              <ul className="space-y-3">
+                {(currentBrief.aiOverviewGeoActivity || []).map((item, idx) => {
+                  const match = item.match(/^(\[[^\]]+\]\s*[^:]+:)([\s\S]*)$/);
+                  if (match) {
+                    return (
+                      <li
+                        key={idx}
+                        className="flex items-start text-xs sm:text-sm text-slate-800 bg-white/80 p-3 rounded-lg border border-violet-100/90 shadow-2xs hover:border-violet-200 transition-colors"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#7C52F5] mt-1.5 mr-2.5 shrink-0" />
+                        <div className="leading-relaxed">
+                          <span className="font-bold text-slate-900 block sm:inline sm:mr-1.5 text-violet-950">
+                            {match[1]}
+                          </span>
+                          <span className="text-slate-700 font-normal">
+                            {match[2].trim()}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  }
+                  return (
+                    <li
+                      key={idx}
+                      className="flex items-start text-xs sm:text-sm text-slate-800 bg-white/80 p-3 rounded-lg border border-violet-100/90 shadow-2xs"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#7C52F5] mt-1.5 mr-2.5 shrink-0" />
+                      <span className="leading-relaxed text-slate-700">{item}</span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
 
             {/* Client Progress */}
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-2.5">Client Progress Matrix</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              <div className="flex items-center justify-between mb-2.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                  Client Progress Matrix
+                </h3>
+                <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                  Verified Deliverables & Milestone Execution
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {(currentBrief.clientProgress || []).map((cp, idx) => (
                   <div
                     key={idx}
-                    className="p-3.5 rounded-xl border border-slate-200 bg-white text-xs shadow-2xs hover:border-violet-200 transition-colors"
+                    className="p-4 rounded-xl border border-slate-200 bg-white text-xs shadow-2xs hover:border-violet-200 transition-colors flex flex-col justify-between space-y-2.5"
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-semibold text-slate-900 text-xs">{cp.client}</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-violet-50 border border-violet-100 text-violet-700">
-                        {cp.status}
-                      </span>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-slate-900 text-sm tracking-tight">{cp.client}</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-violet-50 border border-violet-100 text-violet-700">
+                          {cp.status}
+                        </span>
+                      </div>
+                      <p className="text-slate-700 text-xs leading-relaxed font-normal">{cp.summary}</p>
                     </div>
-                    <p className="text-slate-600 text-xs leading-relaxed">{cp.summary}</p>
+
+                    {/* Granular Deliverable and Milestone Highlights */}
+                    {((cp.completedCards && cp.completedCards.length > 0) ||
+                      (cp.checklistHighlights && cp.checklistHighlights.length > 0) ||
+                      (cp.activeDeliverables && cp.activeDeliverables.length > 0)) && (
+                      <div className="space-y-2 pt-2.5 border-t border-slate-100 text-[11px]">
+                        {cp.completedCards && cp.completedCards.length > 0 && (
+                          <div>
+                            <span className="font-bold text-emerald-800 block text-[10px] uppercase tracking-wider mb-1">
+                              Completed Cards:
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {cp.completedCards.map((cardName, cIdx) => (
+                                <span
+                                  key={cIdx}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-medium text-[10px]"
+                                >
+                                  <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                                  <span className="truncate max-w-[220px]">{cardName}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {cp.checklistHighlights && cp.checklistHighlights.length > 0 && (
+                          <div>
+                            <span className="font-bold text-violet-800 block text-[10px] uppercase tracking-wider mb-1">
+                              Checklist Milestones:
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {cp.checklistHighlights.map((itemName, iIdx) => (
+                                <span
+                                  key={iIdx}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-violet-50 text-violet-800 border border-violet-200/60 font-medium text-[10px]"
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500 shrink-0" />
+                                  <span className="truncate max-w-[220px]">{itemName}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {cp.activeDeliverables && cp.activeDeliverables.length > 0 && (
+                          <div>
+                            <span className="font-bold text-slate-700 block text-[10px] uppercase tracking-wider mb-1">
+                              Active Deliverables Underway:
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {cp.activeDeliverables.map((deliv, dIdx) => (
+                                <span
+                                  key={dIdx}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 font-medium text-[10px]"
+                                >
+                                  <Clock className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                                  <span className="truncate max-w-[220px]">{deliv}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

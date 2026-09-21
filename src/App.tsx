@@ -231,14 +231,16 @@ export default function App() {
 
   // Generate Executive Brief
   const handleGenerateBrief = async (
-    periodType: 'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month'
+    periodType: 'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'custom',
+    dateFrom?: string,
+    dateTo?: string
   ) => {
     setIsGeneratingBrief(true);
     try {
       const res = await fetchWithAuth('/api/management-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periodType }),
+        body: JSON.stringify({ periodType, dateFrom, dateTo }),
       });
 
       if (!res.ok) {
@@ -249,7 +251,7 @@ export default function App() {
       const brief: ManagementBrief = await res.json();
       setCurrentBrief(brief);
       setSavedBriefs((prev) => [brief, ...prev.filter((b) => b.id !== brief.id)]);
-      showNotification('success', `Executive Brief for ${brief.title} generated successfully.`);
+      showNotification('success', `Executive Brief "${brief.title}" generated successfully.`);
     } catch (err: any) {
       showNotification('error', err.message || 'Failed to generate brief');
     } finally {
@@ -257,10 +259,48 @@ export default function App() {
     }
   };
 
-  // Asynchronous Job-Based Trello Synchronization with Polling (Admin only)
+  // Delete Individual Management Brief
+  const handleDeleteBrief = async (briefId: string) => {
+    try {
+      const res = await fetchWithAuth(`/api/management-briefs/${briefId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to delete brief');
+      }
+      setSavedBriefs((prev) => prev.filter((b) => b.id !== briefId));
+      if (currentBrief?.id === briefId) {
+        setCurrentBrief(null);
+      }
+      showNotification('success', 'Executive brief removed from archive.');
+    } catch (err: any) {
+      showNotification('error', err.message || 'Failed to delete brief');
+    }
+  };
+
+  // Clear All Archived Management Briefs
+  const handleClearBriefs = async () => {
+    try {
+      const res = await fetchWithAuth('/api/management-briefs', {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to clear briefs');
+      }
+      setSavedBriefs([]);
+      setCurrentBrief(null);
+      showNotification('success', 'All archived executive briefs cleared.');
+    } catch (err: any) {
+      showNotification('error', err.message || 'Failed to clear briefs');
+    }
+  };
+
+  // Asynchronous Job-Based Trello Synchronization with Polling (Admin & Manager)
   const handleSync = async () => {
-    if (user?.role !== 'ADMIN') {
-      showNotification('error', 'Only Administrators can trigger synchronizations.');
+    if (user?.role !== 'ADMIN' && user?.role !== 'MANAGER') {
+      showNotification('error', 'Only Administrators and Managers can trigger synchronizations.');
       return;
     }
 
@@ -584,6 +624,8 @@ export default function App() {
               savedBriefs={savedBriefs}
               onSelectBrief={(b) => setCurrentBrief(b)}
               onGenerateBrief={handleGenerateBrief}
+              onDeleteBrief={handleDeleteBrief}
+              onClearBriefs={handleClearBriefs}
               isGenerating={isGeneratingBrief}
               onSelectSource={(source) => setSelectedSource(source)}
             />

@@ -136,7 +136,7 @@ export interface ClientEntity {
   id: string;
   canonicalName: string;
   aliases: string[];
-  status: 'Active' | 'Closed';
+  status: 'Active' | 'On Hold' | 'Closed';
   agency?: 'PDS' | 'GFM' | 'Both' | 'Internal';
   isHighPriority?: boolean;
   activeCardCount: number;
@@ -197,7 +197,11 @@ export interface TeamMetrics {
   activeWork: number;
   completedThisMonth: number;
   inReview: number;
-  aiInitiatives: number;
+  activeClients: number;
+  closedClients: number;
+  onHoldClients: number;
+  totalClients: number;
+  aiInitiatives?: number;
   contentWork: number;
   seoWork: number;
   totalMembers: number;
@@ -251,6 +255,9 @@ export interface ManagementBrief {
     client: string;
     summary: string;
     status: string;
+    completedCards?: string[];
+    activeDeliverables?: string[];
+    checklistHighlights?: string[];
   }[];
   currentPriorities: string[];
   blockedWork: string[];

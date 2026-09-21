@@ -104,6 +104,14 @@ export function inferCardStatus(
 ): StatusSemantic {
   if (cardClosed) return 'Completed';
 
+  // Ground truth: If card is located in In Process or Completed list, that is its status
+  if (listSemanticStatus === 'In Process') {
+    return 'In Process';
+  }
+  if (listSemanticStatus === 'Completed') {
+    return 'Completed';
+  }
+
   // Label overrides
   const labelNames = cardLabels.map((l) => l.name.toLowerCase());
   if (labelNames.some((l) => l.includes('complete') || l.includes('done'))) {
@@ -146,6 +154,18 @@ export function detectClientFromCard(
 ): string | undefined {
   const text = `${cardName} ${cardDesc}`.toLowerCase();
 
+  // Explicit normalization for Advanced Wellness MD (and its variations: Advanced Well MD, Advnace Well MD)
+  if (
+    text.includes('advanced wellness') ||
+    text.includes('advanced well md') ||
+    text.includes('advnace well md') ||
+    text.includes('advanced well') ||
+    text.includes('advnace well') ||
+    text.includes('advanced med wellness')
+  ) {
+    return 'Advanced Wellness MD';
+  }
+
   // 1. Direct match with known canonical names and aliases
   for (const client of knownClients) {
     if (text.includes(client.canonicalName.toLowerCase())) {
@@ -161,6 +181,16 @@ export function detectClientFromCard(
   // 2. Check if any checklist on the card matches a client
   for (const cl of checklists) {
     const clLower = (cl.name || '').toLowerCase();
+    if (
+      clLower.includes('advanced wellness') ||
+      clLower.includes('advanced well md') ||
+      clLower.includes('advnace well md') ||
+      clLower.includes('advanced well') ||
+      clLower.includes('advnace well') ||
+      clLower.includes('advanced med wellness')
+    ) {
+      return 'Advanced Wellness MD';
+    }
     for (const client of knownClients) {
       if (clLower.includes(client.canonicalName.toLowerCase())) {
         return client.canonicalName;
@@ -211,6 +241,8 @@ export interface RegisteredClientInfo {
   aliases: string[];
   agency?: 'PDS' | 'GFM' | 'Both' | 'Internal';
   isClosed?: boolean;
+  isOnHold?: boolean;
+  isActive?: boolean;
   isHighPriority?: boolean;
 }
 
@@ -223,13 +255,21 @@ export function buildClientRegistry(
     aliases: Set<string>;
     agency?: 'PDS' | 'GFM' | 'Both' | 'Internal';
     isClosed?: boolean;
+    isOnHold?: boolean;
+    isActive?: boolean;
     isHighPriority?: boolean;
   }>();
 
   const addClient = (
     canonical: string,
     aliases: string[] = [],
-    meta?: { agency?: 'PDS' | 'GFM' | 'Both' | 'Internal'; isClosed?: boolean; isHighPriority?: boolean }
+    meta?: {
+      agency?: 'PDS' | 'GFM' | 'Both' | 'Internal';
+      isClosed?: boolean;
+      isOnHold?: boolean;
+      isActive?: boolean;
+      isHighPriority?: boolean;
+    }
   ) => {
     const cleanCanonical = canonical.trim().replace(/\s+/g, ' ');
     if (!cleanCanonical || cleanCanonical.length < 3) return;
@@ -241,6 +281,8 @@ export function buildClientRegistry(
         aliases: new Set([cleanCanonical]),
         agency: meta?.agency || 'Internal',
         isClosed: meta?.isClosed ?? false,
+        isOnHold: meta?.isOnHold ?? false,
+        isActive: meta?.isActive ?? false,
         isHighPriority: meta?.isHighPriority ?? false,
       });
     }
@@ -260,6 +302,12 @@ export function buildClientRegistry(
     }
     if (meta?.isClosed !== undefined) {
       entry.isClosed = entry.isClosed || meta.isClosed;
+    }
+    if (meta?.isOnHold !== undefined) {
+      entry.isOnHold = entry.isOnHold || meta.isOnHold;
+    }
+    if (meta?.isActive !== undefined) {
+      entry.isActive = entry.isActive || meta.isActive;
     }
     if (meta?.isHighPriority) {
       entry.isHighPriority = true;
@@ -283,6 +331,22 @@ export function buildClientRegistry(
     addClient(c.canonicalName, c.aliases || []);
   }
 
+  // Explicitly ensure Advanced Wellness MD is registered with exact canonical name and aliases
+  addClient(
+    'Advanced Wellness MD',
+    [
+      'Advanced Wellness MD',
+      'Advnace Well MD',
+      'Advanced Well MD',
+      'Advanced Med Wellness',
+      'Advanced Wellness',
+      'Advanced Well',
+      'Advnace Well',
+      'AdvancedWellMD',
+    ],
+    { agency: 'Both', isClosed: false }
+  );
+
   // 2. Identify client cards from lists (e.g. "GFM Clients", "PDS Resources")
   const skipWords = [
     'clients audit record',
@@ -296,7 +360,7 @@ export function buildClientRegistry(
 
   for (const list of raw.lists || []) {
     const listLower = list.name.toLowerCase();
-    const isPds = listLower.includes('pds resource');
+    const isPds = listLower.includes('pds client') || listLower.includes('pds resource');
     const isGfm = listLower.includes('gfm client') || (listLower.includes('client') && !listLower.includes('to do') && !isPds);
 
     if (isPds || isGfm) {
@@ -324,15 +388,34 @@ export function buildClientRegistry(
             } else if (lowerName.includes('capital allergy')) {
               canonical = 'Capital Allergy & Respiratory Disease Center';
             } else if (lowerName.includes('precision podiatry')) {
-              canonical = 'Precision Podiatry PLLC';
+              canonical = 'Precision Podiatry, PLLC';
+            } else if (lowerName.includes('mentally healthy')) {
+              canonical = 'Mentally Healthy Care';
+            } else if (lowerName.includes('main street physician')) {
+              canonical = 'Main Street Physician P.C.';
+            } else if (lowerName.includes('mydoctor') || lowerName.includes('mydoctoc')) {
+              canonical = 'MyDoctor PC';
+            } else if (lowerName.includes('prosto mobile')) {
+              canonical = 'Prosto Mobile Auto Detailing';
+            } else if (lowerName.includes('car studio')) {
+              canonical = 'Car Studio - Automotive Insurance Experts';
+            } else if (
+              lowerName.includes('advanced well') ||
+              lowerName.includes('advnace well') ||
+              lowerName.includes('advanced wellness') ||
+              lowerName.includes('advanced med wellness')
+            ) {
+              canonical = 'Advanced Wellness MD';
             }
 
             const cardLabels = (card.labels || []).map((l: any) => (l.name || '').toLowerCase());
-            const isClosed = cardLabels.some((l: string) => l.includes('project closed') || l.includes('discontinue'));
+            const isClosed = cardLabels.some((l: string) => l.includes('project closed') || l.includes('closed') || l.includes('discontinue') || l.includes('terminate'));
+            const isOnHold = cardLabels.some((l: string) => l.includes('on-hold') || l.includes('on hold') || l.includes('hold'));
+            const isActive = cardLabels.some((l: string) => l === 'active' || l.includes('active'));
             const isHighPriority = cardLabels.some((l: string) => l.includes('high priority'));
             const agency: 'PDS' | 'GFM' = isPds ? 'PDS' : 'GFM';
 
-            addClient(canonical, [cardName], { agency, isClosed, isHighPriority });
+            addClient(canonical, [cardName], { agency, isClosed, isOnHold, isActive, isHighPriority });
           }
         }
       }
@@ -372,6 +455,8 @@ export function buildClientRegistry(
     aliases: Array.from(entry.aliases),
     agency: entry.agency,
     isClosed: entry.isClosed,
+    isOnHold: entry.isOnHold,
+    isActive: entry.isActive,
     isHighPriority: entry.isHighPriority,
   }));
 }
@@ -792,9 +877,17 @@ export function normalizeTrelloPayload(
     }
 
     // Determine status per user rules:
-    // If client card has "Project Closed", it is Closed.
-    // Otherwise Active.
-    const status: 'Active' | 'Closed' = reg.isClosed ? 'Closed' : 'Active';
+    // 1. Closed: labeled with "Project Closed", discontinued, or terminated
+    // 2. On Hold: labeled with "On-hold" or "On Hold" (on hold until next direction from support team)
+    // 3. Active: labeled with "Active" or active accounts being worked on for PDS & GFM
+    let status: 'Active' | 'On Hold' | 'Closed' = 'Active';
+    if (reg.isClosed) {
+      status = 'Closed';
+    } else if (reg.isOnHold) {
+      status = 'On Hold';
+    } else {
+      status = 'Active';
+    }
 
     return {
       id: `client_${Buffer.from(reg.canonicalName).toString('hex').slice(0, 16)}`,
@@ -811,9 +904,12 @@ export function normalizeTrelloPayload(
     };
   });
 
-  // Sort clients: active with tasks first, then alphabetically
+  // Sort clients: active with tasks first, then on hold, then closed
+  const statusPriority: Record<string, number> = { Active: 0, 'On Hold': 1, Closed: 2 };
   clients.sort((a, b) => {
-    if (a.status !== b.status) return a.status === 'Active' ? -1 : 1;
+    if (a.status !== b.status) {
+      return (statusPriority[a.status] ?? 0) - (statusPriority[b.status] ?? 0);
+    }
     if (b.totalTasksCount !== a.totalTasksCount) return b.totalTasksCount - a.totalTasksCount;
     return a.canonicalName.localeCompare(b.canonicalName);
   });

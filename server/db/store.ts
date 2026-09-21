@@ -133,6 +133,78 @@ class Store {
 
       this.persist();
     }
+
+    // Normalize client variations for Advanced Wellness MD and enforce In Process status
+    for (const card of Object.values(this.state.cards)) {
+      const lowerCanonical = (card.clientCanonical || '').toLowerCase();
+      const lowerName = (card.name || '').toLowerCase();
+      if (
+        lowerCanonical === 'advanced med wellness' ||
+        lowerCanonical === 'advanced well md' ||
+        lowerCanonical === 'advnace well md' ||
+        lowerCanonical === 'advanced well' ||
+        lowerCanonical === 'advnace well' ||
+        lowerName.includes('advanced wellness') ||
+        lowerName.includes('advanced well md') ||
+        lowerName.includes('advnace well md') ||
+        lowerName.includes('advanced well') ||
+        lowerName.includes('advnace well') ||
+        lowerName.includes('advanced med wellness')
+      ) {
+        card.clientCanonical = 'Advanced Wellness MD';
+      }
+
+      // Authoritative "In Process" list status: If card is in "In Process", its semantic status is In Process
+      if (card.listName === 'In Process') {
+        card.statusSemantic = 'In Process';
+      }
+    }
+
+    // Ensure client record in this.state.clients for Advanced Wellness MD
+    let advClient = Object.values(this.state.clients).find(
+      (c) =>
+        c.canonicalName === 'Advanced Wellness MD' ||
+        c.canonicalName === 'Advanced Med Wellness' ||
+        c.canonicalName === 'Advanced Well MD'
+    );
+    if (advClient) {
+      advClient.canonicalName = 'Advanced Wellness MD';
+      advClient.aliases = Array.from(
+        new Set([
+          ...(advClient.aliases || []),
+          'Advanced Wellness MD',
+          'Advnace Well MD',
+          'Advanced Well MD',
+          'Advanced Med Wellness',
+          'Advanced Wellness',
+          'Advanced Well',
+          'Advnace Well',
+          'AdvancedWellMD',
+        ])
+      );
+    } else if (Object.keys(this.state.clients).length > 0) {
+      const newId = 'client_advanced_wellness_md';
+      this.state.clients[newId] = {
+        id: newId,
+        canonicalName: 'Advanced Wellness MD',
+        aliases: [
+          'Advanced Wellness MD',
+          'Advnace Well MD',
+          'Advanced Well MD',
+          'Advanced Med Wellness',
+          'Advanced Wellness',
+          'Advanced Well',
+          'Advnace Well',
+          'AdvancedWellMD',
+        ],
+        status: 'Active',
+        activeCardCount: 1,
+        completedTasksCount: 0,
+        totalTasksCount: 0,
+        teamMembers: [],
+        lastActivityDate: new Date().toISOString(),
+      };
+    }
   }
 
   replaceBoardData(data: {
@@ -956,6 +1028,20 @@ class Store {
 
   getManagementBriefById(id: string): ManagementBrief | null {
     return this.state.managementBriefs[id] || null;
+  }
+
+  deleteManagementBrief(id: string): boolean {
+    if (this.state.managementBriefs[id]) {
+      delete this.state.managementBriefs[id];
+      this.persist();
+      return true;
+    }
+    return false;
+  }
+
+  clearManagementBriefs(): void {
+    this.state.managementBriefs = {};
+    this.persist();
   }
 
   // --- Clear & Reset ---
