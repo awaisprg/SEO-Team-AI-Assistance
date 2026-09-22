@@ -184,6 +184,21 @@ export function hybridRetrieve(intent: QueryIntent, threshold = 35): ScoredCard[
       }
     }
 
+    // 3b. On-Hold Clients query boost / isolation
+    if (intent.intent === 'on_hold_clients_list') {
+      const isHold = (card.labels || []).some((l) => {
+        const ln = (l.name || '').toLowerCase();
+        return ln.includes('on-hold') || ln.includes('on hold') || ln === 'hold';
+      });
+      if (isHold) {
+        score += 120;
+        reasons.push('Card is explicitly labeled On-hold');
+        matchType = 'exact';
+      } else {
+        score -= 80;
+      }
+    }
+
     // 4. Topic & Keyword Matching
     let keywordHits = 0;
     for (const token of questionTokens) {

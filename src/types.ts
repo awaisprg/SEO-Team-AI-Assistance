@@ -238,6 +238,7 @@ export interface ChatSession {
 
 export interface ManagementBrief {
   id: string;
+  userId?: string;
   periodType: 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'overall' | 'custom';
   dateFrom: string;
   dateTo: string;

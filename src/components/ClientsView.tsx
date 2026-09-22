@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Building2,
   Users,
@@ -11,6 +11,10 @@ import {
   ChevronUp,
   Sparkles,
   ArrowRight,
+  PauseCircle,
+  XCircle,
+  CheckCircle2,
+  Search,
 } from 'lucide-react';
 import { ClientEntity, UserRole } from '../types';
 
@@ -28,6 +32,8 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
   onAskAboutClient,
 }) => {
   const [newAliasInputs, setNewAliasInputs] = useState<Record<string, string>>({});
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'On Hold' | 'Closed'>('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleAddAlias = (clientId: string) => {
     const val = newAliasInputs[clientId]?.trim();
@@ -36,30 +42,129 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
     setNewAliasInputs((prev) => ({ ...prev, [clientId]: '' }));
   };
 
+  const clientList = clients || [];
+
+  const counts = useMemo(() => {
+    let active = 0;
+    let onHold = 0;
+    let closed = 0;
+    clientList.forEach((c) => {
+      if (c.status === 'Active') active++;
+      else if (c.status === 'On Hold') onHold++;
+      else if (c.status === 'Closed') closed++;
+    });
+    return { active, onHold, closed, total: clientList.length };
+  }, [clientList]);
+
+  const filteredClients = useMemo(() => {
+    return clientList.filter((c) => {
+      if (statusFilter !== 'All' && c.status !== statusFilter) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesName = c.canonicalName.toLowerCase().includes(q);
+        const matchesAlias = (c.aliases || []).some((a) => a.toLowerCase().includes(q));
+        if (!matchesName && !matchesAlias) return false;
+      }
+      return true;
+    });
+  }, [clientList, statusFilter, searchQuery]);
+
   return (
     <div id="clients-view" className="space-y-4">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-2xs">
         <div>
           <div className="inline-flex items-center space-x-1.5 text-[10px] font-bold uppercase tracking-wider text-[#7C52F5] bg-violet-50 px-2.5 py-0.5 rounded-md border border-violet-100 mb-1.5">
             <Sparkles className="w-3 h-3" />
             <span>Account Intelligence</span>
           </div>
           <h2 className="text-base sm:text-lg font-bold text-slate-900">
-            Client Initiatives & Workstreams
+            Client Accounts & Workstreams
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Canonical account profiles, milestone completion rates, team assignments, and Trello card alias mappings.
+          <p className="text-xs text-slate-500 mt-0.5 max-w-2xl">
+            Trello-synchronized client directories, task delivery progress, team assignments, and account statuses across PDS and GFM.
           </p>
         </div>
-        <span className="text-xs px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200/80 font-semibold w-fit shadow-2xs">
-          {(clients || []).length} Active Accounts
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold shadow-2xs">
+            {counts.active} Active
+          </span>
+          <span className="text-xs px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 font-semibold shadow-2xs">
+            {counts.onHold} On Hold
+          </span>
+          <span className="text-xs px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-semibold shadow-2xs">
+            {counts.closed} Closed / Terminated
+          </span>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+        {/* Status Filter Tabs */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            onClick={() => setStatusFilter('All')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+              statusFilter === 'All'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            All Accounts ({counts.total})
+          </button>
+          <button
+            onClick={() => setStatusFilter('Active')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center space-x-1.5 ${
+              statusFilter === 'Active'
+                ? 'bg-emerald-600 text-white shadow-2xs'
+                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Active Clients ({counts.active})</span>
+          </button>
+          <button
+            onClick={() => setStatusFilter('On Hold')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center space-x-1.5 ${
+              statusFilter === 'On Hold'
+                ? 'bg-amber-600 text-white shadow-2xs'
+                : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+            }`}
+          >
+            <PauseCircle className="w-3.5 h-3.5" />
+            <span>On Hold ({counts.onHold})</span>
+          </button>
+          <button
+            onClick={() => setStatusFilter('Closed')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center space-x-1.5 ${
+              statusFilter === 'Closed'
+                ? 'bg-rose-600 text-white shadow-2xs'
+                : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+            }`}
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            <span>Closed / Terminated ({counts.closed})</span>
+          </button>
+        </div>
+
+        {/* Search Input */}
+        <div className="relative w-full sm:w-64">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search accounts or aliases..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-900 placeholder-slate-400 focus:outline-hidden focus:border-[#7C52F5] focus:bg-white"
+          />
+        </div>
       </div>
 
       {/* Client Dossier Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {(clients || []).map((client) => {
+        {filteredClients.map((client) => {
           const progressPercent = client.totalTasksCount
             ? Math.round((client.completedTasksCount / client.totalTasksCount) * 100)
             : 0;
@@ -85,22 +190,41 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                       </h3>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1">
                         <span
-                          className={`text-[9.5px] font-bold px-2 py-0.2 rounded uppercase tracking-wider ${
+                          className={`text-[9.5px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
                             client.status === 'Active'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
-                              : client.status === 'Onboarding'
-                              ? 'bg-violet-50 text-violet-700 border border-violet-200/70'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200/70'
+                              : client.status === 'On Hold'
+                              ? 'bg-amber-50 text-amber-800 border border-amber-300/80'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200/70'
                           }`}
                         >
-                          {client.status}
+                          {client.status === 'Active'
+                            ? 'Active'
+                            : client.status === 'On Hold'
+                            ? 'On Hold'
+                            : 'Closed / Terminated'}
                         </span>
+                        {client.agency && (
+                          <span className="text-[9.5px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                            {client.agency}
+                          </span>
+                        )}
                         {client.primaryInitiative && (
                           <span className="text-[11px] text-slate-500 font-medium line-clamp-1">
                             {client.primaryInitiative}
                           </span>
                         )}
                       </div>
+                      {client.status === 'On Hold' && (
+                        <p className="text-[10.5px] text-amber-700 font-medium mt-1">
+                          Hold for now until next direction from support team
+                        </p>
+                      )}
+                      {client.status === 'Closed' && (
+                        <p className="text-[10.5px] text-slate-500 font-medium mt-1">
+                          Discontinued services or terminated
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -119,14 +243,20 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                 {/* Progress Bar */}
                 <div className="space-y-1.5 mb-3.5 bg-slate-50/80 p-3 rounded-xl border border-slate-200">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Milestone Progress</span>
+                    <span className="text-slate-500 font-medium">Delivery Progress</span>
                     <span className="font-bold text-slate-900 tabular-nums text-[11px]">
                       {client.completedTasksCount} / {client.totalTasksCount} tasks ({progressPercent}%)
                     </span>
                   </div>
                   <div className="w-full bg-slate-200/80 rounded-full h-2 overflow-hidden">
                     <div
-                      className="bg-gradient-to-r from-[#09061A] to-[#7C52F5] h-2 rounded-full transition-all duration-500"
+                      className={`h-2 rounded-full transition-all duration-500 ${
+                        client.status === 'Active'
+                          ? 'bg-gradient-to-r from-emerald-500 to-[#7C52F5]'
+                          : client.status === 'On Hold'
+                          ? 'bg-gradient-to-r from-amber-400 to-amber-600'
+                          : 'bg-slate-400'
+                      }`}
                       style={{ width: `${progressPercent}%` }}
                     />
                   </div>
@@ -200,7 +330,11 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
               {/* Card Footer */}
               <div className="pt-3 mt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-                <span className="text-[11px]">Updated: {new Date(client.lastActivityAt).toLocaleDateString()}</span>
+                <span className="text-[11px]">
+                  {client.lastActivityDate
+                    ? `Last activity: ${new Date(client.lastActivityDate).toLocaleDateString()}`
+                    : 'Tracked on board'}
+                </span>
                 <button
                   onClick={() =>
                     onAskAboutClient(

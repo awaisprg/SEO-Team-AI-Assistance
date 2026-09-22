@@ -2,6 +2,7 @@ import { ChatSource, StatusSemantic } from '../../src/types';
 import { QueryIntent } from './intent';
 import { ScoredCard } from './retrieval';
 import { getAIProvider } from './provider';
+import { db } from '../db/store';
 
 export interface AnswerResult {
   answer: string;
@@ -28,13 +29,314 @@ CRITICAL SECURITY AND REASONING RULES:
    - Key Findings (bullet points)
    - Status Breakdown (counts of Completed, In Process, In Review, To Do)
    - Specific Evidence (card names, people, actions, dates)
+8. When asked for "Active Clients List" or "Active Clients":
+   - ONLY show the list of names of clients labeled as Active in the PDS Clients and GFM Clients lists.
+   - DO NOT provide details of what the team is doing, tasks, deliverables, or metrics. ONLY show names.
+   - Classify them in two separate sections: "PDS Clients (Active)" and "GFM Clients (Active)".
+9. When asked for "Closed Clients" or "Terminated Clients":
+   - Classify into two separate sections: "PDS Clients (Closed / Terminated)" and "GFM Clients (Closed / Terminated)".
+   - Show client names and the reasons why the project is closed if available in card comments or descriptions.
+10. When asked for "On Hold Clients" or "Clients on Hold":
+   - ONLY show those clients that are labeled as On Hold in Trello.
+   - Do NOT show clients with other labels (like Active, Closed, High Priority, etc.).
+   - Classify into sections: "PDS Clients (On Hold)" and "GFM Clients (On Hold)".
+   - Show client names along with the specific Reason why the client is on hold if available in card comments or descriptions.
 `;
+
+function cleanTextSnippet(str?: string): string {
+  if (!str) return '';
+  return str
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[#*`_~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractHoldReasonFromCard(card: any): string {
+  const comments = card.comments || [];
+  const desc = cleanTextSnippet(card.desc || '');
+
+  const candidateTexts: string[] = [];
+
+  for (const cm of comments) {
+    const raw = cm.text || '';
+    const text = cleanTextSnippet(raw);
+    if (!text) continue;
+
+    // Filter out pure spreadsheet links, raw URLs, or standalone headers unless they contain hold indicators
+    const isPureAssetOrLink =
+      /^(https?:\/\/|\[.*\]\(https?:|\*\*on-boarding\*\*|\*\*seo\*\*|email for off-page|gbp only|gbp seo only)/i.test(text.trim()) &&
+      !/waiting|pending|different|hours|issue|hold|pause|please|missing|check|need/i.test(text);
+
+    if (!isPureAssetOrLink) {
+      candidateTexts.push(text);
+    }
+  }
+
+  // Priority 1: Comments with high-signal hold indicators (waiting, hold, different, discrepancy, please add, pending, etc.)
+  for (const text of candidateTexts) {
+    if (/waiting|client to share|information|different|hours|discrepancy|on hold|on-hold|hold|pause|blocked|issue|please add|missing|pending|need info|confirmation/i.test(text)) {
+      return text.length > 250 ? text.slice(0, 247) + '...' : text;
+    }
+  }
+
+  // Priority 2: Any non-pure-link comment that provides substantive explanation
+  for (const text of candidateTexts) {
+    if (text.length > 15 && !text.startsWith('http')) {
+      return text.length > 250 ? text.slice(0, 247) + '...' : text;
+    }
+  }
+
+  // Priority 3: Description if present and substantive
+  if (desc && desc.length > 15 && !desc.startsWith('http')) {
+    return desc.length > 250 ? desc.slice(0, 247) + '...' : desc;
+  }
+
+  return 'Reason not specified in card comments (labeled On-hold in Trello).';
+}
+
+function extractClosedReasonFromCard(card: any): string {
+  const comments = card.comments || [];
+  const desc = cleanTextSnippet(card.desc || '');
+
+  // Look for comments mentioning hold, issue, transition, closed, status, GBP, or client note
+  for (const cm of comments) {
+    const text = cleanTextSnippet(cm.text);
+    if (/issue|hold|closed|discontinue|two separate|staging|wrong|transition|for now|service page|merged/i.test(text)) {
+      return text.length > 200 ? text.slice(0, 197) + '...' : text;
+    }
+  }
+
+  // If there are other comments
+  if (comments.length > 0) {
+    const lastCm = cleanTextSnippet(comments[comments.length - 1].text);
+    if (lastCm && lastCm.length > 10) {
+      return lastCm.length > 200 ? lastCm.slice(0, 197) + '...' : lastCm;
+    }
+  }
+
+  // If description has information
+  if (desc && desc.length > 15 && !desc.startsWith('http')) {
+    return desc.length > 200 ? desc.slice(0, 197) + '...' : desc;
+  }
+
+  return 'Services discontinued / project marked closed in Trello (no detailed closure reason logged on card).';
+}
+
+function generateClientListAnswer(intent: QueryIntent): AnswerResult {
+  const allCards = db.getCards();
+  const allLists = db.getLists();
+
+  const pdsList = allLists.find((l) => l.name.toLowerCase().includes('pds client'));
+  const gfmList = allLists.find((l) => l.name.toLowerCase().includes('gfm client'));
+  const pdsListId = pdsList?.id || '6813d17fb69e648e8ffad111';
+  const gfmListId = gfmList?.id || '69e007cce0c853017f62e6a4';
+
+  if (intent.intent === 'on_hold_clients_list') {
+    // ON HOLD CLIENTS: ONLY show clients that are labeled as On Hold, along with reason if available in comment
+    const isHoldCard = (c: any) => {
+      const lbls = (c.labels || []).map((l: any) => (l.name || '').toLowerCase());
+      return lbls.some((l: string) => l.includes('on-hold') || l.includes('on hold') || l === 'hold');
+    };
+
+    const pdsHoldCards = allCards.filter(
+      (c) =>
+        (c.listId === pdsListId || c.listName?.toLowerCase().includes('pds client')) &&
+        isHoldCard(c)
+    );
+
+    const gfmHoldCards = allCards.filter(
+      (c) =>
+        (c.listId === gfmListId || c.listName?.toLowerCase().includes('gfm client')) &&
+        isHoldCard(c)
+    );
+
+    const otherHoldCards = allCards.filter(
+      (c) =>
+        c.listId !== pdsListId &&
+        c.listId !== gfmListId &&
+        !c.listName?.toLowerCase().includes('pds client') &&
+        !c.listName?.toLowerCase().includes('gfm client') &&
+        isHoldCard(c)
+    );
+
+    const pdsLines =
+      pdsHoldCards.length > 0
+        ? pdsHoldCards.map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractHoldReasonFromCard(c)}`).join('\n')
+        : '_No client accounts currently labeled On Hold under PDS Clients._';
+
+    const gfmLines =
+      gfmHoldCards.length > 0
+        ? gfmHoldCards.map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractHoldReasonFromCard(c)}`).join('\n')
+        : '_No client accounts currently labeled On Hold under GFM Clients._';
+
+    let answer = `### PDS Clients (On Hold)\n${pdsLines}\n\n### GFM Clients (On Hold)\n${gfmLines}`;
+    if (otherHoldCards.length > 0) {
+      const otherLines = otherHoldCards
+        .map((c, i) => `${i + 1}. **${c.name.trim()}** (${c.listName}) — Reason: ${extractHoldReasonFromCard(c)}`)
+        .join('\n');
+      answer += `\n\n### Other Clients (On Hold)\n${otherLines}`;
+    }
+
+    const totalHold = pdsHoldCards.length + gfmHoldCards.length + otherHoldCards.length;
+    const holdCardsList = [...pdsHoldCards, ...gfmHoldCards, ...otherHoldCards];
+
+    const sources: ChatSource[] = holdCardsList.map((c) => ({
+      cardId: c.id,
+      title: c.name,
+      url: c.url,
+      relevance: 100,
+      reason: `Client labeled On-hold (${c.listName})`,
+      date: c.dateLastActivity,
+      client: c.clientCanonical,
+      status: 'Blocked',
+      listName: c.listName,
+    }));
+
+    return {
+      answer,
+      summary: `Currently, ${totalHold} client account${totalHold === 1 ? '' : 's'} ${totalHold === 1 ? 'is' : 'are'} labeled On Hold (${pdsHoldCards.length} in PDS, ${gfmHoldCards.length} in GFM) with documented reasons from comments.`,
+      keyPoints: [
+        `PDS Clients (On Hold): ${pdsHoldCards.length} account${pdsHoldCards.length === 1 ? '' : 's'}`,
+        `GFM Clients (On Hold): ${gfmHoldCards.length} account${gfmHoldCards.length === 1 ? '' : 's'}`,
+        `Total On Hold: ${totalHold} account${totalHold === 1 ? '' : 's'}`,
+      ],
+      statusBreakdown: { 'On Hold': totalHold },
+      sources,
+      evidenceStrength: 'high',
+    };
+  }
+
+  const isClosed = intent.intent === 'closed_clients_list';
+
+  if (!isClosed) {
+    // ACTIVE CLIENTS: ONLY show names, classified by PDS and GFM
+    const pdsActiveCards = allCards.filter(
+      (c) =>
+        (c.listId === pdsListId || c.listName?.toLowerCase().includes('pds client')) &&
+        c.labels.some((l) => l.name.toLowerCase().includes('active')) &&
+        !c.labels.some((l) => l.name.toLowerCase().includes('closed') || l.name.toLowerCase().includes('hold')) &&
+        c.name !== 'Clients Audit Record' &&
+        c.name !== 'GBP Guides'
+    );
+    const pdsActiveNames = Array.from(new Set(pdsActiveCards.map((c) => c.name.trim()))).sort();
+
+    const gfmActiveCards = allCards.filter(
+      (c) =>
+        (c.listId === gfmListId || c.listName?.toLowerCase().includes('gfm client')) &&
+        c.labels.some((l) => l.name.toLowerCase().includes('active')) &&
+        !c.labels.some((l) => l.name.toLowerCase().includes('closed') || l.name.toLowerCase().includes('hold')) &&
+        c.name !== 'Clients Audit Record' &&
+        c.name !== 'GBP Guides'
+    );
+    const gfmActiveNames = Array.from(new Set(gfmActiveCards.map((c) => c.name.trim()))).sort();
+
+    const pdsLines = pdsActiveNames.map((name, i) => `${i + 1}. ${name}`).join('\n');
+    const gfmLines = gfmActiveNames.map((name, i) => `${i + 1}. ${name}`).join('\n');
+
+    const answer = `### PDS Clients (Active)\n${pdsLines}\n\n### GFM Clients (Active)\n${gfmLines}`;
+    const totalActive = pdsActiveNames.length + gfmActiveNames.length;
+
+    const sources: ChatSource[] = [...pdsActiveCards, ...gfmActiveCards].slice(0, 30).map((c) => ({
+      cardId: c.id,
+      title: c.name,
+      url: c.url,
+      relevance: 100,
+      reason: `Active client account (${c.listName})`,
+      date: c.dateLastActivity,
+      client: c.clientCanonical,
+      status: 'In Process',
+      listName: c.listName,
+    }));
+
+    return {
+      answer,
+      summary: `Active clients currently being worked on across PDS Clients (${pdsActiveNames.length}) and GFM Clients (${gfmActiveNames.length}). Total: ${totalActive} active accounts.`,
+      keyPoints: [
+        `PDS Clients: ${pdsActiveNames.length} active client accounts`,
+        `GFM Clients: ${gfmActiveNames.length} active client accounts`,
+        `Total Active Clients: ${totalActive} active accounts`,
+      ],
+      statusBreakdown: { Active: totalActive },
+      sources,
+      evidenceStrength: 'high',
+    };
+  } else {
+    // CLOSED CLIENTS: Classified by PDS and GFM, showing name and reasons why project is closed
+    const pdsClosedCards = allCards.filter(
+      (c) =>
+        (c.listId === pdsListId || c.listName?.toLowerCase().includes('pds client')) &&
+        c.labels.some(
+          (l) =>
+            l.name.toLowerCase().includes('closed') ||
+            l.name.toLowerCase().includes('terminate') ||
+            l.name.toLowerCase().includes('discontinue')
+        )
+    );
+
+    const gfmClosedCards = allCards.filter(
+      (c) =>
+        (c.listId === gfmListId || c.listName?.toLowerCase().includes('gfm client')) &&
+        c.labels.some(
+          (l) =>
+            l.name.toLowerCase().includes('closed') ||
+            l.name.toLowerCase().includes('terminate') ||
+            l.name.toLowerCase().includes('discontinue')
+        )
+    );
+
+    const pdsLines = pdsClosedCards
+      .map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractClosedReasonFromCard(c)}`)
+      .join('\n');
+
+    const gfmLines = gfmClosedCards
+      .map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractClosedReasonFromCard(c)}`)
+      .join('\n');
+
+    const answer = `### PDS Clients (Closed / Terminated)\n${pdsLines}\n\n### GFM Clients (Closed / Terminated)\n${gfmLines}`;
+    const totalClosed = pdsClosedCards.length + gfmClosedCards.length;
+
+    const sources: ChatSource[] = [...pdsClosedCards, ...gfmClosedCards].map((c) => ({
+      cardId: c.id,
+      title: c.name,
+      url: c.url,
+      relevance: 100,
+      reason: `Closed/Terminated client card (${c.listName})`,
+      date: c.dateLastActivity,
+      client: c.clientCanonical,
+      status: 'Completed',
+      listName: c.listName,
+    }));
+
+    return {
+      answer,
+      summary: `Closed and terminated clients classified across PDS Clients (${pdsClosedCards.length}) and GFM Clients (${gfmClosedCards.length}) with documented reasons.`,
+      keyPoints: [
+        `PDS Closed Clients: ${pdsClosedCards.length} accounts`,
+        `GFM Closed Clients: ${gfmClosedCards.length} accounts`,
+        `Total Closed / Terminated: ${totalClosed} accounts`,
+      ],
+      statusBreakdown: { Closed: totalClosed },
+      sources,
+      evidenceStrength: 'high',
+    };
+  }
+}
 
 export async function generateEvidenceAnswer(
   intent: QueryIntent,
   scoredCards: ScoredCard[],
   conversationHistory: { role: string; content: string }[] = []
 ): Promise<AnswerResult> {
+  // Direct specialized handler for Active Clients List, Closed Clients List, and On Hold Clients List
+  if (
+    intent.intent === 'active_clients_list' ||
+    intent.intent === 'closed_clients_list' ||
+    intent.intent === 'on_hold_clients_list'
+  ) {
+    return generateClientListAnswer(intent);
+  }
+
   const isBroadQuery = Boolean(
     intent.targetList ||
     intent.isBoardAnalysis ||

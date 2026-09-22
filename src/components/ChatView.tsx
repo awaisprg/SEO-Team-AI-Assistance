@@ -34,6 +34,7 @@ interface ChatViewProps {
 }
 
 const PROMPT_SUGGESTIONS = [
+  'Which clients are on hold?',
   'What are we doing with AI Overviews?',
   'What is happening with Precision Podiatry right now?',
   'What did the team accomplish this week?',
@@ -306,10 +307,20 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       <button
                         id={`download-pdf-msg-${msg.id}`}
                         onClick={() => {
-                          const queryTitle =
-                            activeSession?.title ||
-                            messages.find((m) => m.role === 'user')?.content ||
-                            'Executive Intelligence Response';
+                          // Find the specific user query that triggered this exact assistant answer
+                          const msgIndex = messages.findIndex((m) => m.id === msg.id);
+                          let queryTitle = '';
+                          if (msgIndex > 0) {
+                            for (let j = msgIndex - 1; j >= 0; j--) {
+                              if (messages[j].role === 'user') {
+                                queryTitle = messages[j].content;
+                                break;
+                              }
+                            }
+                          }
+                          if (!queryTitle) {
+                            queryTitle = activeSession?.title || 'Executive Intelligence Response';
+                          }
                           downloadChatSummaryPDF(msg, queryTitle);
                         }}
                         className="inline-flex items-center space-x-1.5 text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 transition-all cursor-pointer px-2.5 py-1.5 rounded-lg shadow-2xs font-semibold"

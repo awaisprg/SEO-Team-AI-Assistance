@@ -1009,7 +1009,7 @@ class Store {
     }
   }
 
-  getManagementBriefs(): ManagementBrief[] {
+  getManagementBriefs(userId?: string): ManagementBrief[] {
     const isReal = this.state.connection.mode === 'real' || !this.state.connection.isDemoData;
     const demoClientNames = ['apex spine & orthopedics', 'bay area vein center', 'advanced well md'];
 
@@ -1021,26 +1021,52 @@ class Store {
       });
     }
 
+    // Default legacy unassigned briefs to primary admin
+    for (const brief of briefs) {
+      if (!brief.userId) {
+        brief.userId = 'usr_admin_awais';
+      }
+    }
+
+    if (userId) {
+      briefs = briefs.filter((b) => b.userId === userId);
+    }
+
     return briefs.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   }
 
-  getManagementBriefById(id: string): ManagementBrief | null {
-    return this.state.managementBriefs[id] || null;
-  }
-
-  deleteManagementBrief(id: string): boolean {
-    if (this.state.managementBriefs[id]) {
-      delete this.state.managementBriefs[id];
-      this.persist();
-      return true;
+  getManagementBriefById(id: string, userId?: string): ManagementBrief | null {
+    const brief = this.state.managementBriefs[id];
+    if (!brief) return null;
+    if (userId && brief.userId && brief.userId !== userId) {
+      return null;
     }
-    return false;
+    return brief;
   }
 
-  clearManagementBriefs(): void {
-    this.state.managementBriefs = {};
+  deleteManagementBrief(id: string, userId?: string): boolean {
+    const brief = this.state.managementBriefs[id];
+    if (!brief) return false;
+    if (userId && brief.userId && brief.userId !== userId) {
+      return false;
+    }
+    delete this.state.managementBriefs[id];
+    this.persist();
+    return true;
+  }
+
+  clearManagementBriefs(userId?: string): void {
+    if (!userId) {
+      this.state.managementBriefs = {};
+    } else {
+      for (const [id, b] of Object.entries(this.state.managementBriefs)) {
+        if (b.userId === userId || (!b.userId && userId === 'usr_admin_awais')) {
+          delete this.state.managementBriefs[id];
+        }
+      }
+    }
     this.persist();
   }
 

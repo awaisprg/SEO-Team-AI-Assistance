@@ -700,12 +700,21 @@ app.get('/api/team', requireAuth, (req, res) => {
     })
     .sort((a, b) => b.activeCardsCount + b.completedActivitiesCount - (a.activeCardsCount + a.completedActivitiesCount));
 
+  const clients = db.getClients();
+  const activeClients = clients.filter((c) => c.status === 'Active').length;
+  const closedClients = clients.filter((c) => c.status === 'Closed').length;
+  const onHoldClients = clients.filter((c) => c.status === 'On Hold').length;
+
   res.json({
     metrics: {
       totalCards: cards.length,
       activeWork: activeCards.length,
       completedThisMonth: completedCards.length,
       inReview: inReviewCards.length,
+      activeClients,
+      closedClients,
+      onHoldClients,
+      totalClients: clients.length,
       aiInitiatives: aiInitiatives.length,
       contentWork: contentCards.length,
       seoWork: seoCards.length,
@@ -719,7 +728,7 @@ app.get('/api/team', requireAuth, (req, res) => {
 });
 
 // -------------------------------------------------------------
-// 8. MANAGEMENT BRIEFS
+// 8. MANAGEMENT BRIEFS (ISOLATED PER USER ACCOUNT)
 // -------------------------------------------------------------
 app.post('/api/management-brief', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res) => {
   const { periodType = 'this_month', dateFrom, dateTo } = req.body;
@@ -729,10 +738,12 @@ app.post('/api/management-brief', requireAuth, requireRole(['ADMIN', 'MANAGER'])
   }
 
   try {
+    const userId = req.user?.id || 'usr_admin_awais';
     const brief = await generateManagementBrief({
       periodType,
       dateFrom,
       dateTo,
+      userId,
     });
     res.json(brief);
   } catch (err: any) {
@@ -741,11 +752,13 @@ app.post('/api/management-brief', requireAuth, requireRole(['ADMIN', 'MANAGER'])
 });
 
 app.get('/api/management-briefs', requireAuth, (req, res) => {
-  res.json(db.getManagementBriefs());
+  const userId = req.user?.id;
+  res.json(db.getManagementBriefs(userId));
 });
 
 app.get('/api/management-briefs/:id', requireAuth, (req, res) => {
-  const brief = db.getManagementBriefById(req.params.id);
+  const userId = req.user?.id;
+  const brief = db.getManagementBriefById(req.params.id, userId);
   if (!brief) {
     return res.status(404).json({ error: 'Brief not found' });
   }
@@ -753,7 +766,8 @@ app.get('/api/management-briefs/:id', requireAuth, (req, res) => {
 });
 
 app.delete('/api/management-briefs/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), (req, res) => {
-  const success = db.deleteManagementBrief(req.params.id);
+  const userId = req.user?.id;
+  const success = db.deleteManagementBrief(req.params.id, userId);
   if (!success) {
     return res.status(404).json({ error: 'Brief not found' });
   }
@@ -761,7 +775,8 @@ app.delete('/api/management-briefs/:id', requireAuth, requireRole(['ADMIN', 'MAN
 });
 
 app.delete('/api/management-briefs', requireAuth, requireRole(['ADMIN', 'MANAGER']), (req, res) => {
-  db.clearManagementBriefs();
+  const userId = req.user?.id;
+  db.clearManagementBriefs(userId);
   res.json({ success: true, message: 'All management briefs cleared' });
 });
 

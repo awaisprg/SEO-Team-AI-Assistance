@@ -6,6 +6,7 @@ export interface BriefRequestParams {
   periodType: 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'overall' | 'custom';
   dateFrom?: string;
   dateTo?: string;
+  userId?: string;
 }
 
 function cleanSnippet(txt?: string, maxLen = 160): string {
@@ -858,6 +859,7 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
 
   const brief: ManagementBrief = {
     id: `brief_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    userId: params.userId || 'usr_admin_awais',
     periodType: params.periodType,
     dateFrom: dateFrom || '',
     dateTo: dateTo || now.toISOString().slice(0, 10),

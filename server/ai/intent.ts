@@ -16,7 +16,10 @@ export interface QueryIntent {
     | 'overall_summary'
     | 'list_analysis'
     | 'board_analysis'
-    | 'general_team';
+    | 'general_team'
+    | 'active_clients_list'
+    | 'closed_clients_list'
+    | 'on_hold_clients_list';
   isOverall?: boolean;
   isBoardAnalysis?: boolean;
   isDeepInspection?: boolean;
@@ -270,7 +273,72 @@ export function extractQueryIntent(
   // 7. Primary Intent classification
   let intent: QueryIntent['intent'] = 'general_team';
 
-  if (isBoardAnalysis) {
+  const isAskingOnHoldClients = Boolean(
+    q.includes('on hold client') ||
+    q.includes('on hold clients') ||
+    q.includes('on-hold client') ||
+    q.includes('on-hold clients') ||
+    q.includes('clients on hold') ||
+    q.includes('client on hold') ||
+    q.includes('accounts on hold') ||
+    q.includes('account on hold') ||
+    q.includes('hold client') ||
+    q.includes('hold clients') ||
+    ((q.includes('on hold') || q.includes('on-hold') || (q.includes('hold') && !q.includes('household') && !q.includes('threshold') && !q.includes('withhold'))) &&
+      (q.includes('client') ||
+        q.includes('clients') ||
+        q.includes('account') ||
+        q.includes('accounts') ||
+        q.includes('pds') ||
+        q.includes('gfm') ||
+        q.includes('list') ||
+        q.includes('show') ||
+        q.includes('who') ||
+        q.includes('what') ||
+        q.includes('give') ||
+        q.includes('names') ||
+        q.includes('which') ||
+        q === 'on hold' ||
+        q === 'on-hold' ||
+        q === 'clients on hold' ||
+        q === 'on hold clients'))
+  );
+
+  const isAskingActiveClients = Boolean(
+    (q.includes('active client') ||
+      q.includes('active clients') ||
+      q.includes('active accounts') ||
+      q.includes('clients active') ||
+      (q.includes('active') && (q.includes('client') || q.includes('clients') || q.includes('pds') || q.includes('gfm')))) &&
+    (q.includes('list') ||
+      q.includes('show') ||
+      q.includes('who') ||
+      q.includes('what') ||
+      q.includes('give') ||
+      q.includes('names') ||
+      q.includes('all') ||
+      q === 'active clients' ||
+      q === 'active clients list')
+  );
+
+  const isAskingClosedClients = Boolean(
+    q.includes('closed client') ||
+    q.includes('closed clients') ||
+    q.includes('terminated client') ||
+    q.includes('terminated clients') ||
+    q.includes('discontinued client') ||
+    q.includes('discontinued clients') ||
+    ((q.includes('closed') || q.includes('terminated') || q.includes('discontinued')) &&
+      (q.includes('client') || q.includes('clients') || q.includes('accounts') || q.includes('list') || q.includes('show') || q.includes('who') || q.includes('what') || q.includes('names')))
+  );
+
+  if (isAskingOnHoldClients) {
+    intent = 'on_hold_clients_list';
+  } else if (isAskingActiveClients) {
+    intent = 'active_clients_list';
+  } else if (isAskingClosedClients) {
+    intent = 'closed_clients_list';
+  } else if (isBoardAnalysis) {
     intent = 'board_analysis';
   } else if (targetList) {
     intent = 'list_analysis';
