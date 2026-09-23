@@ -28,6 +28,18 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Dedicated App Users Table with credential hashing for persistent admin user provisioning
+CREATE TABLE IF NOT EXISTS app_users (
+  id VARCHAR(128) PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL DEFAULT 'MANAGER',
+  password_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- 2. Trello Connections & Configuration (NO SECRETS STORED IN DB)
 CREATE TABLE IF NOT EXISTS trello_connections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

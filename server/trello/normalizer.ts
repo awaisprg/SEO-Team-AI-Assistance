@@ -146,6 +146,40 @@ export function inferCardStatus(
   return listSemanticStatus || 'To Do';
 }
 
+export const GENERIC_STOPWORDS = new Set([
+  'services',
+  'support',
+  'care',
+  'health',
+  'center',
+  'clinic',
+  'solutions',
+  'medical',
+  'management',
+  'group',
+  'inc',
+  'llc',
+  'pllc',
+  'workflow',
+  'checklist',
+  'tasks',
+  'task',
+  'general',
+  'notes',
+  'reports',
+  'report',
+  'adhoc',
+  'ad hoc',
+  'review',
+  'content',
+  'meta',
+  'links',
+  'audit',
+  'seo',
+  'internal',
+  'work',
+]);
+
 export function detectClientFromCard(
   cardName: string,
   cardDesc: string,
@@ -166,14 +200,27 @@ export function detectClientFromCard(
     return 'Advanced Wellness MD';
   }
 
-  // 1. Direct match with known canonical names and aliases
-  for (const client of knownClients) {
-    if (text.includes(client.canonicalName.toLowerCase())) {
-      return client.canonicalName;
-    }
-    for (const alias of client.aliases) {
-      if (alias.length >= 3 && text.includes(alias.toLowerCase())) {
+  // Sort candidate clients by canonical name length descending so specific names match before general ones
+  const sortedKnownClients = [...knownClients].sort(
+    (a, b) => b.canonicalName.length - a.canonicalName.length
+  );
+
+  // If card is a multi-member weekly/sprint report card, do not assign a single client to the entire card
+  const isMultiMemberCard = /^(haseeb|adil|ali|azeem|shahid|humna|awais)\b/i.test(cardName) ||
+    cardName.toLowerCase().includes("client's & internal projects") ||
+    cardName.toLowerCase().includes("clients projects");
+
+  if (!isMultiMemberCard) {
+    // 1. Direct match with known canonical names and non-generic aliases
+    for (const client of sortedKnownClients) {
+      if (text.includes(client.canonicalName.toLowerCase())) {
         return client.canonicalName;
+      }
+      for (const alias of client.aliases) {
+        const cleanA = alias.toLowerCase().trim();
+        if (cleanA.length >= 3 && !GENERIC_STOPWORDS.has(cleanA) && text.includes(cleanA)) {
+          return client.canonicalName;
+        }
       }
     }
   }
@@ -191,12 +238,13 @@ export function detectClientFromCard(
     ) {
       return 'Advanced Wellness MD';
     }
-    for (const client of knownClients) {
+    for (const client of sortedKnownClients) {
       if (clLower.includes(client.canonicalName.toLowerCase())) {
         return client.canonicalName;
       }
       for (const alias of client.aliases) {
-        if (alias.length >= 3 && clLower.includes(alias.toLowerCase())) {
+        const cleanA = alias.toLowerCase().trim();
+        if (cleanA.length >= 3 && !GENERIC_STOPWORDS.has(cleanA) && clLower.includes(cleanA)) {
           return client.canonicalName;
         }
       }
@@ -208,12 +256,15 @@ export function detectClientFromCard(
   if (dashParts.length > 1) {
     const firstPart = dashParts[0].trim();
     const lastPart = dashParts[dashParts.length - 1].trim();
-    for (const client of knownClients) {
+    for (const client of sortedKnownClients) {
       if (firstPart.toLowerCase() === client.canonicalName.toLowerCase()) return client.canonicalName;
       if (lastPart.toLowerCase() === client.canonicalName.toLowerCase()) return client.canonicalName;
       for (const alias of client.aliases) {
-        if (firstPart.toLowerCase() === alias.toLowerCase()) return client.canonicalName;
-        if (lastPart.toLowerCase() === alias.toLowerCase()) return client.canonicalName;
+        const cleanA = alias.toLowerCase().trim();
+        if (cleanA.length >= 3 && !GENERIC_STOPWORDS.has(cleanA)) {
+          if (firstPart.toLowerCase() === cleanA) return client.canonicalName;
+          if (lastPart.toLowerCase() === cleanA) return client.canonicalName;
+        }
       }
     }
     if (firstPart.length >= 3 && firstPart.length <= 40 && !firstPart.toLowerCase().includes('task') && !firstPart.toLowerCase().includes('seo') && !firstPart.toLowerCase().includes('weekly')) {
@@ -290,7 +341,10 @@ export function buildClientRegistry(
     const entry = clientMetaMap.get(lower)!;
     aliases.forEach((a) => {
       const cleanA = a.trim();
-      if (cleanA.length >= 2) entry.aliases.add(cleanA);
+      const lowerA = cleanA.toLowerCase();
+      if (cleanA.length >= 3 && !GENERIC_STOPWORDS.has(lowerA)) {
+        entry.aliases.add(cleanA);
+      }
     });
 
     if (meta?.agency) {
@@ -315,7 +369,7 @@ export function buildClientRegistry(
 
     // Auto-generate common alias variations
     const withoutSuffix = cleanCanonical.replace(/,?\s*(LLC|PLLC|Inc|P\.C\.|PC|PA|Ltd)\.?$/i, '').trim();
-    if (withoutSuffix && withoutSuffix !== cleanCanonical && withoutSuffix.length >= 3) {
+    if (withoutSuffix && withoutSuffix !== cleanCanonical && withoutSuffix.length >= 3 && !GENERIC_STOPWORDS.has(withoutSuffix.toLowerCase())) {
       entry.aliases.add(withoutSuffix);
     }
     if (cleanCanonical.includes('&')) {
@@ -429,6 +483,7 @@ export function buildClientRegistry(
       const clLower = clName.toLowerCase();
       if (
         clName.length >= 4 &&
+        !GENERIC_STOPWORDS.has(clLower) &&
         !clLower.includes('task') &&
         !clLower.includes('to do') &&
         !clLower.includes('checklist') &&
@@ -437,7 +492,11 @@ export function buildClientRegistry(
       ) {
         let matched = false;
         for (const [lowerKey, entry] of clientMetaMap.entries()) {
-          if (clLower.includes(lowerKey) || lowerKey.includes(clLower)) {
+          if (
+            clLower === lowerKey ||
+            clLower.startsWith(lowerKey + ' ') ||
+            (lowerKey.startsWith(clLower + ' ') && clLower.length >= 5 && !GENERIC_STOPWORDS.has(clLower))
+          ) {
             addClient(entry.canonicalName, [clName]);
             matched = true;
             break;

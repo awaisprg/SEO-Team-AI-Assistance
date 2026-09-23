@@ -114,18 +114,17 @@ export default function App() {
       if (teamRes?.activeCards) setAllCards([...teamRes.activeCards, ...(teamRes.recentCompleted || [])]);
       if (Array.isArray(clientsRes)) setClients(clientsRes);
       if (Array.isArray(listsRes)) setLists(listsRes);
-      if (Array.isArray(sessionsRes)) {
-        setChatSessions(sessionsRes);
-        if (sessionsRes.length > 0 && !currentSessionId && messages.length === 0) {
-          setCurrentSessionId(sessionsRes[0].id);
-          setMessages(sessionsRes[0].messages || []);
-        }
-      }
-      if (Array.isArray(briefsRes)) {
-        setSavedBriefs(briefsRes);
-        if (briefsRes.length > 0 && !currentBrief) {
-          setCurrentBrief(briefsRes[0]);
-        }
+
+      const mergedSessions: ChatSession[] = Array.isArray(sessionsRes) ? sessionsRes : [];
+      const mergedBriefs: ManagementBrief[] = Array.isArray(briefsRes) ? briefsRes : [];
+
+      setChatSessions(mergedSessions);
+      // Keep chat state clean on app load so user starts with a fresh inquiry instead of auto-loading prior queries.
+      // All prior inquiries remain accessible anytime via the Archive sidebar.
+
+      setSavedBriefs(mergedBriefs);
+      if (mergedBriefs.length > 0 && !currentBrief) {
+        setCurrentBrief(mergedBriefs[0]);
       }
     } catch (err) {
       console.error('Failed to load application data:', err);
@@ -138,6 +137,8 @@ export default function App() {
     if (sb) {
       await sb.auth.signOut().catch(() => {});
     }
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('firebase_auth_active');
     localStorage.removeItem('supabase_auth_token');
     localStorage.removeItem('demo_auth_token');
     setUser(null);
@@ -175,11 +176,14 @@ export default function App() {
       if (data.sessionId) {
         setCurrentSessionId(data.sessionId);
       }
+
       // Re-fetch sessions in background to update history sidebar list & timestamps
       fetchWithAuth('/api/chat/sessions')
         .then((r) => (r.ok ? r.json() : []))
         .then((updated) => {
-          if (Array.isArray(updated)) setChatSessions(updated);
+          if (Array.isArray(updated) && updated.length > 0) {
+            setChatSessions(updated);
+          }
         })
         .catch(() => {});
     } catch (err: any) {
@@ -251,6 +255,7 @@ export default function App() {
       const brief: ManagementBrief = await res.json();
       setCurrentBrief(brief);
       setSavedBriefs((prev) => [brief, ...prev.filter((b) => b.id !== brief.id)]);
+
       showNotification('success', `Executive Brief "${brief.title}" generated successfully.`);
     } catch (err: any) {
       showNotification('error', err.message || 'Failed to generate brief');

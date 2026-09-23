@@ -381,7 +381,7 @@ No active or completed cards matched your query regarding "${intent.rawQuestion}
     .map((sc, i) => {
       const c = sc.card;
       const allChecklistItems = c.checklists.flatMap((cl) =>
-        cl.items.map((it) => `[${it.state === 'complete' ? '✓' : ' '}] ${it.name}${it.completedBy ? ` (by ${it.completedBy})` : ''}`)
+        cl.items.map((it) => `[${it.state === 'complete' ? '✓' : ' '}] [${cl.name}] ${it.name}${it.completedBy ? ` (by ${it.completedBy})` : ''}`)
       );
       const recentActivities = c.activities
         .slice(0, 4)
@@ -430,6 +430,22 @@ Relevance Score: ${sc.relevance}% (${sc.reason})
 
   if (aiProvider.isAvailable()) {
     try {
+      let clientContext = '';
+      if (intent.client) {
+        clientContext = `
+STRICT CLIENT SCOPING DIRECTIVE:
+The manager is asking specifically for an update on client: "${intent.client}".
+CRITICAL:
+1. ONLY include tasks, deliverables, cards, and checklists that belong directly to "${intent.client}".
+2. Do NOT mention or list tasks, deliverables, or checklist items belonging to ANY OTHER client or company.
+3. If reporting completed and pending tasks, structure the response clearly with:
+   - ### Executive Summary (Overall progress for ${intent.client})
+   - ### Completed Tasks (All completed items for ${intent.client})
+   - ### Pending & In-Progress Tasks (All remaining deliverables for ${intent.client})
+   - ### Associated Deliverables & Team Discussions
+`;
+      }
+
       let personContext = '';
       if (intent.person) {
         personContext = `
@@ -448,11 +464,18 @@ Trello context:
 
       const userPrompt = `
 Manager's Question: "${intent.rawQuestion}"
+${clientContext}
 ${personContext}
 Retrieved Trello Evidence (${topCards.length} cards across lists, including full descriptions, comments, and checklists):
 ${evidenceText}
 
 Provide an executive, comprehensive answer based STRICTLY on the retrieved Trello data.
+If the manager asks about a specific client (e.g. "${intent.client || 'Client Name'}"):
+- Confine the entire response STRICTLY to ${intent.client || 'this client'}.
+- Detail all Completed Tasks and all Pending/In-Progress Tasks.
+- Mention assigned team members, list locations, and recent comments.
+- Do NOT include any tasks or deliverables belonging to other clients.
+
 If the manager asks about a specific person (e.g. "What is Azeem doing?"):
 - Provide an Executive Summary highlighting their immediate focus and overall workload.
 - Detail their Active & In-Progress tasks, what client they belong to, list location, and checklist status.
@@ -631,6 +654,73 @@ ${sections.join('\n\n')}
     };
   }
 
+  // Priority Case: Specific Client Workstream Summary
+  if (intent.client) {
+    const allClientTasks = topCards.flatMap((sc) =>
+      sc.card.checklists.flatMap((cl) =>
+        cl.items.map((it) => ({
+          ...it,
+          cardName: sc.card.name,
+          listName: sc.card.listName,
+          clName: cl.name,
+        }))
+      )
+    );
+
+    const completedTasks = allClientTasks.filter((t) => t.state === 'complete');
+    const pendingTasks = allClientTasks.filter((t) => t.state !== 'complete');
+    const assignedMembers = Array.from(new Set(topCards.flatMap((sc) => sc.card.members.map((m) => m.fullName)))).join(', ') || 'Team';
+
+    summary = `Workstream Update for **${intent.client}**: Found ${topCards.length} matching Trello cards containing ${allClientTasks.length} dedicated checklist tasks (${completedTasks.length} completed, ${pendingTasks.length} pending). All other client projects have been excluded.`;
+
+    const completedSection = completedTasks.length > 0
+      ? completedTasks.map((t) => `- [✓] **${t.name}** *(Card: ${t.cardName}, List: ${t.listName})*`).join('\n')
+      : '- *No completed tasks logged for this client.*';
+
+    const pendingSection = pendingTasks.length > 0
+      ? pendingTasks.map((t) => `- [ ] **${t.name}** *(Card: ${t.cardName}, List: ${t.listName})*`).join('\n')
+      : '- *No pending tasks logged for this client.*';
+
+    const cardDetails = topCards.map((sc, idx) => {
+      const c = sc.card;
+      const comments = (c.comments || []).length > 0
+        ? c.comments.map((cm) => `   - **${cm.authorName}**: "${cm.text}"`).join('\n')
+        : '   *No comments logged.*';
+      return `#### ${idx + 1}. [${c.name}](${c.url})
+- **List / Status:** ${c.listName} (${c.statusSemantic})
+- **Assigned:** ${c.members.map((m) => m.fullName).join(', ') || 'None'}
+- **Comments & Updates:**
+${comments}`;
+    }).join('\n\n');
+
+    const clientAnswerMarkdown = `### Workstream Update: ${intent.client}
+${summary}
+
+### Completed Tasks (${completedTasks.length})
+${completedSection}
+
+### Pending & In-Progress Tasks (${pendingTasks.length})
+${pendingSection}
+
+### Associated Deliverables & Discussions
+${cardDetails}
+`;
+
+    return {
+      answer: clientAnswerMarkdown,
+      summary,
+      keyPoints: [
+        `**Client:** ${intent.client}`,
+        `**Tasks Progress:** ${completedTasks.length} completed / ${pendingTasks.length} pending out of ${allClientTasks.length} total tasks.`,
+        `**Assigned Team:** ${assignedMembers}.`,
+        `**Active Cards:** ${topCards.length} cards tracked in Trello.`,
+      ],
+      statusBreakdown,
+      sources,
+      evidenceStrength,
+    };
+  }
+
   // Case 3: Overall Agency Pipeline
   if (intent.isOverall) {
     const uncompletedCards = topCards.filter((sc) => sc.card.isUnderProgress);
@@ -667,17 +757,6 @@ ${sections.join('\n\n')}
       'Active GEO (Generative Engine Optimization) and AEO strategy developing FAQ schema blueprints for client visibility.',
       'Tested Claude & ChatGPT for medical content outline and schema generation, cutting routine drafting time by 45%.'
     );
-  } else if (intent.client) {
-    summary = `Found ${topCards.length} Trello cards actively associated with ${intent.client}.`;
-    const primary = topCards[0].card;
-    const completedTasks = primary.checklists.flatMap((cl) => cl.items).filter((i) => i.state === 'complete');
-    if (completedTasks.length > 0) {
-      keyPoints.push(`Completed workflow milestones: ${completedTasks.map((t) => t.name).slice(0, 4).join(', ')}.`);
-    }
-    keyPoints.push(`Current status is marked as "${primary.statusSemantic}". Assigned team: ${primary.members.map((m) => m.fullName).join(', ') || 'Team'}.`);
-    if (primary.comments.length > 0) {
-      keyPoints.push(`Recent update: "${primary.comments[primary.comments.length - 1].text}"`);
-    }
   } else if (intent.person) {
     const activeTasks = topCards.filter((c) => c.card.statusSemantic === 'In Process' || c.card.isUnderProgress);
     const reviewTasks = topCards.filter((c) => c.card.statusSemantic === 'In Review');

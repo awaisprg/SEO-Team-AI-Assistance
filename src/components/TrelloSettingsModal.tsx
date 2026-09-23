@@ -22,6 +22,10 @@ import {
   Lock,
   Mail,
   User as UserIcon,
+  Download,
+  Upload,
+  Database,
+  HardDrive,
 } from 'lucide-react';
 import { TrelloConnectionStatus, UserRole } from '../types';
 import { fetchWithAuth } from '../lib/supabaseClient';
@@ -91,6 +95,11 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [tokenAuthUrl, setTokenAuthUrl] = useState<string>('');
 
+  // Local persistence & Render sync backup states
+  const [backupUsers, setBackupUsers] = useState<any[]>([]);
+  const [missingBackupUsers, setMissingBackupUsers] = useState<any[]>([]);
+  const [isSyncingManifest, setIsSyncingManifest] = useState(false);
+
   const fetchTokenAuthUrl = async (keyOverride?: string) => {
     try {
       const keyParam = keyOverride ? `?apiKey=${encodeURIComponent(keyOverride)}` : '';
@@ -142,14 +151,115 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
     try {
       const res = await fetchWithAuth('/api/admin/users');
       if (res.ok) {
-        const list = await res.json();
+        const list: AppUserRecord[] = await res.json();
         setUsers(list);
+
+        // Check if there are saved backup users from previous sessions
+        try {
+          const stored = localStorage.getItem('gfm_provisioned_users_manifest');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+              setBackupUsers(parsed);
+              const serverEmails = new Set(list.map((u) => u.email.toLowerCase()));
+              const missing = parsed.filter(
+                (u) => !serverEmails.has(u.email.toLowerCase()) && u.email.toLowerCase() !== 'awais7475@prgmd.com'
+              );
+              setMissingBackupUsers(missing);
+            }
+          }
+        } catch (e) {}
+
+        // Fetch full export manifest for local storage backup
+        fetchWithAuth('/api/admin/users/export')
+          .then((r) => (r.ok ? r.json() : null))
+          .then((exp) => {
+            if (exp?.users && Array.isArray(exp.users) && exp.users.length > 0) {
+              localStorage.setItem('gfm_provisioned_users_manifest', JSON.stringify(exp.users));
+              setBackupUsers(exp.users);
+            }
+          })
+          .catch(() => {});
       }
     } catch (err) {
       console.error('Failed to load user list:', err);
     } finally {
       setIsLoadingUsers(false);
     }
+  };
+
+  const handleRestoreFromBackup = async (overrideUsers?: any[]) => {
+    const listToSync = overrideUsers || missingBackupUsers.length > 0 ? missingBackupUsers : backupUsers;
+    if (!listToSync || listToSync.length === 0) {
+      setFeedback({ type: 'error', message: 'No accounts to sync.' });
+      return;
+    }
+
+    setIsSyncingManifest(true);
+    setFeedback(null);
+    try {
+      const res = await fetchWithAuth('/api/admin/users/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ users: listToSync }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to sync users');
+      }
+
+      setFeedback({
+        type: 'success',
+        message: data.message || 'Accounts successfully restored and synced to the server database.',
+      });
+      setMissingBackupUsers([]);
+      fetchUsers();
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err.message || 'Sync failed.' });
+    } finally {
+      setIsSyncingManifest(false);
+    }
+  };
+
+  const handleDownloadBackup = async () => {
+    try {
+      const res = await fetchWithAuth('/api/admin/users/export');
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `goldflex-authorized-users-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setFeedback({ type: 'success', message: 'User manifest exported successfully.' });
+    } catch (e: any) {
+      setFeedback({ type: 'error', message: e.message || 'Export failed.' });
+    }
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+        const usersArray = Array.isArray(parsed) ? parsed : parsed.users;
+        if (!Array.isArray(usersArray)) {
+          throw new Error('Invalid backup file format: missing users list.');
+        }
+        await handleRestoreFromBackup(usersArray);
+      } catch (err: any) {
+        setFeedback({ type: 'error', message: err.message || 'Invalid JSON file.' });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -789,6 +899,36 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
           ) : (
             /* User Management Tab */
             <div className="space-y-6">
+              {/* Alert for missing accounts detected after Render container restart */}
+              {missingBackupUsers.length > 0 && (
+                <div className="p-4 rounded-xl bg-amber-50 border border-amber-300/80 text-amber-900 shadow-xs space-y-2">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Database className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span className="text-xs font-bold text-amber-950">
+                        Render Server Restart Detected ({missingBackupUsers.length} account(s) in local backup)
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Render free containers reset their temporary file system on restart. Your browser backup contains{' '}
+                    <strong>{missingBackupUsers.map((u) => u.name || u.email).join(', ')}</strong>.
+                    Restore them to the live server instantly with one click:
+                  </p>
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleRestoreFromBackup(missingBackupUsers)}
+                      disabled={isSyncingManifest}
+                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncingManifest ? 'animate-spin' : ''}`} />
+                      <span>{isSyncingManifest ? 'Restoring...' : 'Restore Missing Accounts Now'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Add New Manager Form */}
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
                 <div className="flex items-center justify-between">
@@ -941,6 +1081,56 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
                       </div>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Render Persistence & Backup Tools */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <HardDrive className="w-4 h-4 text-slate-700" />
+                    <span className="text-xs font-semibold text-slate-900">Render.com Persistence & Backup</span>
+                  </div>
+                  <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-medium">
+                    Fail-Safe Active
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Free web services on Render restart after inactivity. To make user accounts 100% permanent across all restarts without manual sync, connect a free PostgreSQL database on Render and set <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800 font-mono text-[10px]">DATABASE_URL</code> in your Environment Variables.
+                </p>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleDownloadBackup}
+                    className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-medium cursor-pointer transition-colors shadow-xs"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Export Accounts (JSON)</span>
+                  </button>
+
+                  <label className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-medium cursor-pointer transition-colors shadow-xs">
+                    <Upload className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Import Accounts (JSON)</span>
+                    <input
+                      type="file"
+                      accept=".json,application/json"
+                      onChange={handleImportFile}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {backupUsers.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRestoreFromBackup(backupUsers)}
+                      disabled={isSyncingManifest}
+                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium cursor-pointer transition-colors shadow-xs disabled:opacity-50 ml-auto"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncingManifest ? 'animate-spin' : ''}`} />
+                      <span>{isSyncingManifest ? 'Syncing...' : 'Sync Browser Backup to Server'}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

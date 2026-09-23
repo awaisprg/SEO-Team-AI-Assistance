@@ -93,6 +93,17 @@ export class PostgresStore {
           ALTER TABLE management_briefs ADD COLUMN IF NOT EXISTS cards_created_count INT DEFAULT 0;
 
           ALTER TABLE trello_connections ADD COLUMN IF NOT EXISTS mode VARCHAR(50) DEFAULT 'real';
+
+          CREATE TABLE IF NOT EXISTS app_users (
+            id VARCHAR(128) PRIMARY KEY,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            role VARCHAR(50) NOT NULL DEFAULT 'MANAGER',
+            password_hash TEXT NOT NULL,
+            salt TEXT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+          );
         `);
 
         this.isInitialized = true;
@@ -529,6 +540,96 @@ export class PostgresStore {
     `;
     const res = await this.pool.query(query, [userIdOrEmail, role]);
     return (res.rowCount || 0) > 0;
+  }
+
+  // --- Persistent App User Management (Handles Password Hashes, Salts, & Role Access) ---
+  async getAllAppUsers(): Promise<{
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    passwordHash: string;
+    salt: string;
+    createdAt: string;
+  }[]> {
+    if (!this.pool) return [];
+    try {
+      const res = await this.pool.query(
+        'SELECT id, email, name, role, password_hash, salt, created_at FROM app_users ORDER BY created_at ASC;'
+      );
+      return res.rows.map((r) => ({
+        id: r.id,
+        email: r.email,
+        name: r.name,
+        role: r.role,
+        passwordHash: r.password_hash,
+        salt: r.salt,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+      }));
+    } catch (err: any) {
+      console.warn('Could not query app_users table:', err.message);
+      return [];
+    }
+  }
+
+  async upsertAppUser(user: {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    passwordHash: string;
+    salt: string;
+    createdAt?: string;
+  }): Promise<void> {
+    if (!this.pool) return;
+    try {
+      const query = `
+        INSERT INTO app_users (id, email, name, role, password_hash, salt, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::timestamptz, NOW()), NOW())
+        ON CONFLICT (email) DO UPDATE SET
+          name = EXCLUDED.name,
+          role = EXCLUDED.role,
+          password_hash = EXCLUDED.password_hash,
+          salt = EXCLUDED.salt,
+          updated_at = NOW();
+      `;
+      await this.pool.query(query, [
+        user.id,
+        user.email.toLowerCase().trim(),
+        user.name,
+        user.role,
+        user.passwordHash,
+        user.salt,
+        user.createdAt || null,
+      ]);
+    } catch (err: any) {
+      console.error('Failed to upsert app_user in PostgreSQL:', err.message);
+    }
+  }
+
+  async deleteAppUser(userId: string): Promise<boolean> {
+    if (!this.pool) return false;
+    try {
+      const res = await this.pool.query('DELETE FROM app_users WHERE id = $1;', [userId]);
+      return (res.rowCount || 0) > 0;
+    } catch (err: any) {
+      console.error('Failed to delete app_user from PostgreSQL:', err.message);
+      return false;
+    }
+  }
+
+  async updateAppUserRole(userId: string, role: string): Promise<boolean> {
+    if (!this.pool) return false;
+    try {
+      const res = await this.pool.query(
+        'UPDATE app_users SET role = $2, updated_at = NOW() WHERE id = $1;',
+        [userId, role]
+      );
+      return (res.rowCount || 0) > 0;
+    } catch (err: any) {
+      console.error('Failed to update app_user role in PostgreSQL:', err.message);
+      return false;
+    }
   }
 
   // --- Hydration: Load all data from PostgreSQL ---

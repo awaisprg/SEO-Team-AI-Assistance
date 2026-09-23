@@ -18,7 +18,7 @@ export class GeminiProvider implements AIProvider {
 
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY || '';
-    this.modelName = process.env.AI_MODEL || 'gemini-3.8-flash';
+    this.modelName = process.env.AI_MODEL || 'gemini-2.5-flash';
     if (this.apiKey) {
       try {
         this.client = new GoogleGenAI({
@@ -44,38 +44,34 @@ export class GeminiProvider implements AIProvider {
       throw new Error('Gemini API key is not configured');
     }
 
-    try {
-      const response = await this.client.models.generateContent({
-        model: this.modelName,
-        contents: userPrompt,
-        config: {
-          systemInstruction: systemPrompt,
-          temperature: 0.2, // Low temperature for high factual accuracy and strict evidence adherence
-        },
-      });
+    const candidateModels = [
+      this.modelName,
+      'gemini-flash-latest',
+    ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
-      return response.text || 'No response generated.';
-    } catch (primaryErr: any) {
-      // If resource exhausted or model unavailable, try flash-lite
-      if (this.modelName !== 'gemini-3.1-flash-lite') {
-        console.warn(`Primary model ${this.modelName} error (${primaryErr.message}), retrying with gemini-3.1-flash-lite...`);
-        try {
-          const fallbackResponse = await this.client.models.generateContent({
-            model: 'gemini-3.1-flash-lite',
-            contents: userPrompt,
-            config: {
-              systemInstruction: systemPrompt,
-              temperature: 0.2,
-            },
-          });
-          return fallbackResponse.text || 'No response generated.';
-        } catch (secondaryErr: any) {
-          console.warn('Fallback model also encountered error:', secondaryErr.message);
-          throw secondaryErr;
+    let lastError: any = null;
+
+    for (const model of candidateModels) {
+      try {
+        const response = await this.client.models.generateContent({
+          model,
+          contents: userPrompt,
+          config: {
+            systemInstruction: systemPrompt,
+            temperature: 0.2, // Low temperature for high factual accuracy and strict evidence adherence
+          },
+        });
+
+        if (response.text) {
+          return response.text;
         }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Model ${model} error (${err.message}), trying next candidate...`);
       }
-      throw primaryErr;
     }
+
+    throw lastError || new Error('All candidate AI models failed.');
   }
 
   async generateEmbedding(text: string): Promise<number[]> {

@@ -2,6 +2,7 @@ import { TrelloCard, ChatSource } from '../../src/types';
 import { db } from '../db/store';
 import { QueryIntent } from './intent';
 import { getLocalEmbedding, cosineSimilarity } from './provider';
+import { GENERIC_STOPWORDS } from '../trello/normalizer';
 
 export interface ScoredCard {
   card: TrelloCard;
@@ -11,6 +12,83 @@ export interface ScoredCard {
   snippet?: string;
   matchedPerson?: string;
   matchedClient?: string;
+}
+
+export function filterCardForClientTarget(
+  card: TrelloCard,
+  targetClient: string,
+  targetAliases: string[],
+  otherClientsNormList: string[]
+): TrelloCard | null {
+  const normalize = (s: string) =>
+    (s || '').toLowerCase().replace(/[,.\-_]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  const normTitle = normalize(card.name);
+  const normClient = normalize(card.clientCanonical || '');
+
+  const titleMatch = targetAliases.some((a) => normTitle.includes(a));
+  const clientMatch = targetAliases.some((a) => normClient.includes(a));
+  const isMultiMemberCard =
+    /^(haseeb|adil|ali|azeem|shahid|humna|awais)\b/i.test(card.name) ||
+    normTitle.includes("client's & internal projects") ||
+    normTitle.includes('clients projects');
+
+  const origChecklists = card.checklists || [];
+  const filteredChecklists = [];
+
+  for (const cl of origChecklists) {
+    const normClName = normalize(cl.name);
+    const clNameMatchesTarget = targetAliases.some((a) => normClName.includes(a));
+    const clNameMatchesOther = otherClientsNormList.some(
+      (other) =>
+        normClName === other ||
+        normClName.startsWith(other + ' ') ||
+        (other.length > 5 && normClName.includes(other))
+    );
+
+    if (clNameMatchesTarget) {
+      filteredChecklists.push(cl);
+    } else if (clNameMatchesOther) {
+      // Exclude checklists of other clients
+      continue;
+    } else {
+      // Shared or general checklist (e.g. "Work Report", "Tasks", etc.)
+      const matchingItems = (cl.items || []).filter((it) => {
+        const normItem = normalize(it.name);
+        return targetAliases.some((a) => normItem.includes(a));
+      });
+
+      if (matchingItems.length > 0) {
+        filteredChecklists.push({ ...cl, items: matchingItems });
+      } else if (!isMultiMemberCard && (titleMatch || clientMatch)) {
+        // Dedicated card for this client with general workflow checklist
+        filteredChecklists.push(cl);
+      }
+    }
+  }
+
+  const hasMatchingChecklists = filteredChecklists.length > 0;
+  const isDedicatedCard = !isMultiMemberCard && (titleMatch || clientMatch);
+
+  if (!isDedicatedCard && !hasMatchingChecklists) {
+    return null;
+  }
+
+  // Also filter comments if it's a multi-member sprint card
+  let filteredComments = card.comments || [];
+  if (isMultiMemberCard) {
+    filteredComments = filteredComments.filter((cm) => {
+      const cNorm = normalize(cm.text);
+      return targetAliases.some((a) => cNorm.includes(a));
+    });
+  }
+
+  return {
+    ...card,
+    clientCanonical: targetClient,
+    checklists: filteredChecklists,
+    comments: filteredComments,
+  };
 }
 
 export function hybridRetrieve(intent: QueryIntent, threshold = 35): ScoredCard[] {
@@ -23,9 +101,63 @@ export function hybridRetrieve(intent: QueryIntent, threshold = 35): ScoredCard[
 
   const queryEmbedding = getLocalEmbedding(intent.rawQuestion);
   const scored: ScoredCard[] = [];
-  const effectiveThreshold = (intent.targetList || intent.intent === 'list_analysis' || intent.isBoardAnalysis || intent.person) ? 15 : threshold;
+  const effectiveThreshold =
+    intent.targetList ||
+    intent.intent === 'list_analysis' ||
+    intent.isBoardAnalysis ||
+    intent.person ||
+    intent.client
+      ? 15
+      : threshold;
 
-  for (const card of allCards) {
+  const normalize = (s: string) =>
+    (s || '').toLowerCase().replace(/[,.\-_]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  let targetAliases: string[] = [];
+  let otherClientsNormList: string[] = [];
+
+  if (intent.client) {
+    const allClients = db.getClients();
+    const cObj = allClients.find(
+      (c) =>
+        normalize(c.canonicalName) === normalize(intent.client!) ||
+        (c.aliases || []).some((a) => normalize(a) === normalize(intent.client!))
+    );
+
+    const rawAliases = [
+      intent.client,
+      ...(intent.clientAliases || []),
+      ...(cObj ? [cObj.canonicalName, ...(cObj.aliases || [])] : []),
+    ];
+
+    targetAliases = Array.from(
+      new Set(rawAliases.map(normalize))
+    ).filter((a) => a.length >= 3 && !GENERIC_STOPWORDS.has(a));
+
+    otherClientsNormList = allClients
+      .filter((c) => normalize(c.canonicalName) !== normalize(intent.client!))
+      .flatMap((c) => [c.canonicalName, ...(c.aliases || [])])
+      .map(normalize)
+      .filter((n) => n.length > 3 && !GENERIC_STOPWORDS.has(n));
+  }
+
+  for (const origCard of allCards) {
+    let card = origCard;
+
+    // Strict client isolation: If querying a specific client, filter out any non-client cards or irrelevant tasks
+    if (intent.client) {
+      const filtered = filterCardForClientTarget(
+        origCard,
+        intent.client,
+        targetAliases,
+        otherClientsNormList
+      );
+      if (!filtered) {
+        continue;
+      }
+      card = filtered;
+    }
+
     let score = 0;
     const reasons: string[] = [];
     let matchType: ScoredCard['matchType'] = 'exact';
@@ -73,15 +205,9 @@ export function hybridRetrieve(intent: QueryIntent, threshold = 35): ScoredCard[
 
     // 1. Client filter / boost
     if (intent.client) {
-      const isClientMatch =
-        card.clientCanonical?.toLowerCase() === intent.client.toLowerCase() ||
-        cardTitleLower.includes(intent.client.toLowerCase());
-      if (isClientMatch) {
-        score += 45;
-        reasons.push(`Direct client match for ${intent.client}`);
-      } else {
-        score -= 50;
-      }
+      score += 75;
+      reasons.push(`Deliverable strictly confirmed for client "${intent.client}"`);
+      matchType = 'exact';
     }
 
     // 2. Person filter / boost

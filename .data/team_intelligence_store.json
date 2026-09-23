@@ -4857,7 +4857,7 @@
       "completedBy": null,
       "agencySource": "Internal",
       "priority": "Normal",
-      "clientCanonical": "Bridges Community Support Services, Inc",
+      "clientCanonical": "Express Medical Services",
       "labels": [
         {
           "id": "68114872282c6eabcdad844b",
@@ -9596,7 +9596,7 @@
       "completedBy": null,
       "agencySource": "Internal",
       "priority": "Normal",
-      "clientCanonical": "Bridges Community Support Services, Inc",
+      "clientCanonical": "Express Medical Services",
       "labels": [
         {
           "id": "69d511c7df49fc8eff97d30b",
@@ -10193,7 +10193,7 @@
       "completedBy": null,
       "agencySource": "GFM",
       "priority": "Normal",
-      "clientCanonical": "Bridges Community Support Services, Inc",
+      "clientCanonical": "Express Medical Services",
       "labels": [
         {
           "id": "68114872282c6eabcdad844b",
@@ -55861,7 +55861,7 @@
       "completedBy": "Ali Hamza",
       "agencySource": "Internal",
       "priority": "Normal",
-      "clientCanonical": "Bridges Community Support Services, Inc",
+      "clientCanonical": "Express Medical Services",
       "labels": [
         {
           "id": "68114872282c6eabcdad8449",
@@ -83096,7 +83096,7 @@
       "completedBy": null,
       "agencySource": "Internal",
       "priority": "High Priority",
-      "clientCanonical": "Bridges Community Support Services, Inc",
+      "clientCanonical": "Express Medical Services",
       "labels": [
         {
           "id": "68114872282c6eabcdad844c",
@@ -191639,7 +191639,6 @@
       "aliases": [
         "Bridges Community Support Services, Inc",
         "Bridges Community Support Services",
-        "Services",
         "Bridges Community",
         "Bridges Community Support"
       ],

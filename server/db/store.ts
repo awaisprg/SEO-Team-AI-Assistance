@@ -21,6 +21,7 @@ import fs from 'fs';
 import path from 'path';
 import { pgStore } from './postgres';
 import { getSeedChatSessions } from '../trello/seedSessions';
+import { GENERIC_STOPWORDS } from '../trello/normalizer';
 
 export interface TrelloConnectionConfig {
   boardId: string;
@@ -572,7 +573,10 @@ class Store {
     if (existing) {
       const mergedAliases = Array.from(
         new Set([...(existing.aliases || []), ...(client.aliases || [])])
-      );
+      ).filter((a) => {
+        const clean = a.trim().toLowerCase();
+        return clean.length >= 3 && !GENERIC_STOPWORDS.has(clean);
+      });
       existing = {
         ...existing,
         ...client,
@@ -585,10 +589,18 @@ class Store {
       }
       return existing;
     } else {
+      const rawAliases = client.aliases || [canonical];
+      const sanitizedAliases = rawAliases.filter((a) => {
+        const clean = a.trim().toLowerCase();
+        return clean.length >= 3 && !GENERIC_STOPWORDS.has(clean);
+      });
+      if (!sanitizedAliases.includes(canonical)) {
+        sanitizedAliases.unshift(canonical);
+      }
       const newClient: ClientEntity = {
         id: client.id || `client_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         canonicalName: canonical,
-        aliases: client.aliases || [canonical],
+        aliases: sanitizedAliases,
         status: client.status || 'Active',
         activeCardCount: client.activeCardCount || 0,
         completedTasksCount: client.completedTasksCount || 0,

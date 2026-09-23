@@ -1,5 +1,6 @@
 import { StatusSemantic } from '../../src/types';
 import { resolveTeamMember } from './members';
+import { GENERIC_STOPWORDS } from '../trello/normalizer';
 
 export interface QueryIntent {
   rawQuestion: string;
@@ -26,6 +27,7 @@ export interface QueryIntent {
   targetList?: string;
   topic?: string;
   client?: string;
+  clientAliases?: string[];
   person?: string;
   personAliases?: string[];
   personMemberIds?: string[];
@@ -95,16 +97,33 @@ export function extractQueryIntent(
 
   for (const listName of candidateLists) {
     const lLower = listName.toLowerCase();
-    if (
-      q.includes(lLower) ||
-      q.includes(`"${lLower}"`) ||
-      q.includes(`'${lLower}'`) ||
-      q.includes(`list: ${lLower}`) ||
-      q.includes(`${lLower} list`) ||
-      q.includes(`list ${lLower}`)
-    ) {
-      targetList = listName;
-      break;
+    const isStatusName = ['completed', 'in process', 'in review', 'to do', 'ad hoc tasks'].includes(lLower);
+    if (isStatusName) {
+      if (
+        q.includes(`"${lLower}"`) ||
+        q.includes(`'${lLower}'`) ||
+        q.includes(`list: ${lLower}`) ||
+        q.includes(`${lLower} list`) ||
+        q.includes(`list ${lLower}`) ||
+        q.includes(`in the ${lLower} list`) ||
+        q.includes(`cards in ${lLower}`) ||
+        q.includes(`list called ${lLower}`)
+      ) {
+        targetList = listName;
+        break;
+      }
+    } else {
+      if (
+        q.includes(`"${lLower}"`) ||
+        q.includes(`'${lLower}'`) ||
+        q.includes(`list: ${lLower}`) ||
+        q.includes(`${lLower} list`) ||
+        q.includes(`list ${lLower}`) ||
+        q.includes(lLower)
+      ) {
+        targetList = listName;
+        break;
+      }
     }
   }
 
@@ -118,7 +137,7 @@ export function extractQueryIntent(
   } else if (q.includes('chatgpt') || q.includes('claude') || q.includes('productivity') || q.includes('ai tool') || q.includes('automation')) {
     topic = 'AI Productivity & Tooling';
     isAiRelated = true;
-  } else if (q.includes('ai') || q.includes('artificial intelligence')) {
+  } else if (/\b(ai|artificial intelligence)\b/i.test(q)) {
     topic = 'AI Initiatives';
     isAiRelated = true;
   } else if (q.includes('schema') || q.includes('technical seo') || q.includes('core web vitals') || q.includes('crawl') || q.includes('audit')) {
@@ -129,20 +148,45 @@ export function extractQueryIntent(
     topic = 'SEO Strategy';
   }
 
-  // 2. Client detection
+  // 2. Client detection with normalized punctuation and length-first priority
   let matchedClient: string | undefined;
-  for (const client of knownClients) {
-    if (q.includes(client.canonicalName.toLowerCase())) {
+  let matchedClientAliases: string[] | undefined;
+
+  const normalizeStr = (s: string) =>
+    (s || '').toLowerCase().replace(/[,.\-_]/g, ' ').replace(/\s+/g, ' ').trim();
+  const cleanQ = normalizeStr(question);
+
+  // Sort candidate clients by canonical name length descending so specific names match first
+  const sortedKnownClients = [...knownClients].sort(
+    (a, b) => b.canonicalName.length - a.canonicalName.length
+  );
+
+  for (const client of sortedKnownClients) {
+    const rawAliases = [client.canonicalName, ...(client.aliases || [])];
+    const candidateAliases = Array.from(
+      new Set([
+        client.canonicalName.toLowerCase(),
+        normalizeStr(client.canonicalName),
+        ...rawAliases.map((a) => a.toLowerCase()),
+        ...rawAliases.map(normalizeStr),
+      ])
+    ).filter((a) => a.length >= 3 && !GENERIC_STOPWORDS.has(a));
+
+    const isMatch = candidateAliases.some((alias) => {
+      return (
+        q.includes(alias) ||
+        cleanQ.includes(alias) ||
+        cleanQ.includes(` ${alias} `) ||
+        cleanQ.startsWith(`${alias} `) ||
+        cleanQ.endsWith(` ${alias}`)
+      );
+    });
+
+    if (isMatch) {
       matchedClient = client.canonicalName;
+      matchedClientAliases = candidateAliases;
       break;
     }
-    for (const alias of client.aliases) {
-      if (q.includes(alias.toLowerCase())) {
-        matchedClient = client.canonicalName;
-        break;
-      }
-    }
-    if (matchedClient) break;
   }
 
   // 3. Person detection with first-name, alias & list mapping
@@ -338,6 +382,12 @@ export function extractQueryIntent(
     intent = 'active_clients_list';
   } else if (isAskingClosedClients) {
     intent = 'closed_clients_list';
+  } else if (matchedClient) {
+    intent = 'client_summary';
+    // If targetList was set to a status list (e.g. Completed), clear it so the client query is not treated as a raw list dump
+    if (targetList && ['completed', 'in process', 'in review', 'to do', 'ad hoc tasks'].includes(targetList.toLowerCase())) {
+      targetList = undefined;
+    }
   } else if (isBoardAnalysis) {
     intent = 'board_analysis';
   } else if (targetList) {
@@ -351,8 +401,6 @@ export function extractQueryIntent(
     q.includes('management brief')
   ) {
     intent = 'management_brief';
-  } else if (matchedClient) {
-    intent = 'client_summary';
   } else if (matchedPerson) {
     intent = 'person_activity';
   } else if (q.includes('ai overview') || q.includes('geo') || q.includes('aeo') || q.includes('google ai')) {
@@ -378,6 +426,7 @@ export function extractQueryIntent(
     targetList,
     topic,
     client: matchedClient,
+    clientAliases: matchedClientAliases,
     person: matchedPerson,
     personAliases,
     personMemberIds,

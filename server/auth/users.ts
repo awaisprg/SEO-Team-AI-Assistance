@@ -14,8 +14,41 @@ export interface AppUser {
   createdAt: string;
 }
 
-const DATA_DIR = path.join(process.cwd(), '.data');
-const USERS_FILE = path.join(DATA_DIR, 'app_users.json');
+// Resilient persistent storage directory resolution
+// Handles Render.com Persistent Disks (/var/data, /data, or DATA_DIR)
+function resolveStorageDir(): string {
+  const envPath = process.env.DATA_DIR || process.env.RENDER_DISK_PATH || process.env.PERSISTENT_DATA_PATH;
+  if (envPath) {
+    try {
+      if (!fs.existsSync(envPath)) {
+        fs.mkdirSync(envPath, { recursive: true });
+      }
+      return envPath;
+    } catch (err) {
+      console.warn(`Could not create directory at ${envPath}, falling back:`, err);
+    }
+  }
+
+  // Check common mounted disk paths on Render / Cloud platforms
+  if (fs.existsSync('/var/data')) {
+    return '/var/data';
+  }
+  if (fs.existsSync('/data')) {
+    return '/data';
+  }
+
+  // Fallback to project root .data
+  const localData = path.join(process.cwd(), '.data');
+  if (!fs.existsSync(localData)) {
+    try {
+      fs.mkdirSync(localData, { recursive: true });
+    } catch {}
+  }
+  return localData;
+}
+
+const STORAGE_DIR = resolveStorageDir();
+const USERS_FILE = path.join(STORAGE_DIR, 'app_users.json');
 const TOKEN_SECRET = process.env.SESSION_SECRET || 'seo-intel-production-session-secret-2026';
 
 // Exact Admin credentials specified by user
@@ -28,14 +61,30 @@ function hashPassword(password: string, salt: string): string {
 
 class UserRegistry {
   private users: Map<string, AppUser> = new Map();
+  private isPostgresInitialized = false;
 
   constructor() {
-    this.loadUsers();
+    this.loadFromFilesystem();
     this.ensureAdminUser();
+    // Asynchronously initialize PostgreSQL sync if available
+    this.initPostgresSync().catch((err) => {
+      console.warn('PostgreSQL user sync warning:', err.message);
+    });
   }
 
-  private loadUsers() {
+  private loadFromFilesystem() {
     try {
+      // If primary storage file doesn't exist yet, check project .data fallback
+      if (!fs.existsSync(USERS_FILE)) {
+        const repoFallback = path.join(process.cwd(), '.data', 'app_users.json');
+        if (fs.existsSync(repoFallback) && repoFallback !== USERS_FILE) {
+          try {
+            const initialData = fs.readFileSync(repoFallback, 'utf-8');
+            fs.writeFileSync(USERS_FILE, initialData, 'utf-8');
+          } catch {}
+        }
+      }
+
       if (fs.existsSync(USERS_FILE)) {
         const raw = fs.readFileSync(USERS_FILE, 'utf-8');
         const list: AppUser[] = JSON.parse(raw);
@@ -43,7 +92,7 @@ class UserRegistry {
           if ((u.role as string) === 'VIEWER') {
             u.role = 'MANAGER';
           }
-          this.users.set(u.email.toLowerCase(), u);
+          this.users.set(u.email.toLowerCase().trim(), u);
         }
       }
     } catch (err) {
@@ -51,10 +100,60 @@ class UserRegistry {
     }
   }
 
+  public async initPostgresSync(): Promise<void> {
+    if (!pgStore.isConfigured()) return;
+
+    try {
+      await pgStore.initSchema();
+      this.isPostgresInitialized = true;
+
+      // 1. Load users stored in PostgreSQL
+      const dbUsers = await pgStore.getAllAppUsers();
+      let importedFromDb = 0;
+
+      for (const dbu of dbUsers) {
+        const email = dbu.email.toLowerCase().trim();
+        const role: UserRole = dbu.role === 'ADMIN' ? 'ADMIN' : 'MANAGER';
+        if (!this.users.has(email)) {
+          this.users.set(email, {
+            id: dbu.id,
+            email,
+            name: dbu.name,
+            role,
+            passwordHash: dbu.passwordHash,
+            salt: dbu.salt,
+            createdAt: dbu.createdAt,
+          });
+          importedFromDb++;
+        }
+      }
+
+      if (importedFromDb > 0) {
+        console.log(`Synced ${importedFromDb} user account(s) from persistent PostgreSQL database.`);
+        this.persist();
+      }
+
+      // 2. Ensure all current in-memory users (including created ones) are safely in PostgreSQL
+      for (const u of this.users.values()) {
+        await pgStore.upsertAppUser({
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          passwordHash: u.passwordHash,
+          salt: u.salt,
+          createdAt: u.createdAt,
+        });
+      }
+    } catch (err: any) {
+      console.warn('Error during PostgreSQL user sync:', err.message);
+    }
+  }
+
   private persist() {
     try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
+      if (!fs.existsSync(STORAGE_DIR)) {
+        fs.mkdirSync(STORAGE_DIR, { recursive: true });
       }
       const list = Array.from(this.users.values());
       fs.writeFileSync(USERS_FILE, JSON.stringify(list, null, 2), 'utf-8');
@@ -82,14 +181,18 @@ class UserRegistry {
     this.users.set(adminEmail, adminUser);
     this.persist();
 
-    // Also sync to postgres if available
     if (pgStore.isConfigured()) {
-      pgStore.upsertUser({
-        id: adminUser.id,
-        email: adminUser.email,
-        name: adminUser.name,
-        role: adminUser.role,
-      }).catch(() => {});
+      pgStore
+        .upsertAppUser({
+          id: adminUser.id,
+          email: adminUser.email,
+          name: adminUser.name,
+          role: adminUser.role,
+          passwordHash: adminUser.passwordHash,
+          salt: adminUser.salt,
+          createdAt: adminUser.createdAt,
+        })
+        .catch(() => {});
     }
   }
 
@@ -105,6 +208,11 @@ class UserRegistry {
       role: u.role,
       createdAt: u.createdAt,
     }));
+  }
+
+  // Full backup manifest for admin restore & export
+  public getBackupManifest(): AppUser[] {
+    return Array.from(this.users.values());
   }
 
   public createUser(params: {
@@ -150,13 +258,21 @@ class UserRegistry {
     this.users.set(normalizedEmail, newUser);
     this.persist();
 
+    // Persist to PostgreSQL if configured
     if (pgStore.isConfigured()) {
-      pgStore.upsertUser({
-        id: newUser.id,
-        email: newUser.email,
-        name: newUser.name,
-        role: newUser.role,
-      }).catch(() => {});
+      pgStore
+        .upsertAppUser({
+          id: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+          role: newUser.role,
+          passwordHash: newUser.passwordHash,
+          salt: newUser.salt,
+          createdAt: newUser.createdAt,
+        })
+        .catch((err) => {
+          console.error('Failed to sync new user to PostgreSQL:', err);
+        });
     }
 
     return {
@@ -183,6 +299,10 @@ class UserRegistry {
     if (targetEmail) {
       this.users.delete(targetEmail);
       this.persist();
+
+      if (pgStore.isConfigured()) {
+        pgStore.deleteAppUser(userId).catch(() => {});
+      }
       return true;
     }
     return false;
@@ -196,8 +316,9 @@ class UserRegistry {
         }
         u.role = newRole === 'ADMIN' ? 'ADMIN' : 'MANAGER';
         this.persist();
+
         if (pgStore.isConfigured()) {
-          pgStore.updateUserRole(userId, u.role).catch(() => {});
+          pgStore.updateAppUserRole(userId, u.role).catch(() => {});
         }
         return true;
       }
@@ -205,16 +326,70 @@ class UserRegistry {
     return false;
   }
 
-  public register(params: {
-    email: string;
-    password: string;
-    name?: string;
-    role?: UserRole;
-  }): { user: UserSession; token: string } {
-    return {
-      user: this.createUser(params),
-      token: this.generateToken(this.createUser(params)),
-    };
+  // Restore/sync accounts batch (used by Admin Sync button or file import)
+  public restoreUsersBatch(usersList: any[]): { added: number; updated: number } {
+    let added = 0;
+    let updated = 0;
+
+    for (const item of usersList) {
+      if (!item || !item.email || !item.email.includes('@')) continue;
+      const email = item.email.toLowerCase().trim();
+
+      // Don't overwrite admin's core credentials
+      if (email === ADMIN_EMAIL.toLowerCase()) continue;
+
+      const role: UserRole = item.role === 'ADMIN' ? 'ADMIN' : 'MANAGER';
+      const existing = this.users.get(email);
+
+      let salt = item.salt;
+      let passwordHash = item.passwordHash;
+
+      // If plain password provided during restore
+      if (item.password && (!passwordHash || !salt)) {
+        salt = crypto.randomBytes(16).toString('hex');
+        passwordHash = hashPassword(item.password, salt);
+      }
+
+      if (!passwordHash || !salt) continue;
+
+      const userRecord: AppUser = {
+        id: item.id || existing?.id || `usr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        email,
+        name: item.name || email.split('@')[0],
+        role,
+        passwordHash,
+        salt,
+        createdAt: item.createdAt || existing?.createdAt || new Date().toISOString(),
+      };
+
+      if (existing) {
+        this.users.set(email, userRecord);
+        updated++;
+      } else {
+        this.users.set(email, userRecord);
+        added++;
+      }
+
+      if (pgStore.isConfigured()) {
+        pgStore
+          .upsertAppUser({
+            id: userRecord.id,
+            email: userRecord.email,
+            name: userRecord.name,
+            role: userRecord.role,
+            passwordHash: userRecord.passwordHash,
+            salt: userRecord.salt,
+            createdAt: userRecord.createdAt,
+          })
+          .catch(() => {});
+      }
+    }
+
+    if (added > 0 || updated > 0) {
+      this.persist();
+    }
+
+    return { added, updated };
   }
 
   public authenticate(email: string, password: string): { user: UserSession; token: string } {

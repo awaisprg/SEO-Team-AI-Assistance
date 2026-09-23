@@ -169,6 +169,39 @@ app.delete('/api/admin/users/:id', requireAuth, requireRole(['ADMIN']), (req, re
   }
 });
 
+// Admin Export Users Manifest (Used for offline backups and Render.com persistence transfers)
+app.get('/api/admin/users/export', requireAuth, requireRole(['ADMIN']), (req, res) => {
+  try {
+    const manifest = userRegistry.getBackupManifest();
+    res.json({
+      exportedAt: new Date().toISOString(),
+      count: manifest.length,
+      users: manifest,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to export users' });
+  }
+});
+
+// Admin Sync/Restore Users Batch (Restores users from client manifest or backup file to filesystem & PostgreSQL)
+app.post('/api/admin/users/sync', requireAuth, requireRole(['ADMIN']), (req, res) => {
+  const { users } = req.body || {};
+  if (!Array.isArray(users)) {
+    return res.status(400).json({ error: 'users must be an array of user objects' });
+  }
+
+  try {
+    const result = userRegistry.restoreUsersBatch(users);
+    res.json({
+      success: true,
+      message: `Sync completed. Added ${result.added} and updated ${result.updated} user accounts.`,
+      users: userRegistry.getAllUsers(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to sync users' });
+  }
+});
+
 // Logout endpoint
 app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });

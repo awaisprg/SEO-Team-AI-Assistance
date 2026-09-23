@@ -92,9 +92,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <div className="bg-[#120E2E]/90 backdrop-blur-xl py-8 px-6 shadow-2xl border border-slate-800/80 rounded-2xl sm:px-10">
           <div className="mb-6 pb-4 border-b border-slate-800/60">
-            <h2 className="text-base font-semibold text-white">Account Sign In</h2>
+            <h2 className="text-base font-semibold text-white">Authorized Account Sign In</h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Enter your authorized credentials to access the workspace
+              Sign in with credentials provisioned by your Administrator
             </p>
           </div>
 
@@ -125,7 +125,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@company.com"
+                  placeholder="manager@company.com"
                   className="block w-full pl-9.5 pr-3 py-2.5 text-sm bg-[#09061A]/80 border border-slate-700/80 rounded-lg text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-[#7C52F5] focus:border-[#7C52F5] transition-all"
                 />
               </div>
@@ -148,7 +148,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder="Enter your account password"
                   className="block w-full pl-9.5 pr-10 py-2.5 text-sm bg-[#09061A]/80 border border-slate-700/80 rounded-lg text-white placeholder-slate-500 focus:outline-hidden focus:ring-2 focus:ring-[#7C52F5] focus:border-[#7C52F5] transition-all"
                 />
                 <button
@@ -170,7 +170,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
                 disabled={loading}
                 className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-[#7C52F5] to-[#683EE6] hover:from-[#6D42E6] hover:to-[#572FD6] active:from-[#572FD6] active:to-[#461EC6] focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-[#7C52F5] disabled:opacity-50 transition-all shadow-md shadow-[#7C52F5]/25 cursor-pointer"
               >
-                <span>{loading ? 'Authenticating...' : 'Sign In'}</span>
+                <span>{loading ? 'Verifying Credentials...' : 'Sign In'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -183,7 +183,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
               <span>Restricted Agency Portal</span>
             </div>
             <p className="mt-1 text-[11px] text-slate-500">
-              Access is provisioned exclusively by the agency administrator.
+              Public sign-up is disabled. Only credentials created by the Administrator can access this system.
             </p>
           </div>
         </div>
