@@ -404,43 +404,31 @@ export const ChatView: React.FC<ChatViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full text-left">
                 {[
                   {
-                    category: 'Client Pipeline',
-                    badge: 'On Hold',
                     title: 'On Hold Clients & Reasons',
                     prompt: 'Which clients are currently on hold and why?',
                     desc: 'Review accounts awaiting feedback, onboarding, or client input',
                   },
                   {
-                    category: 'Task Delivery',
-                    badge: 'Active Work',
                     title: 'Active Workstreams & QA',
                     prompt: 'What tasks is the team actively working on right now?',
                     desc: 'Current in-progress cards and deliverables across all boards',
                   },
                   {
-                    category: 'Agency Accounts',
-                    badge: 'PDS vs GFM',
                     title: 'PDS & GFM Distribution',
                     prompt: 'Break down active clients between PDS and GFM',
                     desc: 'Portfolio balance and active work distribution across agencies',
                   },
                   {
-                    category: 'AI Initiatives',
-                    badge: 'AI Overviews',
                     title: 'AI Overviews & GEO',
                     prompt: 'What are we doing with AI Overviews and GEO?',
                     desc: 'Generative search optimization, research & team experiments',
                   },
                   {
-                    category: 'Team Capacity',
-                    badge: 'Capacity',
                     title: 'Team Workload & Capacity',
                     prompt: 'Which team members have the heaviest active workload?',
                     desc: 'Workload distribution, card assignments, and bandwidth',
                   },
                   {
-                    category: 'Leadership',
-                    badge: 'Executive',
                     title: 'Senior Management Brief',
                     prompt: 'What can I tell senior management about our progress?',
                     desc: 'Executive summaries, completed milestones & team highlights',
@@ -450,25 +438,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     key={idx}
                     id={`empty-prompt-btn-${idx}`}
                     onClick={() => onSendMessage(item.prompt)}
-                    className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-[#7C52F5] hover:bg-violet-50/30 text-left transition-all cursor-pointer group shadow-2xs hover:shadow-xs flex flex-col justify-between"
+                    className="p-4 rounded-xl border border-slate-200 bg-white hover:border-[#7C52F5] hover:bg-violet-50/30 text-left transition-all cursor-pointer group shadow-2xs hover:shadow-xs flex flex-col justify-between"
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-violet-50 text-violet-700 border border-violet-100 uppercase">
-                          {item.badge}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          {item.category}
-                        </span>
-                      </div>
-                      <span className="text-xs font-bold text-slate-800 group-hover:text-[#7C52F5] block mb-1">
+                      <span className="text-xs font-bold text-slate-800 group-hover:text-[#7C52F5] block mb-1.5">
                         {item.title}
                       </span>
-                      <span className="text-[11px] text-slate-500 block line-clamp-2">
+                      <span className="text-[11px] text-slate-500 block line-clamp-2 leading-relaxed">
                         {item.desc}
                       </span>
                     </div>
-                    <div className="mt-3 flex items-center text-[11px] font-semibold text-[#7C52F5]">
+                    <div className="mt-3.5 flex items-center text-[11px] font-semibold text-[#7C52F5]">
                       <span>Query Insight</span>
                       <ArrowRight className="w-3 h-3 ml-1 group-hover:translate-x-0.5 transition-transform" />
                     </div>
