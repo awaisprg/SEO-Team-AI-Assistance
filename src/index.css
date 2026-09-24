@@ -23,20 +23,434 @@
   --color-goldflex-gold: #F59E0B;
   --color-goldflex-emerald: #10B981;
   --color-goldflex-crimson: #EF4444;
-  --color-goldflex-cyan: #06B6D4;
+  --color-goldflex-cyan: #00D1C7;
 }
 
+/* =========================================================================
+   THEME 1: GFM Royal Violet (Default Glossy / Glassmorphism)
+   ========================================================================= */
+:root,
+[data-theme="gfm-purple"] {
+  --theme-primary: #7C52F5;
+  --theme-primary-hover: #683EE6;
+  --theme-primary-active: #572FD6;
+  --theme-primary-gradient: linear-gradient(135deg, #7C52F5 0%, #683EE6 100%);
+  --theme-accent-glow: rgba(124, 82, 245, 0.28);
+  --theme-border-tint: rgba(198, 193, 243, 0.75);
+  --theme-border-hover: rgba(124, 82, 245, 0.45);
+  --theme-surface-glass: rgba(255, 255, 255, 0.90);
+  --theme-surface-glass-strong: rgba(255, 255, 255, 0.96);
+  --theme-header-bg: rgba(255, 255, 255, 0.88);
+  --theme-header-border: rgba(226, 232, 240, 0.85);
+  --theme-active-tab-text: #7C52F5;
+  --theme-focus-ring: #7C52F5;
+  --theme-brand-accent: #A78AFD;
+}
+
+[data-theme="gfm-purple"] body,
 body {
   font-family: var(--font-sans);
-  color: #1A1A1E;
-  background-color: #F8F9FC;
+  color: #151722;
+  background-color: #F8FAFD;
   background-image: 
-    radial-gradient(at 0% 0%, rgba(124, 82, 245, 0.03) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(42, 28, 148, 0.02) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(124, 82, 245, 0.02) 0px, transparent 50%);
+    radial-gradient(ellipse 70% 45% at 20% -8%, rgba(124, 82, 245, 0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 55% 40% at 85% -5%, rgba(167, 138, 253, 0.09) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 50% 105%, rgba(42, 28, 148, 0.05) 0%, transparent 70%),
+    radial-gradient(circle at 1px 1px, rgba(124, 82, 245, 0.065) 1px, transparent 0);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 28px 28px;
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* =========================================================================
+   THEME 2: PDS Oceanic Teal (Physicians Digital Services - Glossy Cyan Glaze)
+   ========================================================================= */
+[data-theme="pds-teal"] {
+  --theme-primary: #00B8AE;
+  --theme-primary-hover: #009E96;
+  --theme-primary-active: #00847E;
+  --theme-primary-gradient: linear-gradient(135deg, #00E5D9 0%, #00B8AE 50%, #00847E 100%);
+  --theme-accent-glow: rgba(0, 209, 199, 0.34);
+  --theme-border-tint: rgba(0, 209, 199, 0.38);
+  --theme-border-hover: rgba(0, 209, 199, 0.85);
+  --theme-surface-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.68) 100%);
+  --theme-surface-glass-strong: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.88) 100%);
+  --theme-header-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(235, 251, 249, 0.86) 100%);
+  --theme-header-border: rgba(0, 209, 199, 0.32);
+  --theme-active-tab-text: #009E96;
+  --theme-focus-ring: #00B8AE;
+  --theme-brand-accent: #00D1C7;
+}
+
+[data-theme="pds-teal"] body {
+  background-color: #E2F8F5;
+  background-image: 
+    radial-gradient(circle at 10% 10%, rgba(0, 209, 199, 0.28) 0%, transparent 45%),
+    radial-gradient(circle at 90% 15%, rgba(0, 184, 174, 0.24) 0%, transparent 45%),
+    radial-gradient(circle at 50% 90%, rgba(19, 52, 71, 0.16) 0%, transparent 55%),
+    linear-gradient(145deg, #E8FBF8 0%, #D4F7F4 35%, #EFF9FA 70%, #DAF3F0 100%);
+  background-size: 100% 100%;
+  background-attachment: fixed;
+}
+
+/* =========================================================================
+   THEME 3: GFM Amber Gold (Gold Flex Marketing - Glossy Sunlit Honey Amber)
+   ========================================================================= */
+[data-theme="gfm-gold"] {
+  --theme-primary: #D97706;
+  --theme-primary-hover: #B45309;
+  --theme-primary-active: #92400E;
+  --theme-primary-gradient: linear-gradient(135deg, #FFBE00 0%, #F59E0B 50%, #D97706 100%);
+  --theme-accent-glow: rgba(245, 158, 11, 0.32);
+  --theme-border-tint: rgba(245, 158, 11, 0.42);
+  --theme-border-hover: rgba(217, 119, 6, 0.85);
+  --theme-surface-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.68) 100%);
+  --theme-surface-glass-strong: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.88) 100%);
+  --theme-header-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 249, 235, 0.86) 100%);
+  --theme-header-border: rgba(255, 190, 0, 0.38);
+  --theme-active-tab-text: #D97706;
+  --theme-focus-ring: #D97706;
+  --theme-brand-accent: #FFBE00;
+}
+
+[data-theme="gfm-gold"] body {
+  background-color: #FDF3D8;
+  background-image: 
+    radial-gradient(circle at 10% 10%, rgba(255, 190, 0, 0.30) 0%, transparent 45%),
+    radial-gradient(circle at 90% 15%, rgba(245, 158, 11, 0.24) 0%, transparent 45%),
+    radial-gradient(circle at 50% 90%, rgba(180, 83, 9, 0.15) 0%, transparent 55%),
+    linear-gradient(145deg, #FEF7E5 0%, #FDEFC9 35%, #FFF9EB 70%, #FDE8BC 100%);
+  background-size: 100% 100%;
+  background-attachment: fixed;
+}
+
+/* =========================================================================
+   THEME 4: Cobalt Electric (Glossy Sapphire & Deep Azure Glaze)
+   ========================================================================= */
+[data-theme="cobalt-blue"] {
+  --theme-primary: #2563EB;
+  --theme-primary-hover: #1D4ED8;
+  --theme-primary-active: #1E40AF;
+  --theme-primary-gradient: linear-gradient(135deg, #3B82F6 0%, #2563EB 50%, #1D4ED8 100%);
+  --theme-accent-glow: rgba(37, 99, 235, 0.34);
+  --theme-border-tint: rgba(37, 99, 235, 0.38);
+  --theme-border-hover: rgba(37, 99, 235, 0.85);
+  --theme-surface-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.68) 100%);
+  --theme-surface-glass-strong: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.88) 100%);
+  --theme-header-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(239, 246, 255, 0.86) 100%);
+  --theme-header-border: rgba(37, 99, 235, 0.32);
+  --theme-active-tab-text: #2563EB;
+  --theme-focus-ring: #2563EB;
+  --theme-brand-accent: #60A5FA;
+}
+
+[data-theme="cobalt-blue"] body {
+  background-color: #E2ECFE;
+  background-image: 
+    radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.28) 0%, transparent 45%),
+    radial-gradient(circle at 90% 15%, rgba(59, 130, 246, 0.24) 0%, transparent 45%),
+    radial-gradient(circle at 50% 90%, rgba(29, 78, 216, 0.16) 0%, transparent 55%),
+    linear-gradient(145deg, #EFF4FE 0%, #DFEBFE 35%, #F2F7FE 70%, #D8E7FD 100%);
+  background-size: 100% 100%;
+  background-attachment: fixed;
+}
+
+/* =========================================================================
+   THEME 5: Emerald Luxe (Glossy Jade & Mint Crystal Glass)
+   ========================================================================= */
+[data-theme="emerald-luxe"] {
+  --theme-primary: #059669;
+  --theme-primary-hover: #047857;
+  --theme-primary-active: #065F46;
+  --theme-primary-gradient: linear-gradient(135deg, #34D399 0%, #059669 50%, #047857 100%);
+  --theme-accent-glow: rgba(5, 150, 105, 0.34);
+  --theme-border-tint: rgba(5, 150, 105, 0.38);
+  --theme-border-hover: rgba(5, 150, 105, 0.85);
+  --theme-surface-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.68) 100%);
+  --theme-surface-glass-strong: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.88) 100%);
+  --theme-header-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(236, 253, 245, 0.86) 100%);
+  --theme-header-border: rgba(5, 150, 105, 0.32);
+  --theme-active-tab-text: #059669;
+  --theme-focus-ring: #059669;
+  --theme-brand-accent: #10B981;
+}
+
+[data-theme="emerald-luxe"] body {
+  background-color: #DCF4E7;
+  background-image: 
+    radial-gradient(circle at 10% 10%, rgba(5, 150, 105, 0.28) 0%, transparent 45%),
+    radial-gradient(circle at 90% 15%, rgba(16, 185, 129, 0.24) 0%, transparent 45%),
+    radial-gradient(circle at 50% 90%, rgba(4, 120, 87, 0.16) 0%, transparent 55%),
+    linear-gradient(145deg, #E7F9F1 0%, #D3F5E6 35%, #F0FBF6 70%, #C8EFE1 100%);
+  background-size: 100% 100%;
+  background-attachment: fixed;
+}
+
+/* =========================================================================
+   THEME 6: Rose Quartz (Glossy Raspberry Amethyst & Coral Glow)
+   ========================================================================= */
+[data-theme="rose-quartz"] {
+  --theme-primary: #E11D48;
+  --theme-primary-hover: #BE123C;
+  --theme-primary-active: #9F1239;
+  --theme-primary-gradient: linear-gradient(135deg, #FB7185 0%, #E11D48 50%, #BE123C 100%);
+  --theme-accent-glow: rgba(225, 29, 72, 0.34);
+  --theme-border-tint: rgba(225, 29, 72, 0.38);
+  --theme-border-hover: rgba(225, 29, 72, 0.85);
+  --theme-surface-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.68) 100%);
+  --theme-surface-glass-strong: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.88) 100%);
+  --theme-header-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 241, 242, 0.86) 100%);
+  --theme-header-border: rgba(225, 29, 72, 0.32);
+  --theme-active-tab-text: #E11D48;
+  --theme-focus-ring: #E11D48;
+  --theme-brand-accent: #FB7185;
+}
+
+[data-theme="rose-quartz"] body {
+  background-color: #FCE1EE;
+  background-image: 
+    radial-gradient(circle at 10% 10%, rgba(225, 29, 72, 0.28) 0%, transparent 45%),
+    radial-gradient(circle at 90% 15%, rgba(244, 63, 94, 0.24) 0%, transparent 45%),
+    radial-gradient(circle at 50% 90%, rgba(190, 18, 60, 0.16) 0%, transparent 55%),
+    linear-gradient(145deg, #FEF2F7 0%, #FCE0EF 35%, #FFF1F7 70%, #F8D3E6 100%);
+  background-size: 100% 100%;
+  background-attachment: fixed;
+}
+
+/* =========================================================================
+   THEME 7: Obsidian Midnight (Dark Edition - The 1 Dark Mode Option)
+   ========================================================================= */
+[data-theme="midnight-dark"],
+html.dark {
+  --theme-primary: #8963FB;
+  --theme-primary-hover: #7C52F5;
+  --theme-primary-active: #683EE6;
+  --theme-primary-gradient: linear-gradient(135deg, #A78AFD 0%, #8963FB 50%, #00D1C7 100%);
+  --theme-accent-glow: rgba(137, 99, 251, 0.42);
+  --theme-border-tint: rgba(137, 99, 251, 0.32);
+  --theme-border-hover: rgba(137, 99, 251, 0.75);
+  --theme-surface-glass: linear-gradient(135deg, rgba(22, 19, 44, 0.88) 0%, rgba(14, 12, 28, 0.72) 100%);
+  --theme-surface-glass-strong: linear-gradient(135deg, rgba(28, 24, 56, 0.94) 0%, rgba(18, 15, 36, 0.88) 100%);
+  --theme-header-bg: linear-gradient(180deg, rgba(16, 14, 32, 0.94) 0%, rgba(10, 8, 22, 0.88) 100%);
+  --theme-header-border: rgba(137, 99, 251, 0.30);
+  --theme-active-tab-text: #A78AFD;
+  --theme-focus-ring: #8963FB;
+  --theme-brand-accent: #00D1C7;
+}
+
+[data-theme="midnight-dark"] body {
+  color: #E2E8F0;
+  background-color: #080612;
+  background-image: 
+    radial-gradient(circle at 15% 10%, rgba(137, 99, 251, 0.30) 0%, transparent 50%),
+    radial-gradient(circle at 85% 15%, rgba(0, 209, 199, 0.22) 0%, transparent 50%),
+    radial-gradient(circle at 50% 95%, rgba(42, 28, 148, 0.38) 0%, transparent 60%),
+    linear-gradient(145deg, #090714 0%, #0D0A20 40%, #120E2C 75%, #080612 100%);
+  background-size: 100% 100%;
+  background-attachment: fixed;
+}
+
+/* =========================================================================
+   Universal Glass Cards & Containers
+   ========================================================================= */
+.glass-card {
+  background: var(--theme-surface-glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--theme-border-tint);
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.03), 0 4px 16px -2px var(--theme-accent-glow);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card-hover {
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card-hover:hover {
+  transform: translateY(-1px);
+  border-color: var(--theme-border-hover);
+  box-shadow: 0 4px 14px -2px var(--theme-accent-glow), 0 12px 24px -4px rgba(15, 23, 42, 0.06);
+}
+
+.glass-view-container {
+  background: var(--theme-surface-glass);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--theme-border-tint);
+  border-radius: 1rem;
+  box-shadow: 
+    0 1px 2px 0 rgba(15, 23, 42, 0.02),
+    0 8px 24px -4px var(--theme-accent-glow);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease;
+}
+
+.glass-view-container:hover {
+  transform: translateY(-2px);
+  border-color: var(--theme-border-hover);
+  box-shadow: 
+    0 4px 12px -2px rgba(15, 23, 42, 0.03),
+    0 20px 38px -6px var(--theme-accent-glow);
+}
+
+/* Header theme response */
+#app-header {
+  background: var(--theme-header-bg) !important;
+  border-bottom-color: var(--theme-header-border) !important;
+}
+
+/* Themed Sync & Primary Action Buttons */
+.theme-action-primary {
+  background: var(--theme-primary-gradient) !important;
+  box-shadow: 0 2px 10px -1px var(--theme-accent-glow) !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.theme-action-primary:hover {
+  filter: brightness(1.06);
+  transform: translateY(-0.5px);
+  box-shadow: 0 4px 16px -1px var(--theme-accent-glow) !important;
+}
+
+.theme-action-primary:active {
+  filter: brightness(0.96);
+  transform: translateY(0);
+}
+
+/* Subtle theme glows */
+.ambient-glow-theme {
+  box-shadow: 0 0 40px -10px var(--theme-accent-glow);
+}
+
+/* Dark mode specific enhancements */
+[data-theme="midnight-dark"] .glass-card,
+[data-theme="midnight-dark"] .glass-view-container {
+  box-shadow: 
+    0 1px 2px 0 rgba(0, 0, 0, 0.4),
+    0 12px 32px -4px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="midnight-dark"] .text-slate-900 {
+  color: #F8FAFC !important;
+}
+
+[data-theme="midnight-dark"] .text-slate-800 {
+  color: #F1F5F9 !important;
+}
+
+[data-theme="midnight-dark"] .text-slate-700 {
+  color: #CBD5E1 !important;
+}
+
+[data-theme="midnight-dark"] .text-slate-600 {
+  color: #94A3B8 !important;
+}
+
+[data-theme="midnight-dark"] .text-slate-500 {
+  color: #8392A5 !important;
+}
+
+[data-theme="midnight-dark"] .bg-white {
+  background-color: rgba(22, 19, 44, 0.85) !important;
+}
+
+[data-theme="midnight-dark"] .bg-slate-50 {
+  background-color: rgba(30, 26, 56, 0.75) !important;
+}
+
+[data-theme="midnight-dark"] .bg-slate-100 {
+  background-color: rgba(36, 31, 68, 0.85) !important;
+}
+
+[data-theme="midnight-dark"] .border-slate-200,
+[data-theme="midnight-dark"] .border-slate-200\/70,
+[data-theme="midnight-dark"] .border-slate-200\/80,
+[data-theme="midnight-dark"] .border-slate-200\/90 {
+  border-color: rgba(137, 99, 251, 0.22) !important;
+}
+
+[data-theme="midnight-dark"] .border-slate-100 {
+  border-color: rgba(137, 99, 251, 0.16) !important;
+}
+
+/* KPI Card Sync Pulse Animations */
+@keyframes kpi-pulse-glow {
+  0% {
+    box-shadow: 0 0 0 0 var(--theme-accent-glow), 0 1px 3px 0 rgba(15, 23, 42, 0.03);
+    border-color: var(--theme-primary);
+  }
+  35% {
+    box-shadow: 0 0 22px 2px var(--theme-accent-glow), 0 6px 20px -2px var(--theme-accent-glow);
+    border-color: var(--theme-primary);
+    transform: translateY(-2.5px);
+  }
+  70% {
+    box-shadow: 0 0 14px 1px var(--theme-accent-glow);
+    border-color: var(--theme-border-hover);
+    transform: translateY(-1px);
+  }
+  100% {
+    box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.03), 0 4px 16px -2px var(--theme-accent-glow);
+    border-color: var(--theme-border-tint);
+    transform: translateY(0);
+  }
+}
+
+@keyframes kpi-sync-sheen {
+  0% {
+    transform: translateX(-120%) skewX(-20deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.75;
+  }
+  60% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateX(240%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
+@keyframes kpi-number-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.14);
+    color: var(--theme-primary);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.kpi-pulse-sync {
+  animation: kpi-pulse-glow 1.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.kpi-sync-sheen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--theme-accent-glow) 25%,
+    rgba(255, 255, 255, 0.85) 50%,
+    var(--theme-accent-glow) 75%,
+    transparent 100%
+  );
+  pointer-events: none;
+  animation: kpi-sync-sheen 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.kpi-number-pop {
+  animation: kpi-number-pop 1.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 /* Custom subtle scrollbar */
@@ -58,9 +472,62 @@ body {
   background: #A8AAB8;
 }
 
+[data-theme="midnight-dark"] ::-webkit-scrollbar-thumb {
+  background: #332D58;
+}
+
+[data-theme="midnight-dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #504884;
+}
+
 /* Smooth tab and button focus rings */
 button:focus-visible, a:focus-visible, input:focus-visible {
-  outline: 2px solid #7C52F5;
+  outline: 2px solid var(--theme-focus-ring);
   outline-offset: 2px;
 }
 
+/* Premium Shimmer Skeleton Loading */
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer-box {
+  position: relative;
+  overflow: hidden;
+  background-color: #F1F5F9;
+}
+
+[data-theme="midnight-dark"] .shimmer-box {
+  background-color: #1E1A38;
+}
+
+.shimmer-box::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.7) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer-sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  content: '';
+}
+
+[data-theme="midnight-dark"] .shimmer-box::after {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(137, 99, 251, 0.2) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}

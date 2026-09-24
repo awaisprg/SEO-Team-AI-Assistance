@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   MessageSquareText,
   FileText,
@@ -9,6 +9,7 @@ import {
   RefreshCw,
   AlertCircle,
   ShieldAlert,
+  ShieldCheck,
 } from 'lucide-react';
 import { Header } from './components/Header';
 import { MetricsBar } from './components/MetricsBar';
@@ -16,6 +17,12 @@ import { ChatView } from './components/ChatView';
 import { BriefView } from './components/BriefView';
 import { ClientsView } from './components/ClientsView';
 import { TeamView } from './components/TeamView';
+import {
+  ChatViewSkeleton,
+  BriefViewSkeleton,
+  ClientsViewSkeleton,
+  TeamViewSkeleton,
+} from './components/TabSkeletons';
 import { TrelloSettingsModal } from './components/TrelloSettingsModal';
 import { SourceCardModal } from './components/SourceCardModal';
 import { AuthScreen } from './components/AuthScreen';
@@ -64,13 +71,39 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<ChatSource | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isTabTransitioning, setIsTabTransitioning] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(false);
 
   const syncPollInterval = useRef<any>(null);
+  const tabTransitionTimerRef = useRef<any>(null);
+  const currentSessionIdRef = useRef<string | null>(null);
+  currentSessionIdRef.current = currentSessionId;
+  const chatSessionsRef = useRef<ChatSession[]>([]);
+  chatSessionsRef.current = chatSessions;
+  const userRef = useRef<UserSession | null>(null);
+  userRef.current = user;
+  const connectionRef = useRef<TrelloConnectionStatus | null>(null);
+  connectionRef.current = connection;
+  const isSyncingRef = useRef(false);
+  isSyncingRef.current = isSyncing;
 
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4500);
   };
+
+  // Tab change with smooth shimmer/skeleton transition
+  const handleTabChange = useCallback((newTab: 'chat' | 'brief' | 'clients' | 'team') => {
+    if (newTab === activeTab) return;
+    if (tabTransitionTimerRef.current) {
+      clearTimeout(tabTransitionTimerRef.current);
+    }
+    setActiveTab(newTab);
+    setIsTabTransitioning(true);
+    tabTransitionTimerRef.current = setTimeout(() => {
+      setIsTabTransitioning(false);
+    }, 220);
+  }, [activeTab]);
 
   // Check auth session
   const checkAuthAndLoad = async () => {
@@ -79,7 +112,9 @@ export default function App() {
     const session = await getCurrentUserSession();
     if (session) {
       setUser(session);
+      setIsDataLoading(true);
       await refreshAllData();
+      setIsDataLoading(false);
     } else {
       setUser(null);
     }
@@ -92,6 +127,9 @@ export default function App() {
     return () => {
       if (syncPollInterval.current) {
         clearInterval(syncPollInterval.current);
+      }
+      if (tabTransitionTimerRef.current) {
+        clearTimeout(tabTransitionTimerRef.current);
       }
     };
   }, []);
@@ -132,7 +170,7 @@ export default function App() {
   };
 
   // Sign out handler
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     const sb = getSupabaseBrowserClient();
     if (sb) {
       await sb.auth.signOut().catch(() => {});
@@ -145,10 +183,10 @@ export default function App() {
     setConnection(null);
     setMessages([]);
     showNotification('success', 'You have been signed out.');
-  };
+  }, []);
 
   // Send Chat Message
-  const handleSendMessage = async (question: string) => {
+  const handleSendMessage = useCallback(async (question: string) => {
     setIsLoadingChat(true);
     const tempUserMsg: ChatMessage = {
       id: `usr_${Date.now()}`,
@@ -163,7 +201,7 @@ export default function App() {
       const res = await fetchWithAuth('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, sessionId: currentSessionId }),
+        body: JSON.stringify({ question, sessionId: currentSessionIdRef.current }),
       });
 
       if (!res.ok) {
@@ -197,44 +235,41 @@ export default function App() {
     } finally {
       setIsLoadingChat(false);
     }
-  };
+  }, []);
 
   // Select a session from history
-  const handleSelectSession = (sessionId: string) => {
-    const session = chatSessions.find((s) => s.id === sessionId);
+  const handleSelectSession = useCallback((sessionId: string) => {
+    const session = chatSessionsRef.current.find((s) => s.id === sessionId);
     if (session) {
       setCurrentSessionId(session.id);
       setMessages(session.messages || []);
       setActiveTab('chat');
     }
-  };
+  }, []);
 
   // Start a fresh intelligence query
-  const handleNewSession = () => {
+  const handleNewSession = useCallback(() => {
     setCurrentSessionId(null);
     setMessages([]);
     setActiveTab('chat');
-  };
+  }, []);
 
   // Delete a session from history archive
-  const handleDeleteSession = async (sessionId: string) => {
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
     try {
       const res = await fetchWithAuth(`/api/chat/sessions/${sessionId}`, { method: 'DELETE' });
       if (res.ok) {
         setChatSessions((prev) => prev.filter((s) => s.id !== sessionId));
-        if (currentSessionId === sessionId) {
-          setCurrentSessionId(null);
-          setMessages([]);
-        }
+        setCurrentSessionId((prev) => (prev === sessionId ? null : prev));
         showNotification('success', 'Query removed from archive.');
       }
     } catch (err) {
       showNotification('error', 'Failed to remove query session.');
     }
-  };
+  }, []);
 
   // Generate Executive Brief
-  const handleGenerateBrief = async (
+  const handleGenerateBrief = useCallback(async (
     periodType: 'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'custom',
     dateFrom?: string,
     dateTo?: string
@@ -262,10 +297,10 @@ export default function App() {
     } finally {
       setIsGeneratingBrief(false);
     }
-  };
+  }, []);
 
   // Delete Individual Management Brief
-  const handleDeleteBrief = async (briefId: string) => {
+  const handleDeleteBrief = useCallback(async (briefId: string) => {
     try {
       const res = await fetchWithAuth(`/api/management-briefs/${briefId}`, {
         method: 'DELETE',
@@ -275,17 +310,15 @@ export default function App() {
         throw new Error(errData.error || 'Failed to delete brief');
       }
       setSavedBriefs((prev) => prev.filter((b) => b.id !== briefId));
-      if (currentBrief?.id === briefId) {
-        setCurrentBrief(null);
-      }
+      setCurrentBrief((prev) => (prev?.id === briefId ? null : prev));
       showNotification('success', 'Executive brief removed from archive.');
     } catch (err: any) {
       showNotification('error', err.message || 'Failed to delete brief');
     }
-  };
+  }, []);
 
   // Clear All Archived Management Briefs
-  const handleClearBriefs = async () => {
+  const handleClearBriefs = useCallback(async () => {
     try {
       const res = await fetchWithAuth('/api/management-briefs', {
         method: 'DELETE',
@@ -300,16 +333,16 @@ export default function App() {
     } catch (err: any) {
       showNotification('error', err.message || 'Failed to clear briefs');
     }
-  };
+  }, []);
 
   // Asynchronous Job-Based Trello Synchronization with Polling (Admin & Manager)
-  const handleSync = async () => {
-    if (user?.role !== 'ADMIN' && user?.role !== 'MANAGER') {
+  const handleSync = useCallback(async () => {
+    if (userRef.current?.role !== 'ADMIN' && userRef.current?.role !== 'MANAGER') {
       showNotification('error', 'Only Administrators and Managers can trigger synchronizations.');
       return;
     }
 
-    if (isSyncing) return;
+    if (isSyncingRef.current) return;
 
     setIsSyncing(true);
     setSyncPhase('Initiating background sync...');
@@ -318,7 +351,7 @@ export default function App() {
       const res = await fetchWithAuth('/api/trello/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ boardId: connection?.boardId }),
+        body: JSON.stringify({ boardId: connectionRef.current?.boardId }),
       });
 
       const data = await res.json();
@@ -371,11 +404,11 @@ export default function App() {
       setSyncPhase(undefined);
       showNotification('error', err.message || 'Trello synchronization failed');
     }
-  };
+  }, []);
 
   // Reset Demo Data
-  const handleSeedDemo = async () => {
-    if (user?.role !== 'ADMIN') {
+  const handleSeedDemo = useCallback(async () => {
+    if (userRef.current?.role !== 'ADMIN') {
       showNotification('error', 'Only Administrators can reset database records.');
       return;
     }
@@ -388,10 +421,10 @@ export default function App() {
     } catch (err: any) {
       showNotification('error', err.message || 'Failed to reset demo');
     }
-  };
+  }, []);
 
   // Save Trello Active Board (Zero secrets sent)
-  const handleSaveBoard = async (boardId: string, boardName?: string): Promise<boolean> => {
+  const handleSaveBoard = useCallback(async (boardId: string, boardName?: string): Promise<boolean> => {
     try {
       const res = await fetchWithAuth('/api/trello/connect', {
         method: 'POST',
@@ -411,10 +444,10 @@ export default function App() {
       showNotification('error', err.message || 'Failed to connect board');
       return false;
     }
-  };
+  }, []);
 
   // Add Client Alias
-  const handleAddAlias = async (clientId: string, alias: string) => {
+  const handleAddAlias = useCallback(async (clientId: string, alias: string) => {
     try {
       const res = await fetchWithAuth(`/api/clients/${clientId}/aliases`, {
         method: 'POST',
@@ -428,10 +461,10 @@ export default function App() {
     } catch (err) {
       showNotification('error', 'Failed to add client alias');
     }
-  };
+  }, []);
 
   // Update List Semantics
-  const handleUpdateListSemantics = async (
+  const handleUpdateListSemantics = useCallback(async (
     listId: string,
     semanticType: any,
     mappedStatus?: any,
@@ -450,13 +483,42 @@ export default function App() {
     } catch (err) {
       showNotification('error', 'Failed to update list semantics');
     }
-  };
+  }, []);
 
   // Helper when clicking a KPI or chip to ask Assistant
-  const handleSelectFilter = (prompt: string) => {
-    setActiveTab('chat');
+  const handleSelectFilter = useCallback((prompt: string) => {
+    handleTabChange('chat');
     handleSendMessage(prompt);
-  };
+  }, [handleTabChange, handleSendMessage]);
+
+  const handleAskAboutClient = useCallback((name: string) => {
+    handleTabChange('chat');
+    handleSendMessage(`Give me a detailed workstream update for client ${name}`);
+  }, [handleTabChange, handleSendMessage]);
+
+  const handleAskAboutMember = useCallback((name: string) => {
+    handleTabChange('chat');
+    handleSendMessage(`What is ${name} currently working on and what was recently completed?`);
+  }, [handleTabChange, handleSendMessage]);
+
+  const handleSelectCard = useCallback((card: { id: string; name: string; url: string; status: any; listName: string }) => {
+    setSelectedSource({
+      cardId: card.id,
+      title: card.name,
+      url: card.url,
+      relevance: 100,
+      reason: 'Inspected from Team Overview',
+      date: new Date().toISOString(),
+      status: card.status,
+      listName: card.listName,
+    });
+  }, []);
+
+  const handleOpenSettings = useCallback(() => {
+    if (userRef.current?.role === 'ADMIN') {
+      setIsSettingsOpen(true);
+    }
+  }, []);
 
   if (isCheckingAuth) {
     return (
@@ -475,7 +537,17 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F8FC] text-[#27272B] flex flex-col font-sans selection:bg-[#8963FB]/20 selection:text-[#2F20A2]">
+    <div className="min-h-screen text-slate-900 flex flex-col font-sans selection:bg-[#7C52F5]/20 selection:text-[#2A1C94] relative">
+      {/* Top GoldFlex Brand Accent Bar */}
+      <div className="h-[2.5px] w-full bg-gradient-to-r from-[#7C52F5] via-amber-400 to-[#6366F1] shrink-0 sticky top-0 z-50 shadow-xs" />
+
+      {/* Atmospheric ambient glow effects */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
+        <div className="absolute -top-24 left-[15%] w-96 h-96 bg-violet-500/10 rounded-full blur-3xl" />
+        <div className="absolute -top-20 right-[15%] w-80 h-80 bg-amber-400/8 rounded-full blur-3xl" />
+        <div className="absolute bottom-10 left-[30%] w-[32rem] h-[32rem] bg-indigo-500/5 rounded-full blur-3xl" />
+      </div>
+
       {/* Top Header */}
       <Header
         connection={connection}
@@ -483,9 +555,7 @@ export default function App() {
         onSignOut={handleSignOut}
         onSync={handleSync}
         onSeedDemo={handleSeedDemo}
-        onOpenSettings={() => {
-          if (user?.role === 'ADMIN') setIsSettingsOpen(true);
-        }}
+        onOpenSettings={handleOpenSettings}
         isSyncing={isSyncing}
         syncPhase={syncPhase}
       />
@@ -507,170 +577,223 @@ export default function App() {
       )}
 
       {/* Main Container */}
-      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col">
+      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col relative z-10">
         {/* KPI Strip */}
-        <MetricsBar metrics={metrics} onSelectFilter={handleSelectFilter} />
+        <MetricsBar
+          metrics={metrics}
+          onSelectFilter={handleSelectFilter}
+          isSyncing={isSyncing}
+          lastSyncedAt={connection?.lastSync}
+        />
 
         {/* View Navigation Tabs & Live Engine Status */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-          <nav className="inline-flex p-1 rounded-xl bg-slate-200/60 border border-slate-200/80 shadow-2xs gap-1 overflow-x-auto max-w-full">
+          <nav
+            aria-label="Workspace views"
+            className="inline-flex items-center p-1 rounded-xl glass-card gap-1 overflow-x-auto max-w-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          >
+            {/* Tab: Management Assistant */}
             <button
               id="tab-chat-btn"
-              onClick={() => setActiveTab('chat')}
-              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              type="button"
+              onClick={() => handleTabChange('chat')}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 group select-none active:scale-[0.98] ${
                 activeTab === 'chat'
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/70'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                  ? 'theme-tab-active font-semibold'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50 font-medium border border-transparent'
               }`}
             >
-              <Sparkles className={`w-3.5 h-3.5 ${activeTab === 'chat' ? 'text-[#7C52F5]' : 'text-slate-400'}`} />
-              <span>Management Assistant</span>
+              <Sparkles
+                className={`w-3.5 h-3.5 transition-colors ${
+                  activeTab === 'chat' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
+                }`}
+              />
+              <span className="tracking-tight">Management Assistant</span>
               <span
-                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
-                  activeTab === 'chat' ? 'bg-violet-50 text-violet-700 border border-violet-200/60' : 'bg-slate-200 text-slate-600'
+                className={`text-[10px] font-mono px-1.5 py-0.2 rounded transition-colors ${
+                  activeTab === 'chat'
+                    ? 'tab-badge font-semibold'
+                    : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400'
                 }`}
               >
                 AI
               </span>
             </button>
 
+            {/* Tab: Executive Briefs */}
             <button
               id="tab-brief-btn"
-              onClick={() => setActiveTab('brief')}
-              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              type="button"
+              onClick={() => handleTabChange('brief')}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 group select-none active:scale-[0.98] ${
                 activeTab === 'brief'
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/70'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                  ? 'theme-tab-active font-semibold'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50 font-medium border border-transparent'
               }`}
             >
-              <FileText className={`w-3.5 h-3.5 ${activeTab === 'brief' ? 'text-[#7C52F5]' : 'text-slate-400'}`} />
-              <span>Executive Briefs</span>
+              <FileText
+                className={`w-3.5 h-3.5 transition-colors ${
+                  activeTab === 'brief' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
+                }`}
+              />
+              <span className="tracking-tight">Executive Briefs</span>
               <span
-                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
-                  activeTab === 'brief' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-slate-200 text-slate-600'
+                className={`text-[10px] font-mono px-1.5 py-0.2 rounded transition-colors ${
+                  activeTab === 'brief'
+                    ? 'tab-badge font-semibold'
+                    : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400'
                 }`}
               >
                 PDF
               </span>
             </button>
 
+            {/* Tab: Clients & Initiatives */}
             <button
               id="tab-clients-btn"
-              onClick={() => setActiveTab('clients')}
-              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              type="button"
+              onClick={() => handleTabChange('clients')}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 group select-none active:scale-[0.98] ${
                 activeTab === 'clients'
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/70'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                  ? 'theme-tab-active font-semibold'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50 font-medium border border-transparent'
               }`}
             >
-              <Building2 className={`w-3.5 h-3.5 ${activeTab === 'clients' ? 'text-[#7C52F5]' : 'text-slate-400'}`} />
-              <span>Clients & Initiatives</span>
+              <Building2
+                className={`w-3.5 h-3.5 transition-colors ${
+                  activeTab === 'clients' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
+                }`}
+              />
+              <span className="tracking-tight">Clients & Initiatives</span>
               <span
-                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
-                  activeTab === 'clients' ? 'bg-violet-50 text-violet-700 border border-violet-200/60' : 'bg-slate-200 text-slate-600'
+                className={`text-[11px] font-mono tabular-nums px-1.5 py-0.2 rounded transition-colors ${
+                  activeTab === 'clients'
+                    ? 'tab-badge font-semibold'
+                    : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400'
                 }`}
               >
                 {clients.length}
               </span>
             </button>
 
+            {/* Tab: Team Overview */}
             <button
               id="tab-team-btn"
-              onClick={() => setActiveTab('team')}
-              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              type="button"
+              onClick={() => handleTabChange('team')}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 group select-none active:scale-[0.98] ${
                 activeTab === 'team'
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/70'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                  ? 'theme-tab-active font-semibold'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50 font-medium border border-transparent'
               }`}
             >
-              <Users className={`w-3.5 h-3.5 ${activeTab === 'team' ? 'text-[#7C52F5]' : 'text-slate-400'}`} />
-              <span>Team Overview</span>
+              <Users
+                className={`w-3.5 h-3.5 transition-colors ${
+                  activeTab === 'team' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
+                }`}
+              />
+              <span className="tracking-tight">Team Overview</span>
               <span
-                className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${
-                  activeTab === 'team' ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-600'
+                className={`text-[11px] font-mono tabular-nums px-1.5 py-0.2 rounded transition-colors ${
+                  activeTab === 'team'
+                    ? 'tab-badge font-semibold'
+                    : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400'
                 }`}
               >
-                {memberOverviews.length || '3'}
+                {memberOverviews.length || 3}
               </span>
             </button>
           </nav>
 
-          {/* Right Status Indicator */}
-          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 px-3 py-1.5 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            <span className="font-semibold text-slate-800">Evidence Grounded</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-[11px] text-slate-500">639 Cards & 515 Comments Indexed</span>
+          {/* Right Status Indicator: Clean, High-Trust Intelligence Status */}
+          <div className="hidden sm:inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl glass-card shrink-0">
+            {isSyncing ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 text-[var(--theme-primary)] animate-spin shrink-0" />
+                <span className="text-xs font-medium text-slate-700 dark:text-slate-200">Syncing with Trello...</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="font-semibold text-slate-800 dark:text-slate-100 text-xs tracking-tight">Evidence Grounded</span>
+                </div>
+                <span className="text-slate-300 dark:text-slate-600 text-xs" aria-hidden="true">·</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap tabular-nums">
+                  {(metrics?.totalCards || allCards.length || 639)} cards indexed
+                </span>
+                <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800 shrink-0">
+                  Verified
+                </span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Tab Content */}
-        <div className="flex-1">
-          {activeTab === 'chat' && (
-            <ChatView
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              isLoading={isLoadingChat}
-              onSelectSource={(src) => setSelectedSource(src)}
-              sessions={chatSessions}
-              currentSessionId={currentSessionId}
-              onSelectSession={handleSelectSession}
-              onNewSession={handleNewSession}
-              onDeleteSession={handleDeleteSession}
-            />
-          )}
+        {/* Tab Content Area with Shimmer/Skeleton Loading & Fluid Transitions */}
+        <div className="flex-1 relative">
+          {isTabTransitioning || isDataLoading ? (
+            activeTab === 'chat' ? (
+              <div className="glass-view-container overflow-hidden animate-in fade-in duration-150">
+                <ChatViewSkeleton />
+              </div>
+            ) : (
+              <div className="glass-view-container p-4 sm:p-6 overflow-hidden animate-in fade-in duration-150">
+                {activeTab === 'brief' && <BriefViewSkeleton />}
+                {activeTab === 'clients' && <ClientsViewSkeleton />}
+                {activeTab === 'team' && <TeamViewSkeleton />}
+              </div>
+            )
+          ) : (
+            <>
+              <div className={activeTab === 'chat' ? 'glass-view-container overflow-hidden animate-in fade-in duration-200' : 'hidden'}>
+                <ChatView
+                  messages={messages}
+                  onSendMessage={handleSendMessage}
+                  isLoading={isLoadingChat}
+                  onSelectSource={setSelectedSource}
+                  sessions={chatSessions}
+                  currentSessionId={currentSessionId}
+                  onSelectSession={handleSelectSession}
+                  onNewSession={handleNewSession}
+                  onDeleteSession={handleDeleteSession}
+                />
+              </div>
 
-          {activeTab === 'brief' && (
-            <BriefView
-              currentBrief={currentBrief}
-              savedBriefs={savedBriefs}
-              onSelectBrief={(b) => setCurrentBrief(b)}
-              onGenerateBrief={handleGenerateBrief}
-              onDeleteBrief={handleDeleteBrief}
-              onClearBriefs={handleClearBriefs}
-              isGenerating={isGeneratingBrief}
-              onSelectSource={(source) => setSelectedSource(source)}
-            />
-          )}
+              <div className={activeTab === 'brief' ? 'glass-view-container p-4 sm:p-6 animate-in fade-in duration-200' : 'hidden'}>
+                <BriefView
+                  currentBrief={currentBrief}
+                  savedBriefs={savedBriefs}
+                  onSelectBrief={setCurrentBrief}
+                  onGenerateBrief={handleGenerateBrief}
+                  onDeleteBrief={handleDeleteBrief}
+                  onClearBriefs={handleClearBriefs}
+                  isGenerating={isGeneratingBrief}
+                  onSelectSource={setSelectedSource}
+                />
+              </div>
 
-          {activeTab === 'clients' && (
-            <ClientsView
-              clients={clients}
-              role={user.role}
-              onAddAlias={handleAddAlias}
-              onAskAboutClient={(name) => {
-                setActiveTab('chat');
-                handleSendMessage(`Give me a detailed workstream update for client ${name}`);
-              }}
-            />
-          )}
+              <div className={activeTab === 'clients' ? 'glass-view-container p-4 sm:p-6 animate-in fade-in duration-200' : 'hidden'}>
+                <ClientsView
+                  clients={clients}
+                  role={user.role}
+                  onAddAlias={handleAddAlias}
+                  onAskAboutClient={handleAskAboutClient}
+                />
+              </div>
 
-          {activeTab === 'team' && (
-            <TeamView
-              memberOverviews={memberOverviews}
-              lists={lists}
-              role={user.role}
-              onUpdateListSemantics={handleUpdateListSemantics}
-              onAskAboutMember={(name) => {
-                setActiveTab('chat');
-                handleSendMessage(`What is ${name} currently working on and what was recently completed?`);
-              }}
-              onSelectCard={(card) => {
-                setSelectedSource({
-                  cardId: card.id,
-                  title: card.name,
-                  url: card.url,
-                  relevance: 100,
-                  reason: 'Inspected from Team Overview',
-                  date: new Date().toISOString(),
-                  status: card.status,
-                  listName: card.listName,
-                });
-              }}
-            />
+              <div className={activeTab === 'team' ? 'glass-view-container p-4 sm:p-6 animate-in fade-in duration-200' : 'hidden'}>
+                <TeamView
+                  memberOverviews={memberOverviews}
+                  lists={lists}
+                  role={user.role}
+                  onUpdateListSemantics={handleUpdateListSemantics}
+                  onAskAboutMember={handleAskAboutMember}
+                  onSelectCard={handleSelectCard}
+                />
+              </div>
+            </>
           )}
         </div>
       </main>

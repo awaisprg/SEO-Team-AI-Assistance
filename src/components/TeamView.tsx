@@ -52,7 +52,7 @@ interface TeamViewProps {
   onSelectCard?: (card: { id: string; name: string; url: string; status: StatusSemantic; listName: string }) => void;
 }
 
-export const TeamView: React.FC<TeamViewProps> = ({
+const TeamViewComponent: React.FC<TeamViewProps> = ({
   memberOverviews = [],
   lists = [],
   role = 'MANAGER',
@@ -379,3 +379,5 @@ export const TeamView: React.FC<TeamViewProps> = ({
     </div>
   );
 };
+
+export const TeamView = React.memo(TeamViewComponent);

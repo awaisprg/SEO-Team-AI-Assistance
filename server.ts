@@ -753,6 +753,7 @@ app.get('/api/team', requireAuth, (req, res) => {
       seoWork: seoCards.length,
       totalMembers: members.length,
     },
+    cards,
     activeCards: activeCards.slice(0, 10),
     recentCompleted: completedCards.slice(0, 10),
     aiInitiatives,

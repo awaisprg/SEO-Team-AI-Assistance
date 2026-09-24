@@ -25,7 +25,7 @@ interface ClientsViewProps {
   onAskAboutClient: (clientName: string) => void;
 }
 
-export const ClientsView: React.FC<ClientsViewProps> = ({
+const ClientsViewComponent: React.FC<ClientsViewProps> = ({
   clients,
   role,
   onAddAlias,
@@ -354,3 +354,5 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
     </div>
   );
 };
+
+export const ClientsView = React.memo(ClientsViewComponent);

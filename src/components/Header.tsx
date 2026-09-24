@@ -8,8 +8,11 @@ import {
   ChevronRight,
   Activity,
   Layers,
+  Sparkles,
 } from 'lucide-react';
 import { TrelloConnectionStatus, UserSession } from '../types';
+import { ThemeDropdown } from './ThemeDropdown';
+import { useTheme } from '../utils/theme';
 
 interface HeaderProps {
   connection: TrelloConnectionStatus | null;
@@ -22,7 +25,7 @@ interface HeaderProps {
   syncPhase?: string;
 }
 
-export const Header: React.FC<HeaderProps> = ({
+const HeaderComponent: React.FC<HeaderProps> = ({
   connection,
   user,
   onSignOut,
@@ -34,11 +37,13 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const role = user?.role || 'MANAGER';
   const isAdmin = role === 'ADMIN';
+  const { themeConfig } = useTheme();
+  const displayName = user ? user.name.replace(/\s*\((Admin|Manager)\)/i, '').trim() : '';
 
   return (
     <header
       id="app-header"
-      className="bg-white/95 backdrop-blur-xl border-b border-slate-200/80 sticky top-0 z-40 transition-colors shadow-2xs"
+      className="backdrop-blur-xl border-b sticky top-0 z-40 transition-all shadow-xs"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-3 sm:gap-4">
@@ -54,7 +59,9 @@ export const Header: React.FC<HeaderProps> = ({
               <img
                 src="https://goldflexmarketing.com/wp-content/uploads/2026/01/Gold-Flex-Marketing-Dark-1024x260.png"
                 alt="Gold Flex Marketing"
-                className="h-7 sm:h-8 w-auto object-contain shrink-0 transition-transform group-hover:scale-[1.02]"
+                className={`h-7 sm:h-8 w-auto object-contain shrink-0 transition-transform group-hover:scale-[1.02] ${
+                  themeConfig.isDark ? 'brightness-0 invert' : ''
+                }`}
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = 'none';
                   const fallback = document.getElementById('gfm-logo-fallback');
@@ -64,24 +71,38 @@ export const Header: React.FC<HeaderProps> = ({
               <div
                 id="gfm-logo-fallback"
                 style={{ display: 'none' }}
-                className="items-center space-x-2 font-bold tracking-tight text-slate-900 text-base"
+                className="items-center space-x-2 font-bold tracking-tight text-slate-900 dark:text-white text-base"
               >
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#7C52F5] to-[#2A1C94] flex items-center justify-center text-white font-bold text-xs shadow-xs">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-xs"
+                  style={{ background: themeConfig.colors.primaryGradient }}
+                >
                   GF
                 </div>
-                <span className="hidden sm:inline font-bold tracking-tight text-slate-900">
+                <span className="hidden sm:inline font-bold tracking-tight text-slate-900 dark:text-white">
                   Gold Flex
                 </span>
               </div>
             </a>
 
-            <div className="h-5 w-px bg-slate-200 hidden md:block" />
+            <div className="h-5 w-px bg-slate-200/80 dark:bg-slate-700/80 hidden md:block" />
 
             <div className="hidden md:flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-900 tracking-tight font-sans">
+              <span className="text-xs font-bold text-slate-900 dark:text-white tracking-tight font-sans">
                 SEO & Content Intelligence
               </span>
-              <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold bg-violet-50 text-violet-700 rounded-md border border-violet-200/70 shadow-2xs">
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-semibold rounded-full tracking-wide uppercase border shadow-2xs select-none backdrop-blur-xs"
+                style={{
+                  backgroundColor: themeConfig.colors.glow,
+                  borderColor: themeConfig.colors.border,
+                  color: themeConfig.isDark ? '#F1F5F9' : themeConfig.colors.primary,
+                }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                  style={{ backgroundColor: themeConfig.colors.primary }}
+                />
                 Executive Hub
               </span>
             </div>
@@ -94,7 +115,7 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 id="header-board-status-btn"
                 onClick={onOpenSettings}
-                className="group flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-slate-50 hover:bg-violet-50/70 border border-slate-200/90 hover:border-violet-300 text-xs transition-all cursor-pointer shadow-2xs"
+                className="group h-9 px-3.5 rounded-full bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/90 border border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 text-xs transition-all cursor-pointer shadow-2xs hover:shadow-xs inline-flex items-center gap-2.5 select-none"
                 title="Click to manage Trello API credentials & board configuration"
               >
                 <span className="relative flex h-2 w-2 shrink-0">
@@ -103,63 +124,66 @@ export const Header: React.FC<HeaderProps> = ({
                   )}
                   <span
                     className={`relative inline-flex rounded-full h-2 w-2 ${
-                      connection?.connected ? 'bg-emerald-600' : 'bg-amber-500'
+                      connection?.connected ? 'bg-emerald-500' : 'bg-amber-500'
                     }`}
                   />
                 </span>
 
-                <span className="font-medium text-slate-500 group-hover:text-violet-900 transition-colors">
-                  {connection?.isDemoData ? 'Demo Board' : 'Trello Board'}:
+                <span className="font-medium text-slate-400 dark:text-slate-500 text-[11px] whitespace-nowrap">
+                  {connection?.isDemoData ? 'Demo Board:' : 'Trello Board:'}
                 </span>
 
                 <span
-                  className="font-semibold text-slate-800 truncate max-w-[150px] xl:max-w-[200px]"
+                  className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[140px] xl:max-w-[200px] whitespace-nowrap tracking-tight"
                   title={connection?.boardName || 'Not Connected'}
                 >
                   {connection?.boardName || (connection?.connected ? 'Connected' : 'Configure Board')}
                 </span>
 
                 {connection?.lastSyncAt && (
-                  <span className="text-[11px] text-slate-400 font-mono border-l border-slate-200 pl-2 ml-0.5">
+                  <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700/80 px-1.5 py-0.5 rounded-md whitespace-nowrap shrink-0 border border-slate-200/60 dark:border-slate-600/60">
                     {new Date(connection.lastSyncAt).toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
                   </span>
                 )}
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-violet-700 transition-transform group-hover:translate-x-0.5 shrink-0" />
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-transform shrink-0" />
               </button>
             ) : (
               <div
-                className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-slate-50 border border-slate-200/90 text-xs shadow-2xs"
+                className="h-9 px-3.5 rounded-full bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 text-xs shadow-2xs inline-flex items-center gap-2.5 select-none"
                 title="Trello connection status"
               >
                 <span
                   className={`w-2 h-2 rounded-full shrink-0 ${
-                    connection?.connected ? 'bg-emerald-600' : 'bg-amber-500'
+                    connection?.connected ? 'bg-emerald-500' : 'bg-amber-500'
                   }`}
                 />
-                <span className="font-medium text-slate-500">Board:</span>
-                <span className="font-semibold text-slate-800 truncate max-w-[160px]">
+                <span className="font-medium text-slate-400 dark:text-slate-500 text-[11px] whitespace-nowrap">Board:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[160px] whitespace-nowrap">
                   {connection?.boardName || 'Active Board'}
                 </span>
               </div>
             )}
           </div>
 
-          {/* Right: Actions, User & Settings Cluster */}
+          {/* Right: Actions, Theme Selector & User Cluster */}
           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-            {/* Sync Trello (Available to both Admin and Manager) */}
+            {/* Theme Dropdown */}
+            <ThemeDropdown />
+
+            {/* Sync Trello Button */}
             <button
               id="header-sync-btn"
               onClick={onSync}
               disabled={isSyncing}
-              className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold h-9 px-3.5 rounded-lg bg-gradient-to-r from-[#7C52F5] to-[#683EE6] hover:from-[#6D42E6] hover:to-[#572FD6] active:from-[#572FD6] active:to-[#461EC6] text-white focus:outline-hidden disabled:opacity-60 transition-all shadow-xs hover:shadow-sm cursor-pointer group"
+              className="inline-flex items-center justify-center gap-2 text-xs font-semibold h-9 px-3.5 rounded-xl theme-action-primary text-white focus:outline-hidden disabled:opacity-60 transition-all shadow-xs hover:shadow-sm cursor-pointer group active:scale-[0.98] select-none"
               title={syncPhase || 'Synchronize cards, checklists, comments, and activities from Trello'}
             >
               <RefreshCw
                 className={`w-3.5 h-3.5 text-white shrink-0 ${
-                  isSyncing ? 'animate-spin' : 'group-hover:rotate-45 transition-transform'
+                  isSyncing ? 'animate-spin' : 'group-hover:rotate-45 transition-transform duration-200'
                 }`}
               />
               <span className="hidden sm:inline">
@@ -172,10 +196,10 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 id="header-seed-demo-btn"
                 onClick={onSeedDemo}
-                className="inline-flex items-center justify-center gap-1.5 text-xs font-medium h-9 px-3 rounded-lg bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 hover:border-violet-300/80 transition-all shadow-2xs cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 text-xs font-medium h-9 px-3 rounded-xl bg-white/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/80 hover:bg-white dark:hover:bg-slate-700/90 hover:border-slate-300 dark:hover:border-slate-600 transition-all shadow-2xs cursor-pointer active:scale-[0.98] select-none"
                 title="Reset to pre-loaded rich demo dataset"
               >
-                <Database className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <Database className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
                 <span className="hidden xl:inline">Reset Demo</span>
               </button>
             )}
@@ -185,47 +209,48 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 id="header-settings-btn"
                 onClick={onOpenSettings}
-                className="h-9 w-9 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-violet-50/80 border border-slate-200 hover:border-violet-300 transition-all cursor-pointer shadow-2xs"
+                className="h-9 w-9 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700/90 border border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 transition-all cursor-pointer shadow-2xs active:scale-[0.98] group select-none"
                 title="Configure Trello integration, API keys & custom credentials"
               >
-                <Settings className="w-4 h-4 shrink-0" />
+                <Settings className="w-4 h-4 shrink-0 group-hover:rotate-45 transition-transform duration-300" />
               </button>
             )}
 
-            <div className="h-5 w-px bg-slate-200" />
+            <div className="h-5 w-px bg-slate-200/80 dark:bg-slate-700/80" />
 
             {/* User Profile Pill */}
             {user && (
-              <div className="flex items-center gap-2 pl-1 pr-1.5 py-1 rounded-lg border border-slate-200/80 bg-slate-50/60 shadow-2xs">
+              <div className="h-9 pl-1.5 pr-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white/80 dark:bg-slate-800/80 shadow-2xs flex items-center gap-2 backdrop-blur-md select-none">
                 <div
-                  className="w-7 h-7 rounded-md bg-gradient-to-br from-slate-800 to-slate-950 text-white flex items-center justify-center text-[11px] font-bold tracking-wider shadow-2xs shrink-0"
+                  className="w-6.5 h-6.5 rounded-lg text-white flex items-center justify-center text-[10px] font-bold tracking-wider shadow-2xs shrink-0 ring-1 ring-black/5"
+                  style={{ background: themeConfig.colors.primaryGradient }}
                   title={`${user.name} (${user.email})`}
                 >
-                  {user.name.slice(0, 2).toUpperCase()}
+                  {displayName.slice(0, 2).toUpperCase() || 'AW'}
                 </div>
 
-                <div className="hidden sm:block text-left">
-                  <div className="text-xs font-semibold text-slate-800 leading-snug truncate max-w-[110px]">
-                    {user.name}
+                <div className="hidden sm:flex flex-col text-left justify-center min-w-0">
+                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 leading-none truncate max-w-[100px]">
+                    {displayName || user.name}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span
-                      className={`inline-flex items-center text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider ${
-                        isAdmin
-                          ? 'bg-[#09061A] text-white'
-                          : 'bg-violet-50 text-violet-800 border border-violet-200/60'
-                      }`}
-                    >
-                      {isAdmin && <ShieldCheck className="w-2.5 h-2.5 mr-0.5 text-violet-300 shrink-0" />}
-                      {role}
-                    </span>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    {isAdmin ? (
+                      <span className="inline-flex items-center text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider leading-none">
+                        <ShieldCheck className="w-2.5 h-2.5 mr-0.5 shrink-0" />
+                        Admin
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider leading-none">
+                        {role}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 <button
                   id="header-signout-btn"
                   onClick={onSignOut}
-                  className="h-7 w-7 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer ml-0.5"
+                  className="h-6 w-6 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 flex items-center justify-center transition-colors cursor-pointer ml-0.5"
                   title="Sign Out of Session"
                 >
                   <LogOut className="w-3.5 h-3.5" />
@@ -238,3 +263,5 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+
+export const Header = React.memo(HeaderComponent);

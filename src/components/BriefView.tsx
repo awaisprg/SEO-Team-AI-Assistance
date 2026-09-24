@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { ManagementBrief, ChatSource } from '../types';
 import { downloadBriefPDF } from '../utils/pdfGenerator';
+import { BriefDocumentSkeleton } from './TabSkeletons';
 
 interface BriefViewProps {
   currentBrief: ManagementBrief | null;
@@ -33,7 +34,7 @@ interface BriefViewProps {
   onSelectSource: (source: ChatSource) => void;
 }
 
-export const BriefView: React.FC<BriefViewProps> = ({
+const BriefViewComponent: React.FC<BriefViewProps> = ({
   currentBrief,
   savedBriefs,
   onGenerateBrief,
@@ -251,7 +252,9 @@ export const BriefView: React.FC<BriefViewProps> = ({
 
       {/* Right Content: Rendered Executive Brief Document */}
       <div className="lg:col-span-3">
-        {currentBrief ? (
+        {isGenerating ? (
+          <BriefDocumentSkeleton isSynthesizing={true} />
+        ) : currentBrief ? (
           <div
             id="brief-document"
             className="bg-white rounded-2xl border border-slate-200/90 p-6 sm:p-7 shadow-xs space-y-5 relative overflow-hidden"
@@ -650,3 +653,5 @@ export const BriefView: React.FC<BriefViewProps> = ({
     </div>
   );
 };
+
+export const BriefView = React.memo(BriefViewComponent);
