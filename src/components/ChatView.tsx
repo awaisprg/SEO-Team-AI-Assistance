@@ -1046,8 +1046,67 @@ const ChatViewComponent: React.FC<ChatViewProps> = ({
   );
 };
 
+function reorderProjectSummarySections(text: string): string {
+  if (!text) return text;
+
+  // Find "Associated Deliverables" heading
+  const deliverablesRegex = /(?:^|\n)(#{2,3}\s*Associated Deliverables[^\n]*\n?)/i;
+  const deliverablesMatch = deliverablesRegex.exec(text);
+  if (!deliverablesMatch || deliverablesMatch.index === undefined) {
+    return text;
+  }
+
+  // Find summary / update heading
+  const summaryRegex = /(?:^|\n)(#{2,3}\s*(?:Workstream Update|Executive Summary|Key Findings|Project Summary|Client Summary)[^\n]*\n?)/i;
+  const summaryMatch = summaryRegex.exec(text);
+  if (!summaryMatch || summaryMatch.index === undefined) {
+    return text;
+  }
+
+  const deliverablesStart = deliverablesMatch.index + (deliverablesMatch[0].startsWith('\n') ? 1 : 0);
+  const summaryStart = summaryMatch.index + (summaryMatch[0].startsWith('\n') ? 1 : 0);
+
+  // If Associated Deliverables is already above summary/update, keep as is
+  if (deliverablesStart <= summaryStart) {
+    return text;
+  }
+
+  // Extract the Associated Deliverables section:
+  // Runs until the next section heading (### or ##) or the end of text
+  const textAfterDeliverables = text.slice(deliverablesStart);
+  const nextHeadingMatch = textAfterDeliverables.slice(1).match(/\n#{2,3}\s+[^\n]+/);
+
+  let deliverablesSection = '';
+  let restOfText = '';
+
+  if (nextHeadingMatch && nextHeadingMatch.index !== undefined) {
+    const sectionEnd = deliverablesStart + 1 + nextHeadingMatch.index;
+    deliverablesSection = text.slice(deliverablesStart, sectionEnd).trim();
+    restOfText = (text.slice(0, deliverablesStart).trimEnd() + '\n\n' + text.slice(sectionEnd).trimStart()).trim();
+  } else {
+    deliverablesSection = textAfterDeliverables.trim();
+    restOfText = text.slice(0, deliverablesStart).trim();
+  }
+
+  // Re-find summaryStart in restOfText
+  const newSummaryMatch = summaryRegex.exec(restOfText);
+  if (!newSummaryMatch || newSummaryMatch.index === undefined) {
+    return `${deliverablesSection}\n\n${restOfText}`;
+  }
+
+  const newSummaryStart = newSummaryMatch.index + (newSummaryMatch[0].startsWith('\n') ? 1 : 0);
+  const prefix = restOfText.slice(0, newSummaryStart).trim();
+  const suffix = restOfText.slice(newSummaryStart).trim();
+
+  if (prefix) {
+    return `${prefix}\n\n${deliverablesSection}\n\n${suffix}`;
+  }
+  return `${deliverablesSection}\n\n${suffix}`;
+}
+
 function formatMarkdownForDisplay(text: string): string {
-  let html = text
+  const processedText = reorderProjectSummarySections(text);
+  let html = processedText
     .replace(/^### (.*?)$/gm, '<h3 class="font-bold text-slate-900 text-sm mt-3.5 mb-1">$1</h3>')
     .replace(/^## (.*?)$/gm, '<h2 class="font-bold text-slate-900 text-base mt-4 mb-1.5">$1</h2>')
     .replace(/^# (.*?)$/gm, '<h1 class="font-bold text-slate-900 text-lg mt-4 mb-2">$1</h1>')

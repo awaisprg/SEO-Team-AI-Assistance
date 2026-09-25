@@ -434,15 +434,16 @@ Relevance Score: ${sc.relevance}% (${sc.reason})
       if (intent.client) {
         clientContext = `
 STRICT CLIENT SCOPING DIRECTIVE:
-The manager is asking specifically for an update on client: "${intent.client}".
+The manager is asking specifically for an update on project/client: "${intent.client}".
 CRITICAL:
 1. ONLY include tasks, deliverables, cards, and checklists that belong directly to "${intent.client}".
 2. Do NOT mention or list tasks, deliverables, or checklist items belonging to ANY OTHER client or company.
-3. If reporting completed and pending tasks, structure the response clearly with:
-   - ### Executive Summary (Overall progress for ${intent.client})
+3. Structure the response strictly in this order:
+   - ### Associated Deliverables & Discussions (ALWAYS FIRST: detailed list of all matching Trello cards with names, direct links, list status, assigned owners, and recent comments)
+   - ### Workstream Update (Overall progress, executive summary, and key findings for ${intent.client})
    - ### Completed Tasks (All completed items for ${intent.client})
    - ### Pending & In-Progress Tasks (All remaining deliverables for ${intent.client})
-   - ### Associated Deliverables & Team Discussions
+CRITICAL: "### Associated Deliverables & Discussions" MUST be placed ABOVE the Workstream Update, Executive Summary, or key findings.
 `;
       }
 
@@ -470,8 +471,9 @@ Retrieved Trello Evidence (${topCards.length} cards across lists, including full
 ${evidenceText}
 
 Provide an executive, comprehensive answer based STRICTLY on the retrieved Trello data.
-If the manager asks about a specific client (e.g. "${intent.client || 'Client Name'}"):
+If the manager asks about a specific client or project (e.g. "${intent.client || 'Client Name'}"):
 - Confine the entire response STRICTLY to ${intent.client || 'this client'}.
+- CRITICAL: Always place "### Associated Deliverables & Discussions" at the very top, ABOVE the Workstream Update, Executive Summary, or Key Findings.
 - Detail all Completed Tasks and all Pending/In-Progress Tasks.
 - Mention assigned team members, list locations, and recent comments.
 - Do NOT include any tasks or deliverables belonging to other clients.
@@ -493,7 +495,8 @@ If the manager asks about a specific list (e.g. "In Process") or asks about all 
   ### Next Steps & Recommendations
 `;
 
-      const aiText = await aiProvider.generateAnswer(SYSTEM_PROMPT, userPrompt);
+      const rawAiText = await aiProvider.generateAnswer(SYSTEM_PROMPT, userPrompt);
+      const aiText = reorderProjectSummarySections(rawAiText);
       const keyPoints = extractKeyPointsFromText(aiText, topCards);
       const summary = extractSummaryFromText(aiText);
 
@@ -693,7 +696,10 @@ ${sections.join('\n\n')}
 ${comments}`;
     }).join('\n\n');
 
-    const clientAnswerMarkdown = `### Workstream Update: ${intent.client}
+    const clientAnswerMarkdown = `### Associated Deliverables & Discussions
+${cardDetails}
+
+### Workstream Update: ${intent.client}
 ${summary}
 
 ### Completed Tasks (${completedTasks.length})
@@ -701,9 +707,6 @@ ${completedSection}
 
 ### Pending & In-Progress Tasks (${pendingTasks.length})
 ${pendingSection}
-
-### Associated Deliverables & Discussions
-${cardDetails}
 `;
 
     return {
@@ -844,4 +847,66 @@ function extractSummaryFromText(text: string): string {
   const clean = text.replace(/#+\s+.*?\n/g, '').trim();
   const firstParagraph = clean.split('\n\n')[0] || clean;
   return firstParagraph.slice(0, 240);
+}
+
+/**
+ * Ensures "Associated Deliverables & Discussions" is positioned ABOVE
+ * "Workstream Update", "Executive Summary", or "Key Findings" for any project/client summary.
+ */
+export function reorderProjectSummarySections(text: string): string {
+  if (!text) return text;
+
+  // Find "Associated Deliverables" heading
+  const deliverablesRegex = /(?:^|\n)(#{2,3}\s*Associated Deliverables[^\n]*\n?)/i;
+  const deliverablesMatch = deliverablesRegex.exec(text);
+  if (!deliverablesMatch || deliverablesMatch.index === undefined) {
+    return text;
+  }
+
+  // Find summary / update heading
+  const summaryRegex = /(?:^|\n)(#{2,3}\s*(?:Workstream Update|Executive Summary|Key Findings|Project Summary|Client Summary)[^\n]*\n?)/i;
+  const summaryMatch = summaryRegex.exec(text);
+  if (!summaryMatch || summaryMatch.index === undefined) {
+    return text;
+  }
+
+  const deliverablesStart = deliverablesMatch.index + (deliverablesMatch[0].startsWith('\n') ? 1 : 0);
+  const summaryStart = summaryMatch.index + (summaryMatch[0].startsWith('\n') ? 1 : 0);
+
+  // If Associated Deliverables is already above summary/update, keep as is
+  if (deliverablesStart <= summaryStart) {
+    return text;
+  }
+
+  // Extract the Associated Deliverables section:
+  // Runs until the next section heading (### or ##) or the end of text
+  const textAfterDeliverables = text.slice(deliverablesStart);
+  const nextHeadingMatch = textAfterDeliverables.slice(1).match(/\n#{2,3}\s+[^\n]+/);
+
+  let deliverablesSection = '';
+  let restOfText = '';
+
+  if (nextHeadingMatch && nextHeadingMatch.index !== undefined) {
+    const sectionEnd = deliverablesStart + 1 + nextHeadingMatch.index;
+    deliverablesSection = text.slice(deliverablesStart, sectionEnd).trim();
+    restOfText = (text.slice(0, deliverablesStart).trimEnd() + '\n\n' + text.slice(sectionEnd).trimStart()).trim();
+  } else {
+    deliverablesSection = textAfterDeliverables.trim();
+    restOfText = text.slice(0, deliverablesStart).trim();
+  }
+
+  // Re-find summaryStart in restOfText
+  const newSummaryMatch = summaryRegex.exec(restOfText);
+  if (!newSummaryMatch || newSummaryMatch.index === undefined) {
+    return `${deliverablesSection}\n\n${restOfText}`;
+  }
+
+  const newSummaryStart = newSummaryMatch.index + (newSummaryMatch[0].startsWith('\n') ? 1 : 0);
+  const prefix = restOfText.slice(0, newSummaryStart).trim();
+  const suffix = restOfText.slice(newSummaryStart).trim();
+
+  if (prefix) {
+    return `${prefix}\n\n${deliverablesSection}\n\n${suffix}`;
+  }
+  return `${deliverablesSection}\n\n${suffix}`;
 }

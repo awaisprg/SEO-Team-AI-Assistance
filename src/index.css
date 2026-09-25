@@ -273,6 +273,29 @@ html.dark {
   box-shadow: 0 4px 14px -2px var(--theme-accent-glow), 0 12px 24px -4px rgba(15, 23, 42, 0.06);
 }
 
+/* KPI Cards: Subtle Lift Animation & Radiant Border Glow on Hover */
+.kpi-card-interactive {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              background 0.22s ease;
+  will-change: transform, box-shadow;
+}
+
+.kpi-card-interactive:hover {
+  transform: translateY(-4px);
+  border-color: var(--kpi-glow-border, var(--theme-primary)) !important;
+  box-shadow: 
+    0 0 0 1.5px var(--kpi-glow-border, var(--theme-primary)),
+    0 8px 24px -4px var(--kpi-glow-color, var(--theme-accent-glow)),
+    0 16px 36px -8px rgba(15, 23, 42, 0.1) !important;
+}
+
+.kpi-card-interactive:active {
+  transform: translateY(-1px) scale(0.985);
+  transition-duration: 0.08s;
+}
+
 .glass-view-container {
   background: var(--theme-surface-glass);
   backdrop-filter: blur(18px);
