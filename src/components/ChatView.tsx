@@ -1049,70 +1049,88 @@ const ChatViewComponent: React.FC<ChatViewProps> = ({
 function reorderProjectSummarySections(text: string): string {
   if (!text) return text;
 
-  // Find "Associated Deliverables" heading
+  let workingText = text;
+  let extractedStrategyBlock = '';
+
+  // 1. Check if there is an embedded "# Strategy Overview" in comments (like from Ali Hamza or card comments)
+  const stratRegex = /(?:[ \t]*-[ \t]*\*\*([^*]+)\*\*:[ \t]*)["\x27]?#+\s*Strategy Overview\s*([\s\S]*?)(?:["\x27]?)(?=\n[ \t]*-[ \t]*\*\*|\n#{2,4}\s+|$)/i;
+  const stratMatch = stratRegex.exec(workingText);
+
+  if (stratMatch) {
+    const author = stratMatch[1] ? stratMatch[1].trim() : '';
+    let body = stratMatch[2].trim();
+    if (body.endsWith('"') || body.endsWith("'")) body = body.slice(0, -1).trim();
+
+    // Check if there is a directive immediately following this comment (e.g. • Awais Yaseen: "directive")
+    const afterMatch = workingText.slice(stratMatch.index + stratMatch[0].length);
+    const nextCommentRegex = /^[ \t]*\n[ \t]*-[ \t]*\*\*([^*]+)\*\*:[ \t]*["\x27]?([^\n"\x27]+)["\x27]?/i;
+    const nextM = nextCommentRegex.exec(afterMatch);
+
+    let directive = '';
+    let fullConsumedLength = stratMatch[0].length;
+    if (nextM) {
+      directive = `\n\n• **${nextM[1].trim()}**: "${nextM[2].trim()}"`;
+      fullConsumedLength += nextM[0].length;
+    }
+
+    // Replace the embedded comment block with a clean reference
+    const replacement = author ? `- **${author}**: *(Strategy Overview featured at top)*` : '';
+    workingText = workingText.slice(0, stratMatch.index) + replacement + workingText.slice(stratMatch.index + fullConsumedLength);
+
+    extractedStrategyBlock = `${body}${directive}`;
+  }
+
+  if (extractedStrategyBlock) {
+    return `${extractedStrategyBlock}\n\n${workingText.trim()}`;
+  }
+
+  // 2. Ensure any Executive Summary / Strategy Overview / Workstream Update is positioned ABOVE Associated Deliverables
+  const summaryRegex = /(?:^|\n)(#{2,3}\s*(?:Executive Project Summary|Project Strategy|Executive Summary|Workstream Update|Key Findings|Project Summary|Client Summary)[^\n]*\n?)/i;
+  const summaryMatch = summaryRegex.exec(workingText);
+
   const deliverablesRegex = /(?:^|\n)(#{2,3}\s*Associated Deliverables[^\n]*\n?)/i;
-  const deliverablesMatch = deliverablesRegex.exec(text);
-  if (!deliverablesMatch || deliverablesMatch.index === undefined) {
-    return text;
+  const deliverablesMatch = deliverablesRegex.exec(workingText);
+
+  if (summaryMatch && deliverablesMatch) {
+    const summaryStart = summaryMatch.index + (summaryMatch[0].startsWith('\n') ? 1 : 0);
+    const deliverablesStart = deliverablesMatch.index + (deliverablesMatch[0].startsWith('\n') ? 1 : 0);
+
+    // If summary is currently AFTER deliverables, extract summary and move it to the top!
+    if (deliverablesStart < summaryStart) {
+      const afterSummary = workingText.slice(summaryStart);
+      const nextHeadingMatch = afterSummary.slice(1).match(/\n#{2,3}\s+[^\n]+/);
+
+      let summarySection = '';
+      let rest = '';
+
+      if (nextHeadingMatch && nextHeadingMatch.index !== undefined) {
+        const sectionEnd = summaryStart + 1 + nextHeadingMatch.index;
+        summarySection = workingText.slice(summaryStart, sectionEnd).trim();
+        rest = (workingText.slice(0, summaryStart).trimEnd() + '\n\n' + workingText.slice(sectionEnd).trimStart()).trim();
+      } else {
+        summarySection = afterSummary.trim();
+        rest = workingText.slice(0, summaryStart).trim();
+      }
+
+      return `${summarySection}\n\n${rest}`;
+    }
   }
 
-  // Find summary / update heading
-  const summaryRegex = /(?:^|\n)(#{2,3}\s*(?:Workstream Update|Executive Summary|Key Findings|Project Summary|Client Summary)[^\n]*\n?)/i;
-  const summaryMatch = summaryRegex.exec(text);
-  if (!summaryMatch || summaryMatch.index === undefined) {
-    return text;
-  }
-
-  const deliverablesStart = deliverablesMatch.index + (deliverablesMatch[0].startsWith('\n') ? 1 : 0);
-  const summaryStart = summaryMatch.index + (summaryMatch[0].startsWith('\n') ? 1 : 0);
-
-  // If Associated Deliverables is already above summary/update, keep as is
-  if (deliverablesStart <= summaryStart) {
-    return text;
-  }
-
-  // Extract the Associated Deliverables section:
-  // Runs until the next section heading (### or ##) or the end of text
-  const textAfterDeliverables = text.slice(deliverablesStart);
-  const nextHeadingMatch = textAfterDeliverables.slice(1).match(/\n#{2,3}\s+[^\n]+/);
-
-  let deliverablesSection = '';
-  let restOfText = '';
-
-  if (nextHeadingMatch && nextHeadingMatch.index !== undefined) {
-    const sectionEnd = deliverablesStart + 1 + nextHeadingMatch.index;
-    deliverablesSection = text.slice(deliverablesStart, sectionEnd).trim();
-    restOfText = (text.slice(0, deliverablesStart).trimEnd() + '\n\n' + text.slice(sectionEnd).trimStart()).trim();
-  } else {
-    deliverablesSection = textAfterDeliverables.trim();
-    restOfText = text.slice(0, deliverablesStart).trim();
-  }
-
-  // Re-find summaryStart in restOfText
-  const newSummaryMatch = summaryRegex.exec(restOfText);
-  if (!newSummaryMatch || newSummaryMatch.index === undefined) {
-    return `${deliverablesSection}\n\n${restOfText}`;
-  }
-
-  const newSummaryStart = newSummaryMatch.index + (newSummaryMatch[0].startsWith('\n') ? 1 : 0);
-  const prefix = restOfText.slice(0, newSummaryStart).trim();
-  const suffix = restOfText.slice(newSummaryStart).trim();
-
-  if (prefix) {
-    return `${prefix}\n\n${deliverablesSection}\n\n${suffix}`;
-  }
-  return `${deliverablesSection}\n\n${suffix}`;
+  return workingText;
 }
 
 function formatMarkdownForDisplay(text: string): string {
   const processedText = reorderProjectSummarySections(text);
   let html = processedText
-    .replace(/^### (.*?)$/gm, '<h3 class="font-bold text-slate-900 text-sm mt-3.5 mb-1">$1</h3>')
-    .replace(/^## (.*?)$/gm, '<h2 class="font-bold text-slate-900 text-base mt-4 mb-1.5">$1</h2>')
-    .replace(/^# (.*?)$/gm, '<h1 class="font-bold text-slate-900 text-lg mt-4 mb-2">$1</h1>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>')
-    .replace(/^\s*-\s*(.*?)$/gm, '<li class="ml-4 list-disc text-slate-700 my-1 leading-relaxed">$1</li>')
-    .replace(/^\s*\*\s*(.*?)$/gm, '<li class="ml-4 list-disc text-slate-700 my-1 leading-relaxed">$1</li>');
+    .replace(/^### (.*?)$/gm, '<h3 class="font-bold text-slate-900 dark:text-white text-sm mt-3.5 mb-1">$1</h3>')
+    .replace(/^## (.*?)$/gm, '<h2 class="font-bold text-slate-900 dark:text-white text-base mt-4 mb-1.5">$1</h2>')
+    .replace(/^# (.*?)$/gm, '<h1 class="font-bold text-slate-900 dark:text-white text-lg mt-4 mb-2">$1</h1>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-900 dark:text-white">$1</strong>')
+    .replace(/^\s*-\s*(.*?)$/gm, '<li class="ml-4 list-disc text-slate-700 dark:text-slate-300 my-1 leading-relaxed">$1</li>')
+    .replace(/^\s*\*\s*(.*?)$/gm, '<li class="ml-4 list-disc text-slate-700 dark:text-slate-300 my-1 leading-relaxed">$1</li>')
+    .replace(/^\s*•\s*(.*?)$/gm, '<li class="ml-4 list-disc text-slate-700 dark:text-slate-300 my-1 leading-relaxed">$1</li>')
+    .replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono text-xs border border-slate-200 dark:border-slate-700">$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">$1</a>');
 
   return html;
 }

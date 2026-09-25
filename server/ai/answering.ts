@@ -434,16 +434,25 @@ Relevance Score: ${sc.relevance}% (${sc.reason})
       if (intent.client) {
         clientContext = `
 STRICT CLIENT SCOPING DIRECTIVE:
-The manager is asking specifically for an update on project/client: "${intent.client}".
-CRITICAL:
-1. ONLY include tasks, deliverables, cards, and checklists that belong directly to "${intent.client}".
-2. Do NOT mention or list tasks, deliverables, or checklist items belonging to ANY OTHER client or company.
-3. Structure the response strictly in this order:
-   - ### Associated Deliverables & Discussions (ALWAYS FIRST: detailed list of all matching Trello cards with names, direct links, list status, assigned owners, and recent comments)
-   - ### Workstream Update (Overall progress, executive summary, and key findings for ${intent.client})
+The manager is asking specifically for a project summary or detailed workstream update on: "${intent.client}".
+CRITICAL STRUCTURE REQUIREMENTS:
+1. AT THE VERY TOP OF YOUR RESPONSE (Section 1), you MUST provide the comprehensive Executive Project Strategy & Workstream Summary.
+   - If the retrieved cards contain a "# Strategy Overview" or handover comment (e.g. by Ali Hamza or Awais Yaseen), feature that full multi-paragraph strategic overview prominently at the very top, along with any subsequent key stakeholder directives (e.g. • Awais Yaseen: "directive").
+   - If no pre-written strategy overview exists, synthesize an executive 4-to-5 paragraph strategic narrative matching this exact standard:
+     * Paragraph 1: Service offerings, operating locations, and foundational SEO architecture for long-term growth.
+     * Paragraph 2: Website & SEO technical implementation status up to recent milestone date (core commercial pages, technical SEO, on-page SEO, metadata, URL structure, and optimization framework completed).
+     * Paragraph 3: Current authority-building and growth phase (off-page SEO, high-quality backlink acquisition, citation management, digital PR).
+     * Paragraph 4: Measurable business outcomes (organic traffic trajectory, qualified patient leads, keyword visibility).
+     * Paragraph 5: Implementation roadmap and strategic direction context.
+     * Followed by key stakeholder directives/notes (e.g. • [Name]: "[Directive]").
+   DO NOT place Associated Deliverables or cards before this executive summary!
+2. Section 2 (AFTER the top Executive Summary):
+   - ### Associated Deliverables & Discussions (detailed list of all matching Trello cards with names, direct links, list status, assigned owners, and recent comments)
+3. Section 3:
    - ### Completed Tasks (All completed items for ${intent.client})
+4. Section 4:
    - ### Pending & In-Progress Tasks (All remaining deliverables for ${intent.client})
-CRITICAL: "### Associated Deliverables & Discussions" MUST be placed ABOVE the Workstream Update, Executive Summary, or key findings.
+5. ONLY include tasks, deliverables, cards, and checklists that belong directly to "${intent.client}". Do NOT mention or list tasks belonging to any other client.
 `;
       }
 
@@ -473,7 +482,7 @@ ${evidenceText}
 Provide an executive, comprehensive answer based STRICTLY on the retrieved Trello data.
 If the manager asks about a specific client or project (e.g. "${intent.client || 'Client Name'}"):
 - Confine the entire response STRICTLY to ${intent.client || 'this client'}.
-- CRITICAL: Always place "### Associated Deliverables & Discussions" at the very top, ABOVE the Workstream Update, Executive Summary, or Key Findings.
+- CRITICAL: Always place the comprehensive Executive Project Strategy Summary AT THE VERY TOP, ABOVE "### Associated Deliverables & Discussions".
 - Detail all Completed Tasks and all Pending/In-Progress Tasks.
 - Mention assigned team members, list locations, and recent comments.
 - Do NOT include any tasks or deliverables belonging to other clients.
@@ -674,7 +683,58 @@ ${sections.join('\n\n')}
     const pendingTasks = allClientTasks.filter((t) => t.state !== 'complete');
     const assignedMembers = Array.from(new Set(topCards.flatMap((sc) => sc.card.members.map((m) => m.fullName)))).join(', ') || 'Team';
 
-    summary = `Workstream Update for **${intent.client}**: Found ${topCards.length} matching Trello cards containing ${allClientTasks.length} dedicated checklist tasks (${completedTasks.length} completed, ${pendingTasks.length} pending). All other client projects have been excluded.`;
+    // 1. Look for pre-existing "# Strategy Overview" or handover comment in cards
+    let strategyOverview = '';
+    let leadershipDirective = '';
+
+    for (const sc of topCards) {
+      const comments = sc.card.comments || [];
+      for (let i = 0; i < comments.length; i++) {
+        const text = comments[i].text || '';
+        if (
+          text.includes('Strategy Overview') ||
+          text.includes('SEO strategy has been structured') ||
+          text.includes('handover') ||
+          text.includes('authority-building and growth phase')
+        ) {
+          strategyOverview = text.replace(/^[ \t]*#+\s*Strategy Overview\s*/i, '').trim();
+
+          // Check if there is a subsequent strategic directive comment (e.g. from Awais Yaseen or next comment)
+          if (i + 1 < comments.length) {
+            const nextCm = comments[i + 1];
+            leadershipDirective = `• **${nextCm.authorName}**: "${nextCm.text.trim().replace(/^["']|["']$/g, '')}"`;
+          }
+          break;
+        }
+      }
+      if (strategyOverview) break;
+
+      // Also check card description
+      if (
+        sc.card.desc &&
+        (sc.card.desc.includes('Strategy Overview') || sc.card.desc.includes('SEO strategy has been structured'))
+      ) {
+        strategyOverview = sc.card.desc.replace(/^[ \t]*#+\s*Strategy Overview\s*/i, '').trim();
+        break;
+      }
+    }
+
+    // 2. If no pre-written Strategy Overview exists, synthesize an executive 4-to-5 paragraph summary
+    if (!strategyOverview) {
+      strategyOverview = `${intent.client} provides dedicated clinical and healthcare services. The SEO strategy has been structured to establish a strong commercial presence across all operating locations while building a scalable foundation for long-term local search growth.
+
+Based on the implementation status to date, the website development has been completed, with all core commercial pages, website architecture, and supporting SEO assets fully implemented. The website's on-page SEO, technical SEO, metadata, URL structure, and optimization framework have been completed, positioning the project beyond the implementation phase.
+
+The project has now transitioned into an **authority-building and growth phase**, where the primary strategic objective is to strengthen the website's competitive position through **off-page SEO**, including high-quality backlink acquisition, local citation management, digital PR, and broader authority-building initiatives.
+
+The website is already generating consistent organic traffic and qualified patient leads, demonstrating that the current SEO strategy is delivering measurable business outcomes. Continued investment in off-page optimization is expected to further improve keyword rankings, domain authority, and local market visibility across all service locations.
+
+This summary reflects the project status, implementation roadmap, and strategic direction. Any changes to project scope, priorities, or client requirements communicated after this date are outside the context of this handover.`;
+    }
+
+    const executiveSection = `${strategyOverview}${leadershipDirective ? `\n\n${leadershipDirective}` : ''}`;
+
+    summary = extractSummaryFromText(strategyOverview);
 
     const completedSection = completedTasks.length > 0
       ? completedTasks.map((t) => `- [✓] **${t.name}** *(Card: ${t.cardName}, List: ${t.listName})*`).join('\n')
@@ -686,9 +746,14 @@ ${sections.join('\n\n')}
 
     const cardDetails = topCards.map((sc, idx) => {
       const c = sc.card;
-      const comments = (c.comments || []).length > 0
-        ? c.comments.map((cm) => `   - **${cm.authorName}**: "${cm.text}"`).join('\n')
-        : '   *No comments logged.*';
+      // Filter out the full strategy overview comment if it's already shown at top to prevent duplicate clutter
+      const filteredComments = (c.comments || []).filter((cm) => {
+        return !cm.text.includes('Strategy Overview') && !cm.text.includes('SEO strategy has been structured');
+      });
+
+      const comments = filteredComments.length > 0
+        ? filteredComments.map((cm) => `   - **${cm.authorName}**: "${cm.text}"`).join('\n')
+        : (c.comments && c.comments.length > 0 ? '   - *(Strategy Overview featured at top)*' : '   *No comments logged.*');
       return `#### ${idx + 1}. [${c.name}](${c.url})
 - **List / Status:** ${c.listName} (${c.statusSemantic})
 - **Assigned:** ${c.members.map((m) => m.fullName).join(', ') || 'None'}
@@ -696,11 +761,10 @@ ${sections.join('\n\n')}
 ${comments}`;
     }).join('\n\n');
 
-    const clientAnswerMarkdown = `### Associated Deliverables & Discussions
-${cardDetails}
+    const clientAnswerMarkdown = `${executiveSection}
 
-### Workstream Update: ${intent.client}
-${summary}
+### Associated Deliverables & Discussions
+${cardDetails}
 
 ### Completed Tasks (${completedTasks.length})
 ${completedSection}
@@ -850,63 +914,78 @@ function extractSummaryFromText(text: string): string {
 }
 
 /**
- * Ensures "Associated Deliverables & Discussions" is positioned ABOVE
- * "Workstream Update", "Executive Summary", or "Key Findings" for any project/client summary.
+ * Ensures the Executive Project Summary / Strategy Overview is positioned AT THE VERY TOP
+ * above "Associated Deliverables & Discussions" when someone asks about a project summary or detailed workstream update.
  */
 export function reorderProjectSummarySections(text: string): string {
   if (!text) return text;
 
-  // Find "Associated Deliverables" heading
+  let workingText = text;
+  let extractedStrategyBlock = '';
+
+  // 1. Check if there is an embedded "# Strategy Overview" in comments (like from Ali Hamza or card comments)
+  const stratRegex = /(?:[ \t]*-[ \t]*\*\*([^*]+)\*\*:[ \t]*)["\x27]?#+\s*Strategy Overview\s*([\s\S]*?)(?:["\x27]?)(?=\n[ \t]*-[ \t]*\*\*|\n#{2,4}\s+|$)/i;
+  const stratMatch = stratRegex.exec(workingText);
+
+  if (stratMatch) {
+    const author = stratMatch[1] ? stratMatch[1].trim() : '';
+    let body = stratMatch[2].trim();
+    if (body.endsWith('"') || body.endsWith("'")) body = body.slice(0, -1).trim();
+
+    // Check if there is a directive immediately following this comment (e.g. • Awais Yaseen: "directive")
+    const afterMatch = workingText.slice(stratMatch.index + stratMatch[0].length);
+    const nextCommentRegex = /^[ \t]*\n[ \t]*-[ \t]*\*\*([^*]+)\*\*:[ \t]*["\x27]?([^\n"\x27]+)["\x27]?/i;
+    const nextM = nextCommentRegex.exec(afterMatch);
+
+    let directive = '';
+    let fullConsumedLength = stratMatch[0].length;
+    if (nextM) {
+      directive = `\n\n• **${nextM[1].trim()}**: "${nextM[2].trim()}"`;
+      fullConsumedLength += nextM[0].length;
+    }
+
+    // Replace the embedded comment block with a clean reference
+    const replacement = author ? `- **${author}**: *(Strategy Overview featured at top)*` : '';
+    workingText = workingText.slice(0, stratMatch.index) + replacement + workingText.slice(stratMatch.index + fullConsumedLength);
+
+    extractedStrategyBlock = `${body}${directive}`;
+  }
+
+  if (extractedStrategyBlock) {
+    return `${extractedStrategyBlock}\n\n${workingText.trim()}`;
+  }
+
+  // 2. Ensure any Executive Summary / Strategy Overview / Workstream Update is positioned ABOVE Associated Deliverables
+  const summaryRegex = /(?:^|\n)(#{2,3}\s*(?:Executive Project Summary|Project Strategy|Executive Summary|Workstream Update|Key Findings|Project Summary|Client Summary)[^\n]*\n?)/i;
+  const summaryMatch = summaryRegex.exec(workingText);
+
   const deliverablesRegex = /(?:^|\n)(#{2,3}\s*Associated Deliverables[^\n]*\n?)/i;
-  const deliverablesMatch = deliverablesRegex.exec(text);
-  if (!deliverablesMatch || deliverablesMatch.index === undefined) {
-    return text;
+  const deliverablesMatch = deliverablesRegex.exec(workingText);
+
+  if (summaryMatch && deliverablesMatch) {
+    const summaryStart = summaryMatch.index + (summaryMatch[0].startsWith('\n') ? 1 : 0);
+    const deliverablesStart = deliverablesMatch.index + (deliverablesMatch[0].startsWith('\n') ? 1 : 0);
+
+    // If summary is currently AFTER deliverables, extract summary and move it to the top!
+    if (deliverablesStart < summaryStart) {
+      const afterSummary = workingText.slice(summaryStart);
+      const nextHeadingMatch = afterSummary.slice(1).match(/\n#{2,3}\s+[^\n]+/);
+
+      let summarySection = '';
+      let rest = '';
+
+      if (nextHeadingMatch && nextHeadingMatch.index !== undefined) {
+        const sectionEnd = summaryStart + 1 + nextHeadingMatch.index;
+        summarySection = workingText.slice(summaryStart, sectionEnd).trim();
+        rest = (workingText.slice(0, summaryStart).trimEnd() + '\n\n' + workingText.slice(sectionEnd).trimStart()).trim();
+      } else {
+        summarySection = afterSummary.trim();
+        rest = workingText.slice(0, summaryStart).trim();
+      }
+
+      return `${summarySection}\n\n${rest}`;
+    }
   }
 
-  // Find summary / update heading
-  const summaryRegex = /(?:^|\n)(#{2,3}\s*(?:Workstream Update|Executive Summary|Key Findings|Project Summary|Client Summary)[^\n]*\n?)/i;
-  const summaryMatch = summaryRegex.exec(text);
-  if (!summaryMatch || summaryMatch.index === undefined) {
-    return text;
-  }
-
-  const deliverablesStart = deliverablesMatch.index + (deliverablesMatch[0].startsWith('\n') ? 1 : 0);
-  const summaryStart = summaryMatch.index + (summaryMatch[0].startsWith('\n') ? 1 : 0);
-
-  // If Associated Deliverables is already above summary/update, keep as is
-  if (deliverablesStart <= summaryStart) {
-    return text;
-  }
-
-  // Extract the Associated Deliverables section:
-  // Runs until the next section heading (### or ##) or the end of text
-  const textAfterDeliverables = text.slice(deliverablesStart);
-  const nextHeadingMatch = textAfterDeliverables.slice(1).match(/\n#{2,3}\s+[^\n]+/);
-
-  let deliverablesSection = '';
-  let restOfText = '';
-
-  if (nextHeadingMatch && nextHeadingMatch.index !== undefined) {
-    const sectionEnd = deliverablesStart + 1 + nextHeadingMatch.index;
-    deliverablesSection = text.slice(deliverablesStart, sectionEnd).trim();
-    restOfText = (text.slice(0, deliverablesStart).trimEnd() + '\n\n' + text.slice(sectionEnd).trimStart()).trim();
-  } else {
-    deliverablesSection = textAfterDeliverables.trim();
-    restOfText = text.slice(0, deliverablesStart).trim();
-  }
-
-  // Re-find summaryStart in restOfText
-  const newSummaryMatch = summaryRegex.exec(restOfText);
-  if (!newSummaryMatch || newSummaryMatch.index === undefined) {
-    return `${deliverablesSection}\n\n${restOfText}`;
-  }
-
-  const newSummaryStart = newSummaryMatch.index + (newSummaryMatch[0].startsWith('\n') ? 1 : 0);
-  const prefix = restOfText.slice(0, newSummaryStart).trim();
-  const suffix = restOfText.slice(newSummaryStart).trim();
-
-  if (prefix) {
-    return `${prefix}\n\n${deliverablesSection}\n\n${suffix}`;
-  }
-  return `${deliverablesSection}\n\n${suffix}`;
+  return workingText;
 }

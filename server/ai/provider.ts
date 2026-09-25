@@ -18,7 +18,7 @@ export class GeminiProvider implements AIProvider {
 
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY || '';
-    this.modelName = process.env.AI_MODEL || 'gemini-2.5-flash';
+    this.modelName = process.env.AI_MODEL || 'gemini-3.8-flash';
     if (this.apiKey) {
       try {
         this.client = new GoogleGenAI({
@@ -46,6 +46,7 @@ export class GeminiProvider implements AIProvider {
 
     const candidateModels = [
       this.modelName,
+      'gemini-3.8-flash',
       'gemini-flash-latest',
     ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
