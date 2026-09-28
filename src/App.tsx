@@ -272,14 +272,15 @@ export default function App() {
   const handleGenerateBrief = useCallback(async (
     periodType: 'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'custom',
     dateFrom?: string,
-    dateTo?: string
+    dateTo?: string,
+    client?: string
   ) => {
     setIsGeneratingBrief(true);
     try {
       const res = await fetchWithAuth('/api/management-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periodType, dateFrom, dateTo }),
+        body: JSON.stringify({ periodType, dateFrom, dateTo, client }),
       });
 
       if (!res.ok) {
@@ -577,7 +578,7 @@ export default function App() {
       )}
 
       {/* Main Container */}
-      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col relative z-10">
+      <main className="max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 flex flex-col relative z-10 overflow-x-hidden">
         {/* KPI Strip */}
         <MetricsBar
           metrics={metrics}
@@ -587,123 +588,133 @@ export default function App() {
         />
 
         {/* View Navigation Tabs & Live Engine Status */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-          <nav
-            aria-label="Workspace views"
-            className="inline-flex items-center p-1 rounded-xl glass-card gap-1 overflow-x-auto max-w-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-          >
-            {/* Tab: Management Assistant */}
-            <button
-              id="tab-chat-btn"
-              type="button"
-              onClick={() => handleTabChange('chat')}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 group select-none active:scale-[0.98] ${
-                activeTab === 'chat'
-                  ? 'theme-tab-active font-semibold'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50 font-medium border border-transparent'
-              }`}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 sm:mb-6 w-full max-w-full">
+          <div className="relative w-full sm:w-auto overflow-hidden">
+            <nav
+              aria-label="Workspace views"
+              className="flex items-center p-1 rounded-xl glass-card gap-1 overflow-x-auto w-full max-w-full no-scrollbar overscroll-x-contain touch-pan-x"
             >
-              <Sparkles
-                className={`w-3.5 h-3.5 transition-colors ${
-                  activeTab === 'chat' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
-                }`}
-              />
-              <span className="tracking-tight">Management Assistant</span>
-              <span
-                className={`text-[10px] font-mono px-1.5 py-0.2 rounded transition-colors ${
+              {/* Tab: Management Assistant */}
+              <button
+                id="tab-chat-btn"
+                type="button"
+                onClick={() => handleTabChange('chat')}
+                className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 group select-none active:scale-[0.98] ${
                   activeTab === 'chat'
-                    ? 'tab-badge font-semibold'
-                    : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400'
+                    ? 'theme-tab-active font-semibold'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50 font-medium border border-transparent'
                 }`}
               >
-                AI
-              </span>
-            </button>
+                <Sparkles
+                  className={`w-3.5 h-3.5 transition-colors shrink-0 ${
+                    activeTab === 'chat' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
+                  }`}
+                />
+                <span className="tracking-tight">
+                  <span className="hidden sm:inline">Management </span>Assistant
+                </span>
+                <span
+                  className={`text-[9.5px] sm:text-[10px] font-mono px-1.5 py-0.2 rounded transition-colors ${
+                    activeTab === 'chat'
+                      ? 'tab-badge font-semibold'
+                      : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400'
+                  }`}
+                >
+                  AI
+                </span>
+              </button>
 
-            {/* Tab: Executive Briefs */}
-            <button
-              id="tab-brief-btn"
-              type="button"
-              onClick={() => handleTabChange('brief')}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 group select-none active:scale-[0.98] ${
-                activeTab === 'brief'
-                  ? 'theme-tab-active font-semibold'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50 font-medium border border-transparent'
-              }`}
-            >
-              <FileText
-                className={`w-3.5 h-3.5 transition-colors ${
-                  activeTab === 'brief' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
-                }`}
-              />
-              <span className="tracking-tight">Executive Briefs</span>
-              <span
-                className={`text-[10px] font-mono px-1.5 py-0.2 rounded transition-colors ${
+              {/* Tab: Executive Briefs */}
+              <button
+                id="tab-brief-btn"
+                type="button"
+                onClick={() => handleTabChange('brief')}
+                className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 group select-none active:scale-[0.98] ${
                   activeTab === 'brief'
-                    ? 'tab-badge font-semibold'
-                    : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400'
+                    ? 'theme-tab-active font-semibold'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50 font-medium border border-transparent'
                 }`}
               >
-                PDF
-              </span>
-            </button>
+                <FileText
+                  className={`w-3.5 h-3.5 transition-colors shrink-0 ${
+                    activeTab === 'brief' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
+                  }`}
+                />
+                <span className="tracking-tight">
+                  <span className="hidden sm:inline">Executive </span>Briefs
+                </span>
+                <span
+                  className={`text-[9.5px] sm:text-[10px] font-mono px-1.5 py-0.2 rounded transition-colors ${
+                    activeTab === 'brief'
+                      ? 'tab-badge font-semibold'
+                      : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400'
+                  }`}
+                >
+                  PDF
+                </span>
+              </button>
 
-            {/* Tab: Clients & Initiatives */}
-            <button
-              id="tab-clients-btn"
-              type="button"
-              onClick={() => handleTabChange('clients')}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 group select-none active:scale-[0.98] ${
-                activeTab === 'clients'
-                  ? 'theme-tab-active font-semibold'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50 font-medium border border-transparent'
-              }`}
-            >
-              <Building2
-                className={`w-3.5 h-3.5 transition-colors ${
-                  activeTab === 'clients' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
-                }`}
-              />
-              <span className="tracking-tight">Clients & Initiatives</span>
-              <span
-                className={`text-[11px] font-mono tabular-nums px-1.5 py-0.2 rounded transition-colors ${
+              {/* Tab: Clients & Initiatives */}
+              <button
+                id="tab-clients-btn"
+                type="button"
+                onClick={() => handleTabChange('clients')}
+                className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 group select-none active:scale-[0.98] ${
                   activeTab === 'clients'
-                    ? 'tab-badge font-semibold'
-                    : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400'
+                    ? 'theme-tab-active font-semibold'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50 font-medium border border-transparent'
                 }`}
               >
-                {clients.length}
-              </span>
-            </button>
+                <Building2
+                  className={`w-3.5 h-3.5 transition-colors shrink-0 ${
+                    activeTab === 'clients' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
+                  }`}
+                />
+                <span className="tracking-tight">
+                  Clients<span className="hidden sm:inline"> & Initiatives</span>
+                </span>
+                <span
+                  className={`text-[10px] sm:text-[11px] font-mono tabular-nums px-1.5 py-0.2 rounded transition-colors ${
+                    activeTab === 'clients'
+                      ? 'tab-badge font-semibold'
+                      : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400'
+                  }`}
+                >
+                  {clients.length}
+                </span>
+              </button>
 
-            {/* Tab: Team Overview */}
-            <button
-              id="tab-team-btn"
-              type="button"
-              onClick={() => handleTabChange('team')}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 group select-none active:scale-[0.98] ${
-                activeTab === 'team'
-                  ? 'theme-tab-active font-semibold'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50 font-medium border border-transparent'
-              }`}
-            >
-              <Users
-                className={`w-3.5 h-3.5 transition-colors ${
-                  activeTab === 'team' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
-                }`}
-              />
-              <span className="tracking-tight">Team Overview</span>
-              <span
-                className={`text-[11px] font-mono tabular-nums px-1.5 py-0.2 rounded transition-colors ${
+              {/* Tab: Team Overview */}
+              <button
+                id="tab-team-btn"
+                type="button"
+                onClick={() => handleTabChange('team')}
+                className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 group select-none active:scale-[0.98] ${
                   activeTab === 'team'
-                    ? 'tab-badge font-semibold'
-                    : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400'
+                    ? 'theme-tab-active font-semibold'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50 font-medium border border-transparent'
                 }`}
               >
-                {memberOverviews.length || 3}
-              </span>
-            </button>
-          </nav>
+                <Users
+                  className={`w-3.5 h-3.5 transition-colors shrink-0 ${
+                    activeTab === 'team' ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
+                  }`}
+                />
+                <span className="tracking-tight">
+                  Team<span className="hidden sm:inline"> Overview</span>
+                </span>
+                <span
+                  className={`text-[10px] sm:text-[11px] font-mono tabular-nums px-1.5 py-0.2 rounded transition-colors ${
+                    activeTab === 'team'
+                      ? 'tab-badge font-semibold'
+                      : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400'
+                  }`}
+                >
+                  {memberOverviews.length || 3}
+                </span>
+              </button>
+            </nav>
+          </div>
 
           {/* Right Status Indicator: Clean, High-Trust Intelligence Status */}
           <div className="hidden sm:inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl glass-card shrink-0">
@@ -765,6 +776,7 @@ export default function App() {
                 <BriefView
                   currentBrief={currentBrief}
                   savedBriefs={savedBriefs}
+                  clients={clients}
                   onSelectBrief={setCurrentBrief}
                   onGenerateBrief={handleGenerateBrief}
                   onDeleteBrief={handleDeleteBrief}

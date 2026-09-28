@@ -765,7 +765,7 @@ app.get('/api/team', requireAuth, (req, res) => {
 // 8. MANAGEMENT BRIEFS (ISOLATED PER USER ACCOUNT)
 // -------------------------------------------------------------
 app.post('/api/management-brief', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res) => {
-  const { periodType = 'this_month', dateFrom, dateTo } = req.body;
+  const { periodType = 'this_month', dateFrom, dateTo, client } = req.body;
   const allowed = ['overall', 'this_week', 'last_week', 'this_month', 'last_month', 'custom'];
   if (!allowed.includes(periodType)) {
     return res.status(400).json({ error: `periodType must be one of: ${allowed.join(', ')}` });
@@ -778,6 +778,7 @@ app.post('/api/management-brief', requireAuth, requireRole(['ADMIN', 'MANAGER'])
       dateFrom,
       dateTo,
       userId,
+      client,
     });
     res.json(brief);
   } catch (err: any) {

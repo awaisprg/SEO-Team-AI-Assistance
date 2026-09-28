@@ -7,6 +7,7 @@ export interface BriefRequestParams {
   dateFrom?: string;
   dateTo?: string;
   userId?: string;
+  client?: string;
 }
 
 function cleanSnippet(txt?: string, maxLen = 160): string {
@@ -463,10 +464,20 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
   }
 
   // Retrieve live entities
-  const allCards = db.getCards();
+  let allCards = db.getCards();
   const allClients = db.getClients();
   const allLists = db.getLists();
   const allMembers = db.getMembers();
+
+  const isClientTargeted = Boolean(params.client && params.client !== 'all');
+  if (isClientTargeted) {
+    const target = params.client!.toLowerCase().trim();
+    allCards = allCards.filter((c) => {
+      const cardClient = (c.clientCanonical || '').toLowerCase();
+      const cardName = (c.name || '').toLowerCase();
+      return cardClient === target || cardName.includes(target);
+    });
+  }
 
   const windowStartISO = dateFrom ? `${dateFrom}T00:00:00.000Z` : '';
   const windowEndISO = dateTo ? `${dateTo}T23:59:59.999Z` : '';
@@ -857,18 +868,77 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
     }
   }
 
+  // --- EXECUTIVE SCORECARD CALCULATIONS ---
+  const blockedCount = (blockedWork || []).length;
+  let healthStatus: 'on_track' | 'needs_attention' | 'at_risk' = 'on_track';
+  let healthStatusLabel = 'On Track • Strong Delivery Velocity';
+  let healthScore = 96;
+
+  if (blockedCount >= 3) {
+    healthStatus = 'at_risk';
+    healthStatusLabel = 'At Risk • Critical Blockers Active';
+    healthScore = 72;
+  } else if (blockedCount >= 1) {
+    healthStatus = 'needs_attention';
+    healthStatusLabel = 'Needs Attention • Client Dependencies Pending';
+    healthScore = 84;
+  }
+
+  const completedCount = isOverall
+    ? allCards.filter((c) => c.statusSemantic === 'Completed').length
+    : cardsCompletedInWindow.length;
+  const activeCount = activeUncompletedCards.length;
+  const totalTracked = completedCount + activeCount || 1;
+  const deliveryVelocityRate = Math.min(100, Math.max(25, Math.round((completedCount / totalTracked) * 100))) || 75;
+
+  const bluf = {
+    currentState: `${isClientTargeted ? `For ${params.client}, the team is advancing` : 'Across the agency portfolio, the team is advancing'} ${activeUncompletedCards.length} active deliverables with ${completedCount} verified milestones completed ${isOverall ? 'overall' : 'in this window'}.`,
+    criticalBlocker: blockedWork && blockedWork.length > 0
+      ? blockedWork[0]
+      : 'No critical blockers identified. Client approval gates and technical deliverables are progressing without delays.',
+    managementPriority: currentPriorities && currentPriorities.length > 0
+      ? currentPriorities[0]
+      : 'Maintain scheduled velocity on staging reviews and ensure 48-hour turnarounds on quality review items.',
+  };
+
+  // Resource allocation summary
+  const resourceMap = new Map<string, { activeCount: number; completedCount: number }>();
+  for (const card of (isOverall ? activeUncompletedCards : [...cardsCompletedInWindow, ...activeUncompletedCards])) {
+    for (const m of card.members || []) {
+      const name = m.fullName || m.username;
+      if (!name) continue;
+      const entry = resourceMap.get(name) || { activeCount: 0, completedCount: 0 };
+      if (card.statusSemantic === 'Completed') entry.completedCount++;
+      else entry.activeCount++;
+      resourceMap.set(name, entry);
+    }
+  }
+  const resourceAllocation = Array.from(resourceMap.entries())
+    .map(([specialist, counts]) => ({ specialist, ...counts }))
+    .sort((a, b) => (b.activeCount + b.completedCount) - (a.activeCount + a.completedCount))
+    .slice(0, 6);
+
   const brief: ManagementBrief = {
     id: `brief_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     userId: params.userId || 'usr_admin_awais',
+    clientTarget: isClientTargeted ? params.client : undefined,
     periodType: params.periodType,
     dateFrom: dateFrom || '',
     dateTo: dateTo || now.toISOString().slice(0, 10),
-    title: `SEO & Content Team Management Brief — ${periodLabel}`,
+    title: isClientTargeted
+      ? `${params.client} — Executive Status Brief (${periodLabel})`
+      : `SEO & Content Team Management Brief — ${periodLabel}`,
     executiveSummary,
     cardsCreatedCount: isOverall ? undefined : cardsCreatedInWindow.length,
     cardsCompletedCount: isOverall ? undefined : cardsCompletedInWindow.length,
     checklistTasksCompletedCount: isOverall ? undefined : checklistItemsCompletedInWindow.length,
     activePipelineCount: activeUncompletedCards.length,
+    healthStatus,
+    healthScore,
+    healthStatusLabel,
+    deliveryVelocityRate,
+    bluf,
+    resourceAllocation,
     majorAccomplishments,
     seoActivity,
     contentActivity,

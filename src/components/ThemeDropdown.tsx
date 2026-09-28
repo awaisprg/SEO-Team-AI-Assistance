@@ -75,7 +75,7 @@ export const ThemeDropdown: React.FC = () => {
         type="button"
         id="theme-dropdown-btn"
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all cursor-pointer relative shadow-2xs group select-none active:scale-[0.98] ${
+        className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl flex items-center justify-center transition-all cursor-pointer relative shadow-2xs group select-none active:scale-[0.98] ${
           isOpen
             ? 'bg-white dark:bg-slate-700 text-[var(--theme-primary)] border-2 border-[var(--theme-primary)] shadow-xs ring-2 ring-[var(--theme-primary)]/15'
             : 'bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-700/90 border border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600'
@@ -85,11 +85,11 @@ export const ThemeDropdown: React.FC = () => {
         aria-haspopup="menu"
         aria-expanded={isOpen}
       >
-        <Palette className="w-4 h-4 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-105" />
+        <Palette className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 group-hover:rotate-12 group-hover:scale-105" />
 
         {/* Integrated neat color accent indicator */}
         <span
-          className="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full ring-1 ring-white dark:ring-slate-900 shadow-2xs"
+          className="absolute bottom-1 sm:bottom-1.5 right-1 sm:right-1.5 w-1.5 h-1.5 rounded-full ring-1 ring-white dark:ring-slate-900 shadow-2xs"
           style={{ background: themeConfig.colors.primaryGradient }}
         />
       </button>
@@ -97,7 +97,7 @@ export const ThemeDropdown: React.FC = () => {
       {/* Theme Dropdown Menu */}
       {isOpen && (
         <div
-          className="absolute right-0 mt-2 w-56 rounded-xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/90 dark:border-slate-700/90 shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150 text-left focus:outline-hidden"
+          className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-24px)] rounded-xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/90 dark:border-slate-700/90 shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150 text-left focus:outline-hidden"
           role="menu"
           aria-orientation="vertical"
           aria-labelledby="theme-dropdown-btn"

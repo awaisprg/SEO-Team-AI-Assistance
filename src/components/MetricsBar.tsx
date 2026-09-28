@@ -177,24 +177,24 @@ const MetricsBarComponent: React.FC<MetricsBarProps> = ({
 
   if (!metrics) {
     return (
-      <div id="metrics-bar-skeleton" className="mb-5">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div id="metrics-bar-skeleton" className="mb-4 sm:mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div
               key={i}
-              className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3"
+              className="p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-2.5 sm:space-y-3"
             >
               <div className="flex items-center justify-between">
-                <div className="h-3 w-20 rounded shimmer-box" />
-                <div className="w-7 h-7 rounded-xl shimmer-box" />
+                <div className="h-3 w-16 sm:w-20 rounded shimmer-box" />
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl shimmer-box" />
               </div>
               <div className="space-y-1">
-                <div className="h-7 w-12 rounded shimmer-box-dark" />
-                <div className="h-2.5 w-16 rounded shimmer-box" />
+                <div className="h-6 sm:h-7 w-10 sm:w-12 rounded shimmer-box-dark" />
+                <div className="h-2 sm:h-2.5 w-14 sm:w-16 rounded shimmer-box" />
               </div>
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                <div className="h-4 w-16 rounded-full shimmer-box" />
-                <div className="w-5 h-5 rounded-full shimmer-box" />
+                <div className="h-3.5 sm:h-4 w-14 sm:w-16 rounded-full shimmer-box" />
+                <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full shimmer-box" />
               </div>
             </div>
           ))}
@@ -204,9 +204,9 @@ const MetricsBarComponent: React.FC<MetricsBarProps> = ({
   }
 
   return (
-    <div id="metrics-bar" className="mb-5">
+    <div id="metrics-bar" className="mb-4 sm:mb-5">
       {/* Grid of KPI Cards (6 cards in requested order) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
         {cards.map((card, idx) => {
           const Icon = card.icon;
           const staggerDelay = `${idx * 65}ms`;
@@ -223,7 +223,7 @@ const MetricsBarComponent: React.FC<MetricsBarProps> = ({
                 ['--kpi-glow-border' as any]: card.glowBorder,
                 ['--kpi-glow-color' as any]: card.glowColor,
               }}
-              className={`relative p-3.5 rounded-2xl text-left cursor-pointer group flex flex-col justify-between overflow-hidden glass-card kpi-card-interactive focus:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 ${
+              className={`relative p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl text-left cursor-pointer group flex flex-col justify-between overflow-hidden glass-card kpi-card-interactive focus:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 ${
                 isPulsing ? 'kpi-pulse-sync ring-1 ring-violet-500/40' : ''
               } ${isSyncing ? 'opacity-85' : ''}`}
             >
@@ -242,44 +242,44 @@ const MetricsBarComponent: React.FC<MetricsBarProps> = ({
               />
 
               {/* Top row: Label & Icon */}
-              <div className="flex items-center justify-between mb-2 relative z-10">
-                <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 tracking-tight truncate pr-1 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+              <div className="flex items-center justify-between mb-1.5 sm:mb-2 relative z-10">
+                <span className="text-[10.5px] sm:text-[11px] font-semibold text-slate-600 dark:text-slate-300 tracking-tight truncate pr-1 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
                   {card.title}
                 </span>
                 <div
-                  className={`w-7 h-7 rounded-xl flex items-center justify-center border shrink-0 transition-transform group-hover:scale-110 duration-200 ${card.iconBg} shadow-2xs`}
+                  className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center border shrink-0 transition-transform group-hover:scale-110 duration-200 ${card.iconBg} shadow-2xs`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${card.iconColor}`} />
+                  <Icon className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${card.iconColor}`} />
                 </div>
               </div>
 
               {/* Middle: Clean Counter Metric */}
-              <div className="my-1.5 relative z-10">
+              <div className="my-1 sm:my-1.5 relative z-10">
                 <div
                   style={isPulsing ? { animationDelay: `${idx * 65 + 100}ms` } : undefined}
-                  className={`text-2xl sm:text-[26px] font-extrabold text-slate-900 dark:text-white tracking-tight tabular-nums leading-none font-sans transition-transform ${
+                  className={`text-xl sm:text-2xl lg:text-[26px] font-extrabold text-slate-900 dark:text-white tracking-tight tabular-nums leading-none font-sans transition-transform ${
                     isPulsing ? 'kpi-number-pop' : ''
                   }`}
                 >
                   {card.value}
                 </div>
-                <div className="text-[11px] font-medium text-slate-400 dark:text-slate-500 tracking-tight truncate mt-1">
+                <div className="text-[10px] sm:text-[11px] font-medium text-slate-400 dark:text-slate-500 tracking-tight truncate mt-0.5 sm:mt-1">
                   {card.unit}
                 </div>
               </div>
 
               {/* Bottom Row: Unboxed Status indicator & Clear Query affordance */}
-              <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-100/90 dark:border-slate-800/80 relative z-10 text-[11px]">
-                <div className="flex items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400 truncate">
+              <div className="flex items-center justify-between mt-2 pt-1.5 sm:mt-2.5 sm:pt-2 border-t border-slate-100/90 dark:border-slate-800/80 relative z-10 text-[10px] sm:text-[11px]">
+                <div className="flex items-center gap-1 sm:gap-1.5 font-medium text-slate-500 dark:text-slate-400 truncate">
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${card.dotColor}`} />
                   <span className="truncate">{card.badge}</span>
                 </div>
 
-                <div className="flex items-center gap-1 text-[11px] font-medium text-slate-400 dark:text-slate-500 transition-colors shrink-0 pl-1 group-hover:text-[var(--kpi-glow-border)]">
+                <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-medium text-slate-400 dark:text-slate-500 transition-colors shrink-0 pl-1 group-hover:text-[var(--kpi-glow-border)]">
                   <span className="hidden sm:inline opacity-0 group-hover:opacity-100 transition-opacity font-semibold">
                     Query
                   </span>
-                  <ArrowRight className="w-3 h-3 text-slate-300 dark:text-slate-600 group-hover:text-[var(--kpi-glow-border)] group-hover:translate-x-0.5 transition-all" />
+                  <ArrowRight className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-300 dark:text-slate-600 group-hover:text-[var(--kpi-glow-border)] group-hover:translate-x-0.5 transition-all" />
                 </div>
               </div>
             </button>

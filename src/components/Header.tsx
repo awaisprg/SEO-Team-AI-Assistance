@@ -3,11 +3,8 @@ import {
   RefreshCw,
   Database,
   Settings,
-  ShieldCheck,
   LogOut,
   ChevronRight,
-  Activity,
-  Layers,
   Sparkles,
 } from 'lucide-react';
 import { TrelloConnectionStatus, UserSession } from '../types';
@@ -38,60 +35,88 @@ const HeaderComponent: React.FC<HeaderProps> = ({
   const role = user?.role || 'MANAGER';
   const isAdmin = role === 'ADMIN';
   const { themeConfig } = useTheme();
-  const displayName = user ? user.name.replace(/\s*\((Admin|Manager)\)/i, '').trim() : '';
+
+  // Clean user display name (strip any appended role tags like "(Admin)" or "(Manager)")
+  const displayName = user
+    ? user.name.replace(/\s*[-–(]?\s*(Admin|Manager|Administrator)\s*[)]?/gi, '').trim() || user.name
+    : '';
+
+  // Extract clean initials
+  const initials = displayName
+    ? displayName
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((p) => p[0].toUpperCase())
+        .join('')
+    : 'GF';
 
   return (
     <header
       id="app-header"
       className="backdrop-blur-xl border-b sticky top-0 z-40 transition-all shadow-xs"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between min-h-16 sm:h-[68px] gap-3 sm:gap-4 py-2 sm:py-2.5">
-          {/* Left: Brand & Product Identity */}
-          <div className="flex flex-col justify-center shrink-0">
-            <a
-              href="https://goldflexmarketing.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center group transition-all"
-              title="Gold Flex Marketing Home"
-            >
-              <img
-                src="https://goldflexmarketing.com/wp-content/uploads/2026/01/Gold-Flex-Marketing-Dark-1024x260.png"
-                alt="Gold Flex Marketing"
-                className={`h-7 sm:h-7.5 w-auto object-contain shrink-0 transition-transform group-hover:scale-[1.01] ${
-                  themeConfig.isDark ? 'brightness-0 invert' : ''
-                }`}
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                  const fallback = document.getElementById('gfm-logo-fallback');
-                  if (fallback) fallback.style.display = 'flex';
-                }}
-              />
-              <div
-                id="gfm-logo-fallback"
-                style={{ display: 'none' }}
-                className="items-center space-x-2 font-bold tracking-tight text-slate-900 dark:text-white"
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between min-h-14 sm:h-[68px] gap-2 sm:gap-4 py-1.5 sm:py-2.5">
+          {/* Left: Brand Identity & Executive Hub */}
+          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
+            {/* Prominent Logo & SEO Subtitle */}
+            <div className="flex flex-col justify-center min-w-0">
+              <a
+                href="https://goldflexmarketing.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center group transition-all"
+                title="Gold Flex Marketing Home"
               >
+                <img
+                  src="https://goldflexmarketing.com/wp-content/uploads/2026/01/Gold-Flex-Marketing-Dark-1024x260.png"
+                  alt="Gold Flex Marketing"
+                  className={`h-7 sm:h-8.5 w-auto object-contain shrink-0 transition-transform group-hover:scale-[1.01] ${
+                    themeConfig.isDark ? 'brightness-0 invert' : ''
+                  }`}
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                    const fallback = document.getElementById('gfm-logo-fallback');
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
                 <div
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-xs"
-                  style={{ background: themeConfig.colors.primaryGradient }}
+                  id="gfm-logo-fallback"
+                  style={{ display: 'none' }}
+                  className="items-center space-x-1.5 sm:space-x-2 font-bold tracking-tight text-slate-900 dark:text-white"
                 >
-                  GF
+                  <div
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-xs shrink-0"
+                    style={{ background: themeConfig.colors.primaryGradient }}
+                  >
+                    GF
+                  </div>
+                  <span className="font-bold tracking-tight text-slate-900 dark:text-white text-sm sm:text-base whitespace-nowrap">
+                    Gold Flex Marketing
+                  </span>
                 </div>
-                <span className="font-bold tracking-tight text-slate-900 dark:text-white text-base">
-                  Gold Flex Marketing
-                </span>
-              </div>
-            </a>
+              </a>
 
-            {/* Product Tagline directly under logo: High-contrast, crystal clear readability */}
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs sm:text-[13px] font-semibold text-slate-800 dark:text-slate-100 tracking-tight leading-none whitespace-nowrap">
-                SEO & Content Intelligence
+              {/* Tagline directly under logo */}
+              <span className="text-[10px] sm:text-xs md:text-[13px] font-semibold text-slate-800 dark:text-slate-100 tracking-tight leading-none mt-1 whitespace-nowrap">
+                SEO &amp; Content Intelligence
               </span>
-              <span className="text-slate-300 dark:text-slate-600 select-none text-xs">·</span>
-              <span className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 tracking-tight whitespace-nowrap">
+            </div>
+
+            {/* Subtle Divider */}
+            <div className="h-6 sm:h-7 w-px bg-slate-200 dark:bg-slate-700/80 hidden xs:block shrink-0" />
+
+            {/* Elevated Executive Hub Indicator */}
+            <div
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10.5px] sm:text-xs font-semibold tracking-wide bg-gradient-to-r from-amber-500/10 via-amber-500/15 to-amber-600/10 dark:from-amber-400/15 dark:via-amber-400/10 dark:to-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-300/50 dark:border-amber-500/30 shadow-2xs select-none backdrop-blur-md shrink-0"
+              title="Gold Flex Marketing Executive Intelligence Hub"
+            >
+              <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+              </span>
+              <span className="font-bold tracking-tight text-amber-900 dark:text-amber-100 whitespace-nowrap">
                 Executive Hub
               </span>
             </div>
@@ -161,7 +186,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
           </div>
 
           {/* Right: Actions, Theme Selector & User Cluster */}
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Theme Dropdown */}
             <ThemeDropdown />
 
@@ -170,7 +195,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
               id="header-sync-btn"
               onClick={onSync}
               disabled={isSyncing}
-              className="inline-flex items-center justify-center gap-2 text-xs font-semibold h-9 px-3.5 rounded-xl theme-action-primary text-white focus:outline-hidden disabled:opacity-60 transition-all shadow-xs hover:shadow-sm cursor-pointer group active:scale-[0.97] select-none"
+              className="inline-flex items-center justify-center gap-1.5 sm:gap-2 text-xs font-semibold h-8 w-8 sm:h-9 sm:w-auto px-0 sm:px-3.5 rounded-lg sm:rounded-xl theme-action-primary text-white focus:outline-hidden disabled:opacity-60 transition-all shadow-xs hover:shadow-sm cursor-pointer group active:scale-[0.97] select-none shrink-0"
               title={syncPhase || 'Synchronize cards, checklists, comments, and activities from Trello'}
             >
               <RefreshCw
@@ -188,7 +213,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
               <button
                 id="header-seed-demo-btn"
                 onClick={onSeedDemo}
-                className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold h-9 px-3.5 rounded-xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700/90 hover:bg-white dark:hover:bg-slate-700/90 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-white transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-[0.97] select-none"
+                className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold h-8 sm:h-9 px-2 sm:px-3.5 rounded-lg sm:rounded-xl bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700/90 hover:bg-white dark:hover:bg-slate-700/90 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-white transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-[0.97] select-none shrink-0"
                 title="Reset to pre-loaded rich demo dataset"
               >
                 <Database className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
@@ -201,48 +226,39 @@ const HeaderComponent: React.FC<HeaderProps> = ({
               <button
                 id="header-settings-btn"
                 onClick={onOpenSettings}
-                className="h-9 w-9 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700/90 border border-slate-200/90 dark:border-slate-700/90 hover:border-slate-300 dark:hover:border-slate-600 transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-[0.97] group select-none"
+                className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700/90 border border-slate-200/90 dark:border-slate-700/90 hover:border-slate-300 dark:hover:border-slate-600 transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-[0.97] group select-none shrink-0"
                 title="Configure Trello integration, API keys & custom credentials"
               >
-                <Settings className="w-4 h-4 shrink-0 group-hover:rotate-45 transition-transform duration-300" />
+                <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 group-hover:rotate-45 transition-transform duration-300" />
               </button>
             )}
 
-            <div className="h-5 w-px bg-gradient-to-b from-transparent via-slate-200 to-transparent dark:via-slate-700 mx-0.5" />
+            <div className="h-4 sm:h-5 w-px bg-gradient-to-b from-transparent via-slate-200 to-transparent dark:via-slate-700 mx-0.5 shrink-0" />
 
-            {/* User Profile Pill */}
+            {/* User Profile Pill - Clean & Focused: Avatar + Name only */}
             {user && (
-              <div className="h-9 pl-1.5 pr-2.5 rounded-xl border border-slate-200/90 dark:border-slate-700/90 bg-white/90 dark:bg-slate-800/90 shadow-2xs hover:shadow-xs hover:border-slate-300 dark:hover:border-slate-600 transition-all flex items-center gap-2.5 backdrop-blur-md select-none">
+              <div className="h-8 sm:h-9 pl-1 sm:pl-1.5 pr-1 sm:pr-2 rounded-lg sm:rounded-xl border border-slate-200/90 dark:border-slate-700/90 bg-white/90 dark:bg-slate-800/90 shadow-2xs hover:shadow-xs hover:border-slate-300 dark:hover:border-slate-600 transition-all flex items-center gap-1.5 sm:gap-2 backdrop-blur-md select-none shrink-0">
                 <div
-                  className="w-6.5 h-6.5 rounded-lg text-white flex items-center justify-center text-[10px] font-bold tracking-wider shadow-xs shrink-0 ring-1 ring-black/10"
+                  className="w-6 h-6 sm:w-6.5 sm:h-6.5 rounded-md sm:rounded-lg text-white flex items-center justify-center text-[10px] font-bold tracking-wider shadow-xs shrink-0 ring-1 ring-black/10"
                   style={{ background: themeConfig.colors.primaryGradient }}
-                  title={`${user.name} (${user.email})`}
+                  title={user.email ? `${displayName || user.name} (${user.email})` : displayName || user.name}
                 >
-                  {displayName.slice(0, 2).toUpperCase() || 'AW'}
+                  {initials}
                 </div>
 
-                <div className="hidden sm:flex flex-col text-left justify-center min-w-0">
-                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 leading-tight truncate max-w-[105px]">
+                <div className="hidden sm:block text-left min-w-0 pr-1">
+                  <div
+                    className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate max-w-[100px] md:max-w-[130px] tracking-tight leading-none"
+                    title={user.email ? `${displayName || user.name} (${user.email})` : displayName || user.name}
+                  >
                     {displayName || user.name}
-                  </div>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    {isAdmin ? (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-200/90 dark:border-amber-800/80 uppercase tracking-wider leading-none shadow-2xs">
-                        <ShieldCheck className="w-2.5 h-2.5 mr-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                        Admin
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider leading-none">
-                        {role}
-                      </span>
-                    )}
                   </div>
                 </div>
 
                 <button
                   id="header-signout-btn"
                   onClick={onSignOut}
-                  className="h-6 w-6 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 flex items-center justify-center transition-all cursor-pointer ml-0.5"
+                  className="h-6 w-6 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 flex items-center justify-center transition-all cursor-pointer shrink-0"
                   title="Sign Out of Session"
                 >
                   <LogOut className="w-3.5 h-3.5" />

@@ -239,6 +239,7 @@ export interface ChatSession {
 export interface ManagementBrief {
   id: string;
   userId?: string;
+  clientTarget?: string;
   periodType: 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'overall' | 'custom';
   dateFrom: string;
   dateTo: string;
@@ -248,6 +249,20 @@ export interface ManagementBrief {
   cardsCompletedCount?: number;
   checklistTasksCompletedCount?: number;
   activePipelineCount?: number;
+  healthStatus?: 'on_track' | 'needs_attention' | 'at_risk';
+  healthScore?: number;
+  healthStatusLabel?: string;
+  deliveryVelocityRate?: number;
+  bluf?: {
+    currentState: string;
+    criticalBlocker: string;
+    managementPriority: string;
+  };
+  resourceAllocation?: {
+    specialist: string;
+    activeCount: number;
+    completedCount: number;
+  }[];
   majorAccomplishments: string[];
   seoActivity: string[];
   contentActivity: string[];
