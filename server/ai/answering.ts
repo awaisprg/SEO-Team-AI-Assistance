@@ -435,24 +435,33 @@ Relevance Score: ${sc.relevance}% (${sc.reason})
         clientContext = `
 STRICT CLIENT SCOPING DIRECTIVE:
 The manager is asking specifically for a project summary or detailed workstream update on: "${intent.client}".
+
+CRITICAL EVIDENCE RULES:
+- Trello is connected: gather ALL information from Trello about the asked project (all cards across lists, full checklists, comments, attachments, URLs).
+- NEVER assume or hallucinate medical, clinical, or patient services unless explicitly documented in the retrieved Trello cards for this client!
+- For custom printing/graphics clients (such as Unlimited Graphix), describe their actual graphics, printing, logo, branding, web development, and digital marketing services as documented in their checklists and cards.
+- Ground every statement strictly in the retrieved Trello evidence.
+
 CRITICAL STRUCTURE REQUIREMENTS:
-1. AT THE VERY TOP OF YOUR RESPONSE (Section 1), you MUST provide the comprehensive Executive Project Strategy & Workstream Summary.
+1. AT THE VERY TOP OF YOUR RESPONSE (Section 1), you MUST provide the comprehensive Executive Project Strategy & Workstream Summary:
    - If the retrieved cards contain a "# Strategy Overview" or handover comment (e.g. by Ali Hamza or Awais Yaseen), feature that full multi-paragraph strategic overview prominently at the very top, along with any subsequent key stakeholder directives (e.g. • Awais Yaseen: "directive").
-   - If no pre-written strategy overview exists, synthesize an executive 4-to-5 paragraph strategic narrative matching this exact standard:
-     * Paragraph 1: Service offerings, operating locations, and foundational SEO architecture for long-term growth.
-     * Paragraph 2: Website & SEO technical implementation status up to recent milestone date (core commercial pages, technical SEO, on-page SEO, metadata, URL structure, and optimization framework completed).
-     * Paragraph 3: Current authority-building and growth phase (off-page SEO, high-quality backlink acquisition, citation management, digital PR).
-     * Paragraph 4: Measurable business outcomes (organic traffic trajectory, qualified patient leads, keyword visibility).
-     * Paragraph 5: Implementation roadmap and strategic direction context.
+   - If no pre-written strategy overview exists, synthesize an executive 4-to-5 paragraph strategic narrative grounded strictly in the retrieved Trello data:
+     * Paragraph 1 (Scope & Business Positioning): Client overview, active service lines from checklists (e.g. Services checklist items like Logo, Website Development, Maintenance, SEO, Social Media, Email Marketing), live domain, and commercial objectives.
+     * Paragraph 2 (Current Operational Status): Implementation progress to date, including audits, onboarding, demo/staging websites (cite staging URLs like stag8.drgekas.com and demo review feedback from comments), and active development directives.
+     * Paragraph 3 (Account Access, Assets & Stakeholder Directives): Access secured (e.g. Google Business Profile access, email setup), transition docs or SEO sheets, and direct quotes from team leadership comments.
+     * Paragraph 4 (Strategic Roadmap & Upcoming Milestones): Detail upcoming checklist milestones (e.g. Workflow items: SEO Strategy, Website Structure, Content Development, Client Approval & Launch, Off-Page SEO, GBP SEO).
+     * Paragraph 5 (Governance & Ownership Context): Summary of active ownership and verified data status.
      * Followed by key stakeholder directives/notes (e.g. • [Name]: "[Directive]").
    DO NOT place Associated Deliverables or cards before this executive summary!
 2. Section 2 (AFTER the top Executive Summary):
    - ### Associated Deliverables & Discussions (detailed list of all matching Trello cards with names, direct links, list status, assigned owners, and recent comments)
 3. Section 3:
-   - ### Completed Tasks (All completed items for ${intent.client})
+   - ### Completed Tasks & Milestones (All completed items for ${intent.client})
 4. Section 4:
    - ### Pending & In-Progress Tasks (All remaining deliverables for ${intent.client})
-5. ONLY include tasks, deliverables, cards, and checklists that belong directly to "${intent.client}". Do NOT mention or list tasks belonging to any other client.
+5. Section 5:
+   - ### Key Project Assets & Documentation (All discovered websites, staging URLs, Google Drive spreadsheets/docs, and attachments)
+6. ONLY include tasks, deliverables, cards, and checklists that belong directly to "${intent.client}". Do NOT mention or list tasks belonging to any other client.
 `;
       }
 
@@ -673,6 +682,7 @@ ${sections.join('\n\n')}
         cl.items.map((it) => ({
           ...it,
           cardName: sc.card.name,
+          cardUrl: sc.card.url,
           listName: sc.card.listName,
           clName: cl.name,
         }))
@@ -699,7 +709,7 @@ ${sections.join('\n\n')}
         ) {
           strategyOverview = text.replace(/^[ \t]*#+\s*Strategy Overview\s*/i, '').trim();
 
-          // Check if there is a subsequent strategic directive comment (e.g. from Awais Yaseen or next comment)
+          // Check if there is a subsequent strategic directive comment
           if (i + 1 < comments.length) {
             const nextCm = comments[i + 1];
             leadershipDirective = `• **${nextCm.authorName}**: "${nextCm.text.trim().replace(/^["']|["']$/g, '')}"`;
@@ -719,29 +729,131 @@ ${sections.join('\n\n')}
       }
     }
 
-    // 2. If no pre-written Strategy Overview exists, synthesize an executive 4-to-5 paragraph summary
+    // 2. If no pre-written Strategy Overview exists, synthesize an executive multi-paragraph summary grounded strictly in THIS client's Trello data
     if (!strategyOverview) {
-      strategyOverview = `${intent.client} provides dedicated clinical and healthcare services. The SEO strategy has been structured to establish a strong commercial presence across all operating locations while building a scalable foundation for long-term local search growth.
+      // A. Extract services from checklists
+      const servicesChecklist = topCards
+        .flatMap((sc) => sc.card.checklists)
+        .find((cl) => /services|scope|deliverables|capabilities/i.test(cl.name));
+      const serviceItems = servicesChecklist ? servicesChecklist.items.map((it) => it.name) : [];
 
-Based on the implementation status to date, the website development has been completed, with all core commercial pages, website architecture, and supporting SEO assets fully implemented. The website's on-page SEO, technical SEO, metadata, URL structure, and optimization framework have been completed, positioning the project beyond the implementation phase.
+      // B. Extract workflow stages
+      const workflowChecklist = topCards
+        .flatMap((sc) => sc.card.checklists)
+        .find((cl) => /workflow|process|phases|milestones/i.test(cl.name));
+      const completedWorkflow = workflowChecklist
+        ? workflowChecklist.items.filter((it) => it.state === 'complete').map((it) => it.name)
+        : completedTasks.map((t) => t.name);
+      const pendingWorkflow = workflowChecklist
+        ? workflowChecklist.items.filter((it) => it.state !== 'complete').map((it) => it.name)
+        : pendingTasks.map((t) => t.name);
 
-The project has now transitioned into an **authority-building and growth phase**, where the primary strategic objective is to strengthen the website's competitive position through **off-page SEO**, including high-quality backlink acquisition, local citation management, digital PR, and broader authority-building initiatives.
+      // C. Extract links, staging environments, docs, and substantive comments
+      const liveUrls: string[] = [];
+      const stagingUrls: string[] = [];
+      const docLinks: { title: string; url: string }[] = [];
+      const substantiveComments: { author: string; text: string; date: string }[] = [];
 
-The website is already generating consistent organic traffic and qualified patient leads, demonstrating that the current SEO strategy is delivering measurable business outcomes. Continued investment in off-page optimization is expected to further improve keyword rankings, domain authority, and local market visibility across all service locations.
+      for (const sc of topCards) {
+        for (const cm of sc.card.comments || []) {
+          const text = cm.text || '';
+          const urlMatches = text.match(/https?:\/\/[^\s")]+/g) || [];
+          for (const u of urlMatches) {
+            const cleanU = u.replace(/[\])]+$/, '');
+            if (/stag\d+\.drgekas\.com|staging|preview/i.test(cleanU)) {
+              if (!stagingUrls.includes(cleanU)) stagingUrls.push(cleanU);
+            } else if (/docs\.google\.com|spreadsheets|document/i.test(cleanU)) {
+              const linkTitleMatch = text.match(new RegExp(`\\[([^\\]]+)\\]\\(${cleanU.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'));
+              const title = linkTitleMatch ? linkTitleMatch[1] : 'Google Workspace Document';
+              if (!docLinks.some((d) => d.url === cleanU)) docLinks.push({ title, url: cleanU });
+            } else if (!cleanU.includes('trello.com') && !liveUrls.includes(cleanU)) {
+              liveUrls.push(cleanU);
+            }
+          }
 
-This summary reflects the project status, implementation roadmap, and strategic direction. Any changes to project scope, priorities, or client requirements communicated after this date are outside the context of this handover.`;
+          if (text.length > 25 && !text.startsWith('http') && !text.startsWith('[')) {
+            substantiveComments.push({
+              author: cm.authorName,
+              text: text.trim(),
+              date: cm.createdAt ? cm.createdAt.slice(0, 10) : '',
+            });
+          }
+        }
+      }
+
+      // Paragraph 1: Service Scope & Commercial Architecture
+      let p1Services = '';
+      if (serviceItems.length > 0) {
+        p1Services = `The project scope covers core service capabilities including **${serviceItems.join('**, **')}**. `;
+      } else {
+        p1Services = `The project scope covers dedicated website development, technical architecture, and search visibility deliverables. `;
+      }
+
+      const domainMention = liveUrls.length > 0 ? ` (${liveUrls[0]})` : '';
+      const listsRepresented = Array.from(new Set(topCards.map((sc) => sc.card.listName))).join(', ');
+      const labelsRepresented = Array.from(new Set(topCards.flatMap((sc) => sc.card.labels.map((l) => l.name)))).filter(Boolean);
+      const labelSuffix = labelsRepresented.length > 0 ? ` with **${labelsRepresented.join(', ')}** priority` : '';
+
+      const p1 = `**${intent.client}**${domainMention} is actively tracked across **${listsRepresented}**${labelSuffix}. ${p1Services}The campaign strategy is structured to establish a strong commercial presence, high-performance website infrastructure, and scalable organic growth.`;
+
+      // Paragraph 2: Technical & Operational Implementation Status
+      const completedMilestoneText = completedWorkflow.length > 0
+        ? `Foundational onboarding and audit milestones have been completed to date, including **${completedWorkflow.join('** and **')}**.`
+        : `Initial project setup and scoping deliverables have been completed on the board.`;
+
+      let demoStagingText = '';
+      if (stagingUrls.length > 0) {
+        demoStagingText = ` A dedicated demo/staging environment has been deployed at [${stagingUrls[0]}](${stagingUrls[0]}) and shared with the client for feedback and review.`;
+      }
+
+      const p2 = `Based on verified Trello tracking, ${completedMilestoneText}${demoStagingText} Development directives are actively in place to complete dedicated service pages and foundational web assets while awaiting detailed client feedback.`;
+
+      // Paragraph 3: Directives, Asset Access & Team Discussions
+      let p3 = '';
+      const recentSubstantive = substantiveComments[0];
+      if (recentSubstantive) {
+        p3 = `Recent team updates logged by **${recentSubstantive.author}**: "${recentSubstantive.text.replace(/\n+/g, ' ')}"`;
+      } else if (docLinks.length > 0) {
+        p3 = `Core project assets including the **${docLinks[0].title}** have been linked and deployed to direct project execution.`;
+      } else {
+        p3 = `The SEO and development team is actively coordinating sprint tasks to advance upcoming deliverables on schedule.`;
+      }
+
+      // Paragraph 4: Upcoming Strategic Milestones
+      let p4 = '';
+      if (pendingWorkflow.length > 0) {
+        const nextUp = pendingWorkflow.slice(0, 5).join('**, **');
+        p4 = `The active roadmap focuses on progressing through the next workflow milestones: **${nextUp}**, followed by final client approval, launch verification, and ongoing off-page and local SEO visibility.`;
+      } else {
+        p4 = `The strategic focus remains on executing planned checklist deliverables, monitoring site health, and accelerating high-impact ranking opportunities.`;
+      }
+
+      // Paragraph 5: Governance & Accountability Context
+      const lastActive = topCards[0]?.card.dateLastActivity?.slice(0, 10) || new Date().toISOString().slice(0, 10);
+      const p5 = `This executive project summary reflects verified operational cards, checklist progression, and discussions recorded in Trello as of ${lastActive}, actively owned by **${assignedMembers}**.`;
+
+      strategyOverview = `${p1}\n\n${p2}\n\n${p3}\n\n${p4}\n\n${p5}`;
+
+      if (substantiveComments.length > 1) {
+        const directivesList = substantiveComments
+          .slice(1, 3)
+          .map((sc) => `• **${sc.author}**: "${sc.text.length > 180 ? sc.text.slice(0, 177) + '...' : sc.text}"`)
+          .join('\n');
+        leadershipDirective = directivesList;
+      }
     }
 
-    const executiveSection = `${strategyOverview}${leadershipDirective ? `\n\n${leadershipDirective}` : ''}`;
+    const executiveSection = `### Executive Project Strategy & Workstream Summary: ${intent.client}
+${strategyOverview}${leadershipDirective ? `\n\n${leadershipDirective}` : ''}`;
 
     summary = extractSummaryFromText(strategyOverview);
 
     const completedSection = completedTasks.length > 0
-      ? completedTasks.map((t) => `- [✓] **${t.name}** *(Card: ${t.cardName}, List: ${t.listName})*`).join('\n')
+      ? completedTasks.map((t) => `- [✓] **${t.name}** *(Checklist: ${t.clName}, Card: [${t.cardName}](${t.cardUrl})${t.completedBy ? `, by ${t.completedBy}` : ''})*`).join('\n')
       : '- *No completed tasks logged for this client.*';
 
     const pendingSection = pendingTasks.length > 0
-      ? pendingTasks.map((t) => `- [ ] **${t.name}** *(Card: ${t.cardName}, List: ${t.listName})*`).join('\n')
+      ? pendingTasks.map((t) => `- [ ] **${t.name}** *(Checklist: ${t.clName}, Card: [${t.cardName}](${t.cardUrl}))*`).join('\n')
       : '- *No pending tasks logged for this client.*';
 
     const cardDetails = topCards.map((sc, idx) => {
@@ -754,12 +866,67 @@ This summary reflects the project status, implementation roadmap, and strategic 
       const comments = filteredComments.length > 0
         ? filteredComments.map((cm) => `   - **${cm.authorName}**: "${cm.text}"`).join('\n')
         : (c.comments && c.comments.length > 0 ? '   - *(Strategy Overview featured at top)*' : '   *No comments logged.*');
+
+      const checklistProgress = c.checklists.length > 0
+        ? c.checklists.map((cl) => `${cl.name}: ${cl.items.filter((it) => it.state === 'complete').length}/${cl.items.length}`).join(' | ')
+        : 'None';
+
+      const attachments = (c.attachments || []).length > 0
+        ? (c.attachments || []).map((att) => `[${att.name}](${att.url})`).join(', ')
+        : 'None';
+
       return `#### ${idx + 1}. [${c.name}](${c.url})
 - **List / Status:** ${c.listName} (${c.statusSemantic})
 - **Assigned:** ${c.members.map((m) => m.fullName).join(', ') || 'None'}
+- **Checklist Milestones:** ${checklistProgress}
+- **Attachments:** ${attachments}
 - **Comments & Updates:**
 ${comments}`;
     }).join('\n\n');
+
+    // Discover all reference assets, live links, and drive documents
+    const allDiscoveredAssets: string[] = [];
+    const seenUrls = new Set<string>();
+
+    for (const sc of topCards) {
+      const c = sc.card;
+      for (const cm of c.comments || []) {
+        const rawText = cm.text || '';
+        const mdRegex = /\[([^\]]+)\]\((https?:\/\/[^\s")]+)\)/g;
+        let m;
+        while ((m = mdRegex.exec(rawText)) !== null) {
+          if (!seenUrls.has(m[2]) && !m[2].includes('trello.com')) {
+            seenUrls.add(m[2]);
+            allDiscoveredAssets.push(`- **${m[1].trim()}:** [${m[2]}](${m[2]})`);
+          }
+        }
+
+        const rawUrls = rawText.match(/https?:\/\/[^\s")]+/g) || [];
+        for (const u of rawUrls) {
+          const cleanU = u.replace(/[\])]+$/, '');
+          if (!seenUrls.has(cleanU) && !cleanU.includes('trello.com')) {
+            seenUrls.add(cleanU);
+            const label = /stag\d+/i.test(cleanU)
+              ? 'Staging / Demo Preview'
+              : /docs\.google/i.test(cleanU)
+              ? 'Google Workspace Document'
+              : 'Website / Asset Link';
+            allDiscoveredAssets.push(`- **${label}:** [${cleanU}](${cleanU})`);
+          }
+        }
+      }
+
+      for (const att of c.attachments || []) {
+        if (!seenUrls.has(att.url)) {
+          seenUrls.add(att.url);
+          allDiscoveredAssets.push(`- **File Attachment:** [${att.name}](${att.url})`);
+        }
+      }
+    }
+
+    const assetsSection = allDiscoveredAssets.length > 0
+      ? `\n\n### Key Project Assets & Documentation\n${allDiscoveredAssets.join('\n')}`
+      : '';
 
     const clientAnswerMarkdown = `${executiveSection}
 
@@ -770,7 +937,7 @@ ${cardDetails}
 ${completedSection}
 
 ### Pending & In-Progress Tasks (${pendingTasks.length})
-${pendingSection}
+${pendingSection}${assetsSection}
 `;
 
     return {
@@ -780,7 +947,7 @@ ${pendingSection}
         `**Client:** ${intent.client}`,
         `**Tasks Progress:** ${completedTasks.length} completed / ${pendingTasks.length} pending out of ${allClientTasks.length} total tasks.`,
         `**Assigned Team:** ${assignedMembers}.`,
-        `**Active Cards:** ${topCards.length} cards tracked in Trello.`,
+        `**Active Cards:** ${topCards.length} cards tracked in Trello across ${Array.from(new Set(topCards.map((sc) => sc.card.listName))).join(', ')}.`,
       ],
       statusBreakdown,
       sources,
