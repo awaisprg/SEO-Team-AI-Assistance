@@ -29,17 +29,19 @@ CRITICAL SECURITY AND REASONING RULES:
    - Key Findings (bullet points)
    - Status Breakdown (counts of Completed, In Process, In Review, To Do)
    - Specific Evidence (card names, people, actions, dates)
-8. When asked for "Active Clients List" or "Active Clients":
-   - ONLY show the list of names of clients labeled as Active in the PDS Clients and GFM Clients lists.
-   - DO NOT provide details of what the team is doing, tasks, deliverables, or metrics. ONLY show names.
-   - Classify them in two separate sections: "PDS Clients (Active)" and "GFM Clients (Active)".
+8. CRITICAL RULE FOR ACTIVE CLIENTS / ACCOUNTS:
+   - When asked about Active Clients, Active Accounts, or how many active clients:
+     * NEVER list, count, or include On-Hold, Paused, or Closed/Terminated cards as active clients!
+     * If the user specifies "GFM only" or "GFM", report ONLY GFM clients. Do NOT list PDS clients.
+     * If the user specifies "PDS only" or "PDS", report ONLY PDS clients. Do NOT list GFM clients.
+     * If asked "How many...", state the exact count prominently in bold upfront before listing the accounts.
+     * Always clarify that On-Hold accounts and Closed accounts are strictly excluded from the active roster.
 9. When asked for "Closed Clients" or "Terminated Clients":
-   - Classify into two separate sections: "PDS Clients (Closed / Terminated)" and "GFM Clients (Closed / Terminated)".
+   - If GFM specified, show ONLY GFM closed clients. If PDS specified, show ONLY PDS closed clients.
    - Show client names and the reasons why the project is closed if available in card comments or descriptions.
 10. When asked for "On Hold Clients" or "Clients on Hold":
    - ONLY show those clients that are labeled as On Hold in Trello.
-   - Do NOT show clients with other labels (like Active, Closed, High Priority, etc.).
-   - Classify into sections: "PDS Clients (On Hold)" and "GFM Clients (On Hold)".
+   - If GFM specified, show ONLY GFM on-hold clients. If PDS specified, show ONLY PDS on-hold clients.
    - Show client names along with the specific Reason why the client is on hold if available in card comments or descriptions.
 `;
 
@@ -132,112 +134,169 @@ function generateClientListAnswer(intent: QueryIntent): AnswerResult {
   const pdsListId = pdsList?.id || '6813d17fb69e648e8ffad111';
   const gfmListId = gfmList?.id || '69e007cce0c853017f62e6a4';
 
-  if (intent.intent === 'on_hold_clients_list') {
-    // ON HOLD CLIENTS: ONLY show clients that are labeled as On Hold, along with reason if available in comment
-    const isHoldCard = (c: any) => {
-      const lbls = (c.labels || []).map((l: any) => (l.name || '').toLowerCase());
-      return lbls.some((l: string) => l.includes('on-hold') || l.includes('on hold') || l === 'hold');
-    };
+  const isHoldCard = (c: any) => {
+    const lbls = (c.labels || []).map((l: any) => (l.name || '').toLowerCase());
+    return lbls.some((l: string) => l.includes('on-hold') || l.includes('on hold') || l === 'hold');
+  };
 
-    const pdsHoldCards = allCards.filter(
-      (c) =>
-        (c.listId === pdsListId || c.listName?.toLowerCase().includes('pds client')) &&
-        isHoldCard(c)
+  const isClosedCard = (c: any) => {
+    const lbls = (c.labels || []).map((l: any) => (l.name || '').toLowerCase());
+    return lbls.some(
+      (l: string) =>
+        l.includes('project closed') ||
+        l === 'closed' ||
+        l.includes('terminate') ||
+        l.includes('discontinue')
     );
+  };
 
-    const gfmHoldCards = allCards.filter(
-      (c) =>
-        (c.listId === gfmListId || c.listName?.toLowerCase().includes('gfm client')) &&
-        isHoldCard(c)
+  const isActiveCard = (c: any) => {
+    const lbls = (c.labels || []).map((l: any) => (l.name || '').toLowerCase());
+    return (
+      lbls.some((l: string) => l.includes('active')) &&
+      !isClosedCard(c) &&
+      !isHoldCard(c) &&
+      c.name !== 'Clients Audit Record' &&
+      c.name !== 'GBP Guides'
     );
+  };
 
-    const otherHoldCards = allCards.filter(
-      (c) =>
-        c.listId !== pdsListId &&
-        c.listId !== gfmListId &&
-        !c.listName?.toLowerCase().includes('pds client') &&
-        !c.listName?.toLowerCase().includes('gfm client') &&
-        isHoldCard(c)
-    );
+  const normalizeClientName = (name: string) => {
+    return name
+      .trim()
+      .replace(/,?\s*(LLC|PLLC|Inc|P\.C\.|PC|PA|Ltd)\.?$/i, '')
+      .replace(/’/g, "'")
+      .trim();
+  };
 
-    const pdsLines =
-      pdsHoldCards.length > 0
-        ? pdsHoldCards.map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractHoldReasonFromCard(c)}`).join('\n')
-        : '_No client accounts currently labeled On Hold under PDS Clients._';
+  // PDS Cards
+  const pdsAllCards = allCards.filter(
+    (c) => c.listId === pdsListId || c.listName?.toLowerCase().includes('pds client')
+  );
+  const pdsActiveCards = pdsAllCards.filter(isActiveCard);
+  const pdsHoldCards = pdsAllCards.filter(isHoldCard);
+  const pdsClosedCards = pdsAllCards.filter(isClosedCard);
 
-    const gfmLines =
-      gfmHoldCards.length > 0
-        ? gfmHoldCards.map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractHoldReasonFromCard(c)}`).join('\n')
-        : '_No client accounts currently labeled On Hold under GFM Clients._';
+  // GFM Cards
+  const gfmAllCards = allCards.filter(
+    (c) =>
+      c.listId === gfmListId ||
+      c.listName?.toLowerCase().includes('gfm client') ||
+      (c.labels || []).some((l: any) => (l.name || '').toLowerCase() === 'gfm')
+  );
+  const gfmActiveCards = gfmAllCards.filter(isActiveCard);
+  const gfmHoldCards = gfmAllCards.filter(isHoldCard);
+  const gfmClosedCards = gfmAllCards.filter(isClosedCard);
 
-    let answer = `### PDS Clients (On Hold)\n${pdsLines}\n\n### GFM Clients (On Hold)\n${gfmLines}`;
-    if (otherHoldCards.length > 0) {
-      const otherLines = otherHoldCards
-        .map((c, i) => `${i + 1}. **${c.name.trim()}** (${c.listName}) — Reason: ${extractHoldReasonFromCard(c)}`)
-        .join('\n');
-      answer += `\n\n### Other Clients (On Hold)\n${otherLines}`;
+  const getUniqueSortedNames = (cards: any[]) => {
+    const map = new Map<string, string>();
+    for (const c of cards) {
+      const norm = normalizeClientName(c.name);
+      if (!map.has(norm.toLowerCase())) {
+        map.set(norm.toLowerCase(), c.name.trim());
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
+  };
+
+  const pdsActiveNames = getUniqueSortedNames(pdsActiveCards);
+  const gfmActiveNames = getUniqueSortedNames(gfmActiveCards);
+
+  const agencyTarget = intent.targetAgency || 'all';
+
+  // --- 1. ACTIVE CLIENTS ---
+  if (intent.intent === 'active_clients_list') {
+    if (agencyTarget === 'GFM') {
+      const gfmLines = gfmActiveNames.map((name, i) => `${i + 1}. **${name}**`).join('\n');
+      const answer = `There are currently **${gfmActiveNames.length} active client accounts** under **GFM (Gold Flex Marketing)**:
+
+### GFM Active Clients (${gfmActiveNames.length} Accounts)
+${gfmLines}
+
+> **Executive Verification:**
+> - **Active GFM Accounts:** ${gfmActiveNames.length} accounts actively serviced
+> - **On-Hold GFM Accounts:** ${gfmHoldCards.length} accounts (${gfmHoldCards.map((c) => c.name.trim()).join(', ')}) — *strictly excluded from active roster*
+> - **Closed GFM Accounts:** ${gfmClosedCards.length} accounts (${gfmClosedCards.map((c) => c.name.trim()).slice(0, 4).join(', ')}, etc.) — *strictly excluded from active roster*`;
+
+      const sources: ChatSource[] = gfmActiveCards.map((c) => ({
+        cardId: c.id,
+        title: c.name,
+        url: c.url,
+        relevance: 100,
+        reason: `Active GFM client account (${c.listName})`,
+        date: c.dateLastActivity,
+        client: c.clientCanonical,
+        status: 'In Process',
+        listName: c.listName,
+      }));
+
+      return {
+        answer,
+        summary: `GFM (Gold Flex Marketing) currently has ${gfmActiveNames.length} active client accounts. The ${gfmHoldCards.length} on-hold accounts and ${gfmClosedCards.length} closed accounts under GFM are strictly excluded.`,
+        keyPoints: [
+          `GFM Active Clients: ${gfmActiveNames.length} active client accounts`,
+          `GFM On-Hold Accounts: ${gfmHoldCards.length} accounts (excluded from active count)`,
+          `GFM Closed Projects: ${gfmClosedCards.length} accounts (excluded from active count)`,
+        ],
+        statusBreakdown: { Active: gfmActiveNames.length },
+        sources,
+        evidenceStrength: 'high',
+      };
     }
 
-    const totalHold = pdsHoldCards.length + gfmHoldCards.length + otherHoldCards.length;
-    const holdCardsList = [...pdsHoldCards, ...gfmHoldCards, ...otherHoldCards];
+    if (agencyTarget === 'PDS') {
+      const pdsLines = pdsActiveNames.map((name, i) => `${i + 1}. **${name}**`).join('\n');
+      const answer = `There are currently **${pdsActiveNames.length} active client accounts** under **PDS Clients**:
 
-    const sources: ChatSource[] = holdCardsList.map((c) => ({
-      cardId: c.id,
-      title: c.name,
-      url: c.url,
-      relevance: 100,
-      reason: `Client labeled On-hold (${c.listName})`,
-      date: c.dateLastActivity,
-      client: c.clientCanonical,
-      status: 'Blocked',
-      listName: c.listName,
-    }));
+### PDS Active Clients (${pdsActiveNames.length} Accounts)
+${pdsLines}
 
-    return {
-      answer,
-      summary: `Currently, ${totalHold} client account${totalHold === 1 ? '' : 's'} ${totalHold === 1 ? 'is' : 'are'} labeled On Hold (${pdsHoldCards.length} in PDS, ${gfmHoldCards.length} in GFM) with documented reasons from comments.`,
-      keyPoints: [
-        `PDS Clients (On Hold): ${pdsHoldCards.length} account${pdsHoldCards.length === 1 ? '' : 's'}`,
-        `GFM Clients (On Hold): ${gfmHoldCards.length} account${gfmHoldCards.length === 1 ? '' : 's'}`,
-        `Total On Hold: ${totalHold} account${totalHold === 1 ? '' : 's'}`,
-      ],
-      statusBreakdown: { 'On Hold': totalHold },
-      sources,
-      evidenceStrength: 'high',
-    };
-  }
+> **Executive Verification:**
+> - **Active PDS Accounts:** ${pdsActiveNames.length} accounts actively serviced
+> - **Closed PDS Accounts:** ${pdsClosedCards.length} accounts — *strictly excluded from active roster*`;
 
-  const isClosed = intent.intent === 'closed_clients_list';
+      const sources: ChatSource[] = pdsActiveCards.map((c) => ({
+        cardId: c.id,
+        title: c.name,
+        url: c.url,
+        relevance: 100,
+        reason: `Active PDS client account (${c.listName})`,
+        date: c.dateLastActivity,
+        client: c.clientCanonical,
+        status: 'In Process',
+        listName: c.listName,
+      }));
 
-  if (!isClosed) {
-    // ACTIVE CLIENTS: ONLY show names, classified by PDS and GFM
-    const pdsActiveCards = allCards.filter(
-      (c) =>
-        (c.listId === pdsListId || c.listName?.toLowerCase().includes('pds client')) &&
-        c.labels.some((l) => l.name.toLowerCase().includes('active')) &&
-        !c.labels.some((l) => l.name.toLowerCase().includes('closed') || l.name.toLowerCase().includes('hold')) &&
-        c.name !== 'Clients Audit Record' &&
-        c.name !== 'GBP Guides'
-    );
-    const pdsActiveNames = Array.from(new Set(pdsActiveCards.map((c) => c.name.trim()))).sort();
+      return {
+        answer,
+        summary: `PDS currently has ${pdsActiveNames.length} active client accounts (excluding ${pdsClosedCards.length} closed accounts).`,
+        keyPoints: [
+          `PDS Active Clients: ${pdsActiveNames.length} active client accounts`,
+          `PDS Closed Accounts: ${pdsClosedCards.length} accounts (excluded from active count)`,
+        ],
+        statusBreakdown: { Active: pdsActiveNames.length },
+        sources,
+        evidenceStrength: 'high',
+      };
+    }
 
-    const gfmActiveCards = allCards.filter(
-      (c) =>
-        (c.listId === gfmListId || c.listName?.toLowerCase().includes('gfm client')) &&
-        c.labels.some((l) => l.name.toLowerCase().includes('active')) &&
-        !c.labels.some((l) => l.name.toLowerCase().includes('closed') || l.name.toLowerCase().includes('hold')) &&
-        c.name !== 'Clients Audit Record' &&
-        c.name !== 'GBP Guides'
-    );
-    const gfmActiveNames = Array.from(new Set(gfmActiveCards.map((c) => c.name.trim()))).sort();
-
-    const pdsLines = pdsActiveNames.map((name, i) => `${i + 1}. ${name}`).join('\n');
-    const gfmLines = gfmActiveNames.map((name, i) => `${i + 1}. ${name}`).join('\n');
-
-    const answer = `### PDS Clients (Active)\n${pdsLines}\n\n### GFM Clients (Active)\n${gfmLines}`;
+    // Both / All agencies
     const totalActive = pdsActiveNames.length + gfmActiveNames.length;
+    const pdsLines = pdsActiveNames.map((name, i) => `${i + 1}. **${name}**`).join('\n');
+    const gfmLines = gfmActiveNames.map((name, i) => `${i + 1}. **${name}**`).join('\n');
 
-    const sources: ChatSource[] = [...pdsActiveCards, ...gfmActiveCards].slice(0, 30).map((c) => ({
+    const answer = `There are currently **${totalActive} active client accounts** across the agency (${pdsActiveNames.length} under PDS and ${gfmActiveNames.length} under GFM):
+
+### PDS Clients (Active - ${pdsActiveNames.length} Accounts)
+${pdsLines}
+
+### GFM Clients (Active - ${gfmActiveNames.length} Accounts)
+${gfmLines}
+
+> **Executive Status Note:**
+> - All ${gfmHoldCards.length} On-Hold accounts and all ${pdsClosedCards.length + gfmClosedCards.length} Closed projects are strictly excluded from this active list.`;
+
+    const sources: ChatSource[] = [...pdsActiveCards, ...gfmActiveCards].slice(0, 40).map((c) => ({
       cardId: c.id,
       title: c.name,
       url: c.url,
@@ -261,30 +320,186 @@ function generateClientListAnswer(intent: QueryIntent): AnswerResult {
       sources,
       evidenceStrength: 'high',
     };
-  } else {
-    // CLOSED CLIENTS: Classified by PDS and GFM, showing name and reasons why project is closed
-    const pdsClosedCards = allCards.filter(
-      (c) =>
-        (c.listId === pdsListId || c.listName?.toLowerCase().includes('pds client')) &&
-        c.labels.some(
-          (l) =>
-            l.name.toLowerCase().includes('closed') ||
-            l.name.toLowerCase().includes('terminate') ||
-            l.name.toLowerCase().includes('discontinue')
-        )
-    );
+  }
 
-    const gfmClosedCards = allCards.filter(
-      (c) =>
-        (c.listId === gfmListId || c.listName?.toLowerCase().includes('gfm client')) &&
-        c.labels.some(
-          (l) =>
-            l.name.toLowerCase().includes('closed') ||
-            l.name.toLowerCase().includes('terminate') ||
-            l.name.toLowerCase().includes('discontinue')
-        )
-    );
+  // --- 2. ON-HOLD CLIENTS ---
+  if (intent.intent === 'on_hold_clients_list') {
+    if (agencyTarget === 'GFM') {
+      const gfmLines =
+        gfmHoldCards.length > 0
+          ? gfmHoldCards.map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractHoldReasonFromCard(c)}`).join('\n')
+          : '_No client accounts currently labeled On Hold under GFM Clients._';
 
+      const answer = `There are currently **${gfmHoldCards.length} client accounts On Hold** under **GFM (Gold Flex Marketing)**:
+
+### GFM Clients (On Hold)
+${gfmLines}
+
+> *(Note: Documented hold reasons are extracted directly from Trello team comments and card activity logs.)*`;
+
+      const sources: ChatSource[] = gfmHoldCards.map((c) => ({
+        cardId: c.id,
+        title: c.name,
+        url: c.url,
+        relevance: 100,
+        reason: `Client labeled On-hold (${c.listName})`,
+        date: c.dateLastActivity,
+        client: c.clientCanonical,
+        status: 'Blocked',
+        listName: c.listName,
+      }));
+
+      return {
+        answer,
+        summary: `Currently, ${gfmHoldCards.length} client accounts are labeled On Hold under GFM with documented reasons from comments.`,
+        keyPoints: [
+          `GFM Clients (On Hold): ${gfmHoldCards.length} accounts`,
+          `Status: Blocked / Pending client input`,
+        ],
+        statusBreakdown: { 'On Hold': gfmHoldCards.length },
+        sources,
+        evidenceStrength: 'high',
+      };
+    }
+
+    if (agencyTarget === 'PDS') {
+      const pdsLines =
+        pdsHoldCards.length > 0
+          ? pdsHoldCards.map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractHoldReasonFromCard(c)}`).join('\n')
+          : '_No client accounts are currently labeled On Hold under PDS Clients._';
+
+      const answer = `### PDS Clients (On Hold)
+${pdsLines}`;
+
+      return {
+        answer,
+        summary: `Currently, ${pdsHoldCards.length} client accounts are labeled On Hold under PDS Clients.`,
+        keyPoints: [`PDS Clients (On Hold): ${pdsHoldCards.length} accounts`],
+        statusBreakdown: { 'On Hold': pdsHoldCards.length },
+        sources: [],
+        evidenceStrength: 'high',
+      };
+    }
+
+    // Both / All agencies
+    const pdsLines =
+      pdsHoldCards.length > 0
+        ? pdsHoldCards.map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractHoldReasonFromCard(c)}`).join('\n')
+        : '_No client accounts currently labeled On Hold under PDS Clients._';
+
+    const gfmLines =
+      gfmHoldCards.length > 0
+        ? gfmHoldCards.map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractHoldReasonFromCard(c)}`).join('\n')
+        : '_No client accounts currently labeled On Hold under GFM Clients._';
+
+    const totalHold = pdsHoldCards.length + gfmHoldCards.length;
+    const answer = `There are currently **${totalHold} client accounts On Hold** across the agency:
+
+### PDS Clients (On Hold - ${pdsHoldCards.length} Accounts)
+${pdsLines}
+
+### GFM Clients (On Hold - ${gfmHoldCards.length} Accounts)
+${gfmLines}`;
+
+    const sources: ChatSource[] = [...pdsHoldCards, ...gfmHoldCards].map((c) => ({
+      cardId: c.id,
+      title: c.name,
+      url: c.url,
+      relevance: 100,
+      reason: `Client labeled On-hold (${c.listName})`,
+      date: c.dateLastActivity,
+      client: c.clientCanonical,
+      status: 'Blocked',
+      listName: c.listName,
+    }));
+
+    return {
+      answer,
+      summary: `Currently, ${totalHold} client accounts are labeled On Hold (${pdsHoldCards.length} in PDS, ${gfmHoldCards.length} in GFM) with documented reasons from comments.`,
+      keyPoints: [
+        `PDS Clients (On Hold): ${pdsHoldCards.length} accounts`,
+        `GFM Clients (On Hold): ${gfmHoldCards.length} accounts`,
+        `Total On Hold: ${totalHold} accounts`,
+      ],
+      statusBreakdown: { 'On Hold': totalHold },
+      sources,
+      evidenceStrength: 'high',
+    };
+  }
+
+  // --- 3. CLOSED / TERMINATED CLIENTS ---
+  if (intent.intent === 'closed_clients_list') {
+    if (agencyTarget === 'GFM') {
+      const gfmLines = gfmClosedCards
+        .map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractClosedReasonFromCard(c)}`)
+        .join('\n');
+
+      const answer = `There are currently **${gfmClosedCards.length} closed/terminated client projects** under **GFM (Gold Flex Marketing)**:
+
+### GFM Clients (Closed / Terminated)
+${gfmLines}`;
+
+      const sources: ChatSource[] = gfmClosedCards.map((c) => ({
+        cardId: c.id,
+        title: c.name,
+        url: c.url,
+        relevance: 100,
+        reason: `Closed/Terminated GFM client card (${c.listName})`,
+        date: c.dateLastActivity,
+        client: c.clientCanonical,
+        status: 'Completed',
+        listName: c.listName,
+      }));
+
+      return {
+        answer,
+        summary: `GFM currently has ${gfmClosedCards.length} closed and terminated client projects with documented reasons.`,
+        keyPoints: [
+          `GFM Closed Clients: ${gfmClosedCards.length} accounts`,
+          `Status: Terminated / Discontinued`,
+        ],
+        statusBreakdown: { Closed: gfmClosedCards.length },
+        sources,
+        evidenceStrength: 'high',
+      };
+    }
+
+    if (agencyTarget === 'PDS') {
+      const pdsLines = pdsClosedCards
+        .map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractClosedReasonFromCard(c)}`)
+        .join('\n');
+
+      const answer = `There are currently **${pdsClosedCards.length} closed/terminated client projects** under **PDS Clients**:
+
+### PDS Clients (Closed / Terminated)
+${pdsLines}`;
+
+      const sources: ChatSource[] = pdsClosedCards.map((c) => ({
+        cardId: c.id,
+        title: c.name,
+        url: c.url,
+        relevance: 100,
+        reason: `Closed/Terminated PDS client card (${c.listName})`,
+        date: c.dateLastActivity,
+        client: c.clientCanonical,
+        status: 'Completed',
+        listName: c.listName,
+      }));
+
+      return {
+        answer,
+        summary: `PDS currently has ${pdsClosedCards.length} closed and terminated client projects with documented reasons.`,
+        keyPoints: [
+          `PDS Closed Clients: ${pdsClosedCards.length} accounts`,
+          `Status: Terminated / Discontinued`,
+        ],
+        statusBreakdown: { Closed: pdsClosedCards.length },
+        sources,
+        evidenceStrength: 'high',
+      };
+    }
+
+    // Both / All agencies
     const pdsLines = pdsClosedCards
       .map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractClosedReasonFromCard(c)}`)
       .join('\n');
@@ -293,8 +508,14 @@ function generateClientListAnswer(intent: QueryIntent): AnswerResult {
       .map((c, i) => `${i + 1}. **${c.name.trim()}** — Reason: ${extractClosedReasonFromCard(c)}`)
       .join('\n');
 
-    const answer = `### PDS Clients (Closed / Terminated)\n${pdsLines}\n\n### GFM Clients (Closed / Terminated)\n${gfmLines}`;
     const totalClosed = pdsClosedCards.length + gfmClosedCards.length;
+    const answer = `There are currently **${totalClosed} closed/terminated client projects** across the agency (${pdsClosedCards.length} PDS + ${gfmClosedCards.length} GFM):
+
+### PDS Clients (Closed / Terminated - ${pdsClosedCards.length} Accounts)
+${pdsLines}
+
+### GFM Clients (Closed / Terminated - ${gfmClosedCards.length} Accounts)
+${gfmLines}`;
 
     const sources: ChatSource[] = [...pdsClosedCards, ...gfmClosedCards].map((c) => ({
       cardId: c.id,
@@ -321,6 +542,103 @@ function generateClientListAnswer(intent: QueryIntent): AnswerResult {
       evidenceStrength: 'high',
     };
   }
+
+  // --- 4. OVERALL CLIENTS PORTFOLIO OVERVIEW ---
+  // (e.g. "How many total clients of GFM only?" or "How many clients do we have?")
+  if (agencyTarget === 'GFM') {
+    const totalGfm = gfmActiveNames.length + gfmHoldCards.length + gfmClosedCards.length;
+    const gfmLines = gfmActiveNames.map((name, i) => `  ${i + 1}. ${name}`).join('\n');
+    const holdLines = gfmHoldCards.map((c, i) => `  ${i + 1}. **${c.name.trim()}** (Reason: ${extractHoldReasonFromCard(c)})`).join('\n');
+    const closedLines = gfmClosedCards.map((c, i) => `  ${i + 1}. **${c.name.trim()}** (Reason: ${extractClosedReasonFromCard(c)})`).join('\n');
+
+    const answer = `### GFM (Gold Flex Marketing) Client Portfolio Breakdown
+
+GFM currently tracks a total of **${totalGfm} client accounts** across all states:
+
+- **Active Clients (${gfmActiveNames.length}):**
+${gfmLines}
+
+- **On-Hold Clients (${gfmHoldCards.length}):**
+${holdLines}
+
+- **Closed / Terminated Projects (${gfmClosedCards.length}):**
+${closedLines}
+`;
+
+    const sources: ChatSource[] = [...gfmActiveCards, ...gfmHoldCards, ...gfmClosedCards].map((c) => ({
+      cardId: c.id,
+      title: c.name,
+      url: c.url,
+      relevance: 100,
+      reason: `GFM client record (${c.listName})`,
+      date: c.dateLastActivity,
+      client: c.clientCanonical,
+      status: isHoldCard(c) ? 'Blocked' : isClosedCard(c) ? 'Completed' : 'In Process',
+      listName: c.listName,
+    }));
+
+    return {
+      answer,
+      summary: `GFM tracks ${totalGfm} total client accounts: ${gfmActiveNames.length} active, ${gfmHoldCards.length} on-hold, and ${gfmClosedCards.length} closed.`,
+      keyPoints: [
+        `GFM Active Accounts: ${gfmActiveNames.length}`,
+        `GFM On-Hold Accounts: ${gfmHoldCards.length}`,
+        `GFM Closed Accounts: ${gfmClosedCards.length}`,
+        `GFM Total Accounts: ${totalGfm}`,
+      ],
+      statusBreakdown: { Active: gfmActiveNames.length, 'On Hold': gfmHoldCards.length, Closed: gfmClosedCards.length },
+      sources,
+      evidenceStrength: 'high',
+    };
+  }
+
+  // Full Agency Portfolio Overview
+  const totalAgencyActive = pdsActiveNames.length + gfmActiveNames.length;
+  const totalAgencyHold = pdsHoldCards.length + gfmHoldCards.length;
+  const totalAgencyClosed = pdsClosedCards.length + gfmClosedCards.length;
+  const totalAgency = totalAgencyActive + totalAgencyHold + totalAgencyClosed;
+
+  const answer = `### Agency-Wide Client Portfolio Breakdown
+
+The agency currently tracks a total of **${totalAgency} client accounts** across PDS and GFM:
+
+- **Active Accounts (${totalAgencyActive}):**
+  - **PDS Clients:** ${pdsActiveNames.length} active accounts
+  - **GFM Clients:** ${gfmActiveNames.length} active accounts
+
+- **On-Hold Accounts (${totalAgencyHold}):**
+  - **PDS Clients:** ${pdsHoldCards.length} accounts on hold
+  - **GFM Clients:** ${gfmHoldCards.length} accounts on hold (${gfmHoldCards.map((c) => c.name.trim()).join(', ')})
+
+- **Closed / Terminated Projects (${totalAgencyClosed}):**
+  - **PDS Clients:** ${pdsClosedCards.length} closed accounts
+  - **GFM Clients:** ${gfmClosedCards.length} closed accounts`;
+
+  const sources: ChatSource[] = [...pdsActiveCards, ...gfmActiveCards].slice(0, 30).map((c) => ({
+    cardId: c.id,
+    title: c.name,
+    url: c.url,
+    relevance: 100,
+    reason: `Client account (${c.listName})`,
+    date: c.dateLastActivity,
+    client: c.clientCanonical,
+    status: 'In Process',
+    listName: c.listName,
+  }));
+
+  return {
+    answer,
+    summary: `The agency currently tracks ${totalAgency} client accounts: ${totalAgencyActive} active (${pdsActiveNames.length} PDS, ${gfmActiveNames.length} GFM), ${totalAgencyHold} on hold, and ${totalAgencyClosed} closed.`,
+    keyPoints: [
+      `Active Accounts: ${totalAgencyActive} (${pdsActiveNames.length} PDS, ${gfmActiveNames.length} GFM)`,
+      `On-Hold Accounts: ${totalAgencyHold} (${gfmHoldCards.length} in GFM)`,
+      `Closed Accounts: ${totalAgencyClosed} (${pdsClosedCards.length} PDS, ${gfmClosedCards.length} GFM)`,
+      `Total Client Accounts: ${totalAgency}`,
+    ],
+    statusBreakdown: { Active: totalAgencyActive, 'On Hold': totalAgencyHold, Closed: totalAgencyClosed },
+    sources,
+    evidenceStrength: 'high',
+  };
 }
 
 export async function generateEvidenceAnswer(
@@ -328,11 +646,12 @@ export async function generateEvidenceAnswer(
   scoredCards: ScoredCard[],
   conversationHistory: { role: string; content: string }[] = []
 ): Promise<AnswerResult> {
-  // Direct specialized handler for Active Clients List, Closed Clients List, and On Hold Clients List
+  // Direct specialized handler for Active Clients, Closed Clients, On Hold Clients, and Portfolio Overviews
   if (
     intent.intent === 'active_clients_list' ||
     intent.intent === 'closed_clients_list' ||
-    intent.intent === 'on_hold_clients_list'
+    intent.intent === 'on_hold_clients_list' ||
+    intent.intent === 'clients_overview'
   ) {
     return generateClientListAnswer(intent);
   }

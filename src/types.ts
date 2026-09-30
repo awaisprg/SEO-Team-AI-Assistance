@@ -218,6 +218,12 @@ export interface ChatMessage {
   evidenceStrength?: 'high' | 'medium' | 'low';
   searchMetadata?: {
     resultCount: number;
+    category?: 'client_status' | 'team_workload' | 'general_info';
+    categoryLabel?: string;
+    subIntent?: string;
+    subIntentLabel?: string;
+    confidence?: number;
+    reasoning?: string;
     filtersApplied?: Record<string, any>;
     intent?: string;
     topic?: string;

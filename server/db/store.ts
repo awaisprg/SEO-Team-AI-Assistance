@@ -155,8 +155,16 @@ class Store {
         card.clientCanonical = 'Advanced Wellness MD';
       }
 
-      // Authoritative "In Process" list status: If card is in "In Process", its semantic status is In Process
-      if (card.listName === 'In Process') {
+      // Authoritative status rules: on-hold is Blocked, closed is Completed, In Process list is In Process
+      const cardLabelsLower = (card.labels || []).map((l: any) => (l.name || '').toLowerCase());
+      const isHold = cardLabelsLower.some((l: string) => l.includes('on-hold') || l.includes('on hold') || l === 'hold');
+      const isClosed = cardLabelsLower.some((l: string) => l.includes('project closed') || l.includes('closed') || l.includes('terminate') || l.includes('discontinue'));
+
+      if (isHold) {
+        card.statusSemantic = 'Blocked';
+      } else if (isClosed) {
+        card.statusSemantic = 'Completed';
+      } else if (card.listName === 'In Process') {
         card.statusSemantic = 'In Process';
       }
     }
@@ -206,6 +214,7 @@ class Store {
         lastActivityDate: new Date().toISOString(),
       };
     }
+    this.persist();
   }
 
   replaceBoardData(data: {

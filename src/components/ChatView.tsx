@@ -816,6 +816,30 @@ const ChatViewComponent: React.FC<ChatViewProps> = ({
                         <span className="text-xs font-bold text-slate-900 tracking-wider">
                           Executive Synthesis
                         </span>
+
+                        {/* Classified Intent Category Badge */}
+                        {msg.searchMetadata?.category && (
+                          <span
+                            className={`inline-flex items-center space-x-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                              msg.searchMetadata.category === 'client_status'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200/80'
+                                : msg.searchMetadata.category === 'team_workload'
+                                ? 'bg-purple-50 text-purple-700 border-purple-200/80'
+                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}
+                            title={msg.searchMetadata.reasoning || msg.searchMetadata.subIntentLabel || msg.searchMetadata.categoryLabel}
+                          >
+                            {msg.searchMetadata.category === 'client_status' ? (
+                              <Briefcase className="w-3 h-3 text-blue-600" />
+                            ) : msg.searchMetadata.category === 'team_workload' ? (
+                              <Users className="w-3 h-3 text-purple-600" />
+                            ) : (
+                              <Sparkles className="w-3 h-3 text-slate-600" />
+                            )}
+                            <span>{msg.searchMetadata.categoryLabel || (msg.searchMetadata.category === 'client_status' ? 'Client Status' : msg.searchMetadata.category === 'team_workload' ? 'Team Workload' : 'General Info')}</span>
+                          </span>
+                        )}
+
                         {msg.evidenceStrength && (
                           <span
                             className={`text-[9.5px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${

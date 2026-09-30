@@ -104,6 +104,48 @@ export function inferCardStatus(
 ): StatusSemantic {
   if (cardClosed) return 'Completed';
 
+  const labelNames = cardLabels.map((l) => l.name.toLowerCase());
+
+  // 1. Explicit Closure / Termination labels ALWAYS mean Completed
+  if (
+    labelNames.some(
+      (l) =>
+        l.includes('project closed') ||
+        l === 'closed' ||
+        l.includes('terminated') ||
+        l.includes('discontinued') ||
+        l.includes('complete') ||
+        l.includes('done')
+    )
+  ) {
+    return 'Completed';
+  }
+
+  // 2. Explicit On-Hold / Blocked / Waiting labels ALWAYS mean Blocked
+  if (
+    labelNames.some(
+      (l) =>
+        l.includes('on-hold') ||
+        l.includes('on hold') ||
+        l === 'hold' ||
+        l.includes('blocked') ||
+        l.includes('waiting') ||
+        l.includes('paused')
+    )
+  ) {
+    return 'Blocked';
+  }
+
+  // 3. Review labels
+  if (labelNames.some((l) => l.includes('in review') || l.includes('review'))) {
+    return 'In Review';
+  }
+
+  // 4. In Process / Active labels
+  if (labelNames.some((l) => l.includes('in progress') || l.includes('in process') || l === 'active')) {
+    return 'In Process';
+  }
+
   // Ground truth: If card is located in In Process or Completed list, that is its status
   if (listSemanticStatus === 'In Process') {
     return 'In Process';
@@ -112,20 +154,7 @@ export function inferCardStatus(
     return 'Completed';
   }
 
-  // Label overrides
-  const labelNames = cardLabels.map((l) => l.name.toLowerCase());
-  if (labelNames.some((l) => l.includes('complete') || l.includes('done'))) {
-    return 'Completed';
-  }
-  if (labelNames.some((l) => l.includes('in review') || l.includes('review'))) {
-    return 'In Review';
-  }
-  if (labelNames.some((l) => l.includes('blocked') || l.includes('waiting'))) {
-    return 'Blocked';
-  }
-  if (labelNames.some((l) => l.includes('in progress') || l.includes('in process'))) {
-    return 'In Process';
-  }
+  // Research / Idea
   if (labelNames.some((l) => l.includes('research'))) {
     return 'Research';
   }
@@ -140,6 +169,9 @@ export function inferCardStatus(
   }
   if (lowerName.includes('[in review]') || lowerName.startsWith('review:')) {
     return 'In Review';
+  }
+  if (lowerName.includes('[on hold]') || lowerName.includes('[blocked]')) {
+    return 'Blocked';
   }
 
   // Default to list status
@@ -362,6 +394,10 @@ export function buildClientRegistry(
     }
     if (meta?.isActive !== undefined) {
       entry.isActive = entry.isActive || meta.isActive;
+    }
+    // If closed or on-hold, client is definitely not active
+    if (entry.isClosed || entry.isOnHold) {
+      entry.isActive = false;
     }
     if (meta?.isHighPriority) {
       entry.isHighPriority = true;

@@ -20,7 +20,10 @@ export interface QueryIntent {
     | 'general_team'
     | 'active_clients_list'
     | 'closed_clients_list'
-    | 'on_hold_clients_list';
+    | 'on_hold_clients_list'
+    | 'clients_overview';
+  targetAgency?: 'GFM' | 'PDS' | 'all';
+  wantsCount?: boolean;
   isOverall?: boolean;
   isBoardAnalysis?: boolean;
   isDeepInspection?: boolean;
@@ -314,7 +317,31 @@ export function extractQueryIntent(
     }
   }
 
-  // 7. Primary Intent classification
+  // 7. Agency and Count Intent Detection
+  let targetAgency: 'GFM' | 'PDS' | 'all' = 'all';
+  const hasGfm = /\b(gfm|gold\s*flex|gold\s*flex\s*marketing)\b/i.test(q);
+  const hasPds = /\b(pds|premier\s*dental|premier\s*dental\s*solutions)\b/i.test(q);
+  if (hasGfm && !hasPds) {
+    targetAgency = 'GFM';
+  } else if (hasPds && !hasGfm) {
+    targetAgency = 'PDS';
+  } else {
+    targetAgency = 'all';
+  }
+
+  const wantsCount = Boolean(
+    q.includes('how many') ||
+    q.includes('how much') ||
+    q.includes('count') ||
+    q.includes('number of') ||
+    q.includes('total number') ||
+    q.includes('total count') ||
+    q.includes('quantity') ||
+    q.includes('tally') ||
+    /\b(how many|count of|number of)\b/i.test(q)
+  );
+
+  // 8. Primary Intent classification
   let intent: QueryIntent['intent'] = 'general_team';
 
   const isAskingOnHoldClients = Boolean(
@@ -342,27 +369,13 @@ export function extractQueryIntent(
         q.includes('give') ||
         q.includes('names') ||
         q.includes('which') ||
+        q.includes('how many') ||
+        q.includes('count') ||
+        q.includes('number') ||
         q === 'on hold' ||
         q === 'on-hold' ||
         q === 'clients on hold' ||
         q === 'on hold clients'))
-  );
-
-  const isAskingActiveClients = Boolean(
-    (q.includes('active client') ||
-      q.includes('active clients') ||
-      q.includes('active accounts') ||
-      q.includes('clients active') ||
-      (q.includes('active') && (q.includes('client') || q.includes('clients') || q.includes('pds') || q.includes('gfm')))) &&
-    (q.includes('list') ||
-      q.includes('show') ||
-      q.includes('who') ||
-      q.includes('what') ||
-      q.includes('give') ||
-      q.includes('names') ||
-      q.includes('all') ||
-      q === 'active clients' ||
-      q === 'active clients list')
   );
 
   const isAskingClosedClients = Boolean(
@@ -372,16 +385,75 @@ export function extractQueryIntent(
     q.includes('terminated clients') ||
     q.includes('discontinued client') ||
     q.includes('discontinued clients') ||
-    ((q.includes('closed') || q.includes('terminated') || q.includes('discontinued')) &&
-      (q.includes('client') || q.includes('clients') || q.includes('accounts') || q.includes('list') || q.includes('show') || q.includes('who') || q.includes('what') || q.includes('names')))
+    ((q.includes('closed') || q.includes('terminated') || q.includes('discontinued') || q.includes('project closed')) &&
+      (q.includes('client') ||
+        q.includes('clients') ||
+        q.includes('account') ||
+        q.includes('accounts') ||
+        q.includes('pds') ||
+        q.includes('gfm') ||
+        q.includes('list') ||
+        q.includes('show') ||
+        q.includes('who') ||
+        q.includes('what') ||
+        q.includes('names') ||
+        q.includes('how many') ||
+        q.includes('count') ||
+        q.includes('number')))
+  );
+
+  const isAskingActiveClients = Boolean(
+    !isAskingOnHoldClients &&
+    !isAskingClosedClients &&
+    (
+      q.includes('active client') ||
+      q.includes('active clients') ||
+      q.includes('active accounts') ||
+      q.includes('active account') ||
+      q.includes('clients active') ||
+      q.includes('active projects') ||
+      q.includes('active project') ||
+      (q.includes('active') && (q.includes('client') || q.includes('clients') || q.includes('account') || q.includes('pds') || q.includes('gfm') || q.includes('roster'))) ||
+      ((q.includes('how many') || q.includes('count') || q.includes('list') || q.includes('show') || q.includes('who') || q.includes('what') || q.includes('which') || q.includes('tell')) &&
+        q.includes('active')) ||
+      q === 'active clients' ||
+      q === 'active clients list' ||
+      q === 'active clients only' ||
+      q === 'active'
+    )
+  );
+
+  const isAskingClientsOverview = Boolean(
+    !isAskingOnHoldClients &&
+    !isAskingClosedClients &&
+    !isAskingActiveClients &&
+    !matchedClient &&
+    (
+      q.includes('how many clients') ||
+      q.includes('how many total clients') ||
+      q.includes('total clients') ||
+      q.includes('count of clients') ||
+      q.includes('number of clients') ||
+      q.includes('all clients') ||
+      q.includes('list of clients') ||
+      q.includes('client roster') ||
+      q.includes('client breakdown') ||
+      q.includes('client portfolio') ||
+      (wantsCount && (q.includes('client') || q.includes('clients')) && (hasGfm || hasPds || q.includes('total') || q.includes('all') || q.includes('have')))
+    )
   );
 
   if (isAskingOnHoldClients) {
     intent = 'on_hold_clients_list';
+    status = 'Blocked';
   } else if (isAskingActiveClients) {
     intent = 'active_clients_list';
+    status = 'In Process';
   } else if (isAskingClosedClients) {
     intent = 'closed_clients_list';
+    status = 'Completed';
+  } else if (isAskingClientsOverview) {
+    intent = 'clients_overview';
   } else if (matchedClient) {
     intent = 'client_summary';
     // If targetList was set to a status list (e.g. Completed), clear it so the client query is not treated as a raw list dump
@@ -420,6 +492,8 @@ export function extractQueryIntent(
   return {
     rawQuestion: question,
     intent,
+    targetAgency,
+    wantsCount,
     isOverall,
     isBoardAnalysis,
     isDeepInspection,

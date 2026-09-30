@@ -158,6 +158,31 @@ export function hybridRetrieve(intent: QueryIntent, threshold = 35): ScoredCard[
       card = filtered;
     }
 
+    // Agency isolation: If user asked for GFM only, filter out PDS cards
+    if (intent.targetAgency === 'GFM') {
+      const isGfmCard =
+        card.listName?.toLowerCase().includes('gfm client') ||
+        (card.labels || []).some((l: any) => (l.name || '').toLowerCase().includes('gfm'));
+      const isPdsCard =
+        card.listName?.toLowerCase().includes('pds client') ||
+        card.listName?.toLowerCase().includes('pds resource') ||
+        (card.labels || []).some((l: any) => (l.name || '').toLowerCase().includes('pds'));
+      if (isPdsCard && !isGfmCard) {
+        continue;
+      }
+    } else if (intent.targetAgency === 'PDS') {
+      const isGfmCard =
+        card.listName?.toLowerCase().includes('gfm client') ||
+        (card.labels || []).some((l: any) => (l.name || '').toLowerCase().includes('gfm'));
+      const isPdsCard =
+        card.listName?.toLowerCase().includes('pds client') ||
+        card.listName?.toLowerCase().includes('pds resource') ||
+        (card.labels || []).some((l: any) => (l.name || '').toLowerCase().includes('pds'));
+      if (isGfmCard && !isPdsCard) {
+        continue;
+      }
+    }
+
     let score = 0;
     const reasons: string[] = [];
     let matchType: ScoredCard['matchType'] = 'exact';
@@ -298,7 +323,54 @@ export function hybridRetrieve(intent: QueryIntent, threshold = 35): ScoredCard[
       }
     }
 
-    // 3. Status filter
+    // 3. Status and Client State filter
+    const cardLabelsLower = (card.labels || []).map((l: any) => (l.name || '').toLowerCase());
+    const isHoldCard = cardLabelsLower.some((l: string) => l.includes('on-hold') || l.includes('on hold') || l === 'hold');
+    const isClosedCard = cardLabelsLower.some(
+      (l: string) =>
+        l.includes('project closed') ||
+        l === 'closed' ||
+        l.includes('terminate') ||
+        l.includes('discontinue')
+    );
+    const isActiveCard = cardLabelsLower.some((l: string) => l === 'active' || l.includes('active'));
+
+    // Strict Isolation: If querying active clients, NEVER return on-hold or closed cards
+    const isAskingActive =
+      intent.intent === 'active_clients_list' ||
+      (intent.status === 'In Process' && !intent.rawQuestion.toLowerCase().includes('hold') && !intent.rawQuestion.toLowerCase().includes('closed'));
+
+    if (isAskingActive) {
+      if (isHoldCard || isClosedCard) {
+        continue;
+      }
+      if (isActiveCard) {
+        score += 80;
+        reasons.push('Card is explicitly labeled Active');
+        matchType = 'exact';
+      }
+    }
+
+    if (intent.intent === 'on_hold_clients_list') {
+      if (isHoldCard) {
+        score += 120;
+        reasons.push('Card is explicitly labeled On-hold');
+        matchType = 'exact';
+      } else {
+        continue;
+      }
+    }
+
+    if (intent.intent === 'closed_clients_list') {
+      if (isClosedCard) {
+        score += 120;
+        reasons.push('Card is explicitly labeled Closed/Terminated');
+        matchType = 'exact';
+      } else {
+        continue;
+      }
+    }
+
     if (intent.status && intent.status !== 'all' && !intent.targetList && !intent.isBoardAnalysis) {
       if (card.statusSemantic === intent.status) {
         score += 20;
@@ -307,21 +379,6 @@ export function hybridRetrieve(intent: QueryIntent, threshold = 35): ScoredCard[
         score -= 30;
       } else if (intent.status === 'In Process' && card.statusSemantic !== 'In Process') {
         score -= 20;
-      }
-    }
-
-    // 3b. On-Hold Clients query boost / isolation
-    if (intent.intent === 'on_hold_clients_list') {
-      const isHold = (card.labels || []).some((l) => {
-        const ln = (l.name || '').toLowerCase();
-        return ln.includes('on-hold') || ln.includes('on hold') || ln === 'hold';
-      });
-      if (isHold) {
-        score += 120;
-        reasons.push('Card is explicitly labeled On-hold');
-        matchType = 'exact';
-      } else {
-        score -= 80;
       }
     }
 

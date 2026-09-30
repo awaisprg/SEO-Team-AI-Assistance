@@ -6,6 +6,7 @@ import { getSeedData } from './server/trello/seed';
 import { TrelloClient } from './server/trello/client';
 import { normalizeTrelloPayload } from './server/trello/normalizer';
 import { extractQueryIntent } from './server/ai/intent';
+import { classifyUserQuery } from './server/ai/intentClassifier';
 import { hybridRetrieve } from './server/ai/retrieval';
 import { generateEvidenceAnswer } from './server/ai/answering';
 import { generateManagementBrief } from './server/ai/brief';
@@ -534,11 +535,12 @@ app.post('/api/chat', requireAuth, async (req, res) => {
       content: sanitizedQuestion,
     }, userId);
 
-    // 2. Query Understanding & Intent Extraction
+    // 2. Intent Classification Layer (Categorizes into client_status, team_workload, general_info)
     const knownClients = db.getClients();
     const knownMembers = db.getMembers();
     const knownLists = db.getLists();
-    const intent = extractQueryIntent(sanitizedQuestion, knownClients, knownMembers, knownLists);
+    const classification = classifyUserQuery(sanitizedQuestion, knownClients, knownMembers, knownLists);
+    const intent = classification.toQueryIntent();
 
     // 3. Hybrid Retrieval & Relevance Scoring
     const scoredCards = hybridRetrieve(intent, 30);
@@ -561,9 +563,16 @@ app.post('/api/chat', requireAuth, async (req, res) => {
       evidenceStrength: answerResult.evidenceStrength,
       searchMetadata: {
         resultCount: scoredCards.length,
+        category: classification.category,
+        categoryLabel: classification.categoryLabel,
+        subIntent: classification.subIntent,
+        subIntentLabel: classification.subIntentLabel,
+        confidence: classification.confidence,
+        reasoning: classification.reasoning,
         intent: intent.intent,
         topic: intent.topic,
         filtersApplied: {
+          agency: classification.entities.targetAgency,
           client: intent.client,
           person: intent.person,
           status: intent.status,
@@ -581,11 +590,15 @@ app.post('/api/chat', requireAuth, async (req, res) => {
       statusBreakdown: answerResult.statusBreakdown,
       sources: answerResult.sources,
       evidenceStrength: answerResult.evidenceStrength,
-      searchMetadata: {
-        resultCount: scoredCards.length,
-        intent: intent.intent,
-        topic: intent.topic,
+      classification: {
+        category: classification.category,
+        categoryLabel: classification.categoryLabel,
+        subIntent: classification.subIntent,
+        subIntentLabel: classification.subIntentLabel,
+        confidence: classification.confidence,
+        reasoning: classification.reasoning,
       },
+      searchMetadata: assistantMsg.searchMetadata,
     });
   } catch (err: any) {
     console.error('Chat endpoint error:', err);
