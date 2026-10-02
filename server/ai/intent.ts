@@ -100,8 +100,8 @@ export function extractQueryIntent(
 
   for (const listName of candidateLists) {
     const lLower = listName.toLowerCase();
-    const isStatusName = ['completed', 'in process', 'in review', 'to do', 'ad hoc tasks'].includes(lLower);
-    if (isStatusName) {
+    const isSpecialListName = ['completed', 'in process', 'in review', 'to do', 'ad hoc tasks', 'gfm clients', 'pds clients'].includes(lLower);
+    if (isSpecialListName) {
       if (
         q.includes(`"${lLower}"`) ||
         q.includes(`'${lLower}'`) ||
@@ -320,7 +320,7 @@ export function extractQueryIntent(
   // 7. Agency and Count Intent Detection
   let targetAgency: 'GFM' | 'PDS' | 'all' = 'all';
   const hasGfm = /\b(gfm|gold\s*flex|gold\s*flex\s*marketing)\b/i.test(q);
-  const hasPds = /\b(pds|premier\s*dental|premier\s*dental\s*solutions)\b/i.test(q);
+  const hasPds = /\b(pds|physicians?\s*digital(\s*services)?(\s*llc)?)\b/i.test(q);
   if (hasGfm && !hasPds) {
     targetAgency = 'GFM';
   } else if (hasPds && !hasGfm) {
@@ -439,6 +439,19 @@ export function extractQueryIntent(
       q.includes('client roster') ||
       q.includes('client breakdown') ||
       q.includes('client portfolio') ||
+      q.includes('clients status') ||
+      q.includes('client status') ||
+      q.includes('status of client') ||
+      q.includes('status of clients') ||
+      q.includes('client report') ||
+      q.includes('clients report') ||
+      q.includes('accounts status') ||
+      q.includes('account status') ||
+      q.includes('client overview') ||
+      q.includes('clients overview') ||
+      ((q.includes('status') || q.includes('report') || q.includes('overview') || q.includes('summary')) &&
+        (hasGfm || hasPds || q.includes('client') || q.includes('clients') || q.includes('account') || q.includes('accounts')) &&
+        !matchedPerson) ||
       (wantsCount && (q.includes('client') || q.includes('clients')) && (hasGfm || hasPds || q.includes('total') || q.includes('all') || q.includes('have')))
     )
   );
@@ -454,6 +467,10 @@ export function extractQueryIntent(
     status = 'Completed';
   } else if (isAskingClientsOverview) {
     intent = 'clients_overview';
+    // Clear targetList if it was accidentally captured as GFM/PDS clients list
+    if (targetList && (targetList.toLowerCase().includes('client') || targetList.toLowerCase().includes('resource'))) {
+      targetList = undefined;
+    }
   } else if (matchedClient) {
     intent = 'client_summary';
     // If targetList was set to a status list (e.g. Completed), clear it so the client query is not treated as a raw list dump

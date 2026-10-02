@@ -8,6 +8,8 @@ export interface BriefRequestParams {
   dateTo?: string;
   userId?: string;
   client?: string;
+  agency?: 'all' | 'GFM' | 'PDS';
+  briefIntent?: 'executive_summary' | 'client_deliverables' | 'team_workload' | 'ai_geo_innovation' | 'risk_blockers';
 }
 
 function cleanSnippet(txt?: string, maxLen = 160): string {
@@ -268,7 +270,7 @@ Do NOT output raw metadata, list labels, or unformatted URLs. Provide 2-3 clear,
         systemPrompt,
         `Here are the candidate tasks targeting AI Overviews & GEO:\n${promptCardsData}`
       );
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200));
       const aiResult = await Promise.race([aiPromise, timeoutPromise]);
 
       if (typeof aiResult === 'string' && aiResult.trim().length > 20) {
@@ -317,12 +319,14 @@ function buildClientProgressMatrix(
   isOverall: boolean,
   windowCardsCompleted: TrelloCard[],
   windowCardsCreated: TrelloCard[],
-  windowChecklistItems: { cardName: string; client?: string; itemName: string; completedAt: string }[]
+  windowChecklistItems: { cardName: string; client?: string; itemName: string; completedAt: string }[],
+  isClientDeliverablesIntent = false
 ) {
   const matrix: {
     client: string;
     summary: string;
     status: string;
+    agency?: string;
     completedCards?: string[];
     activeDeliverables?: string[];
     checklistHighlights?: string[];
@@ -330,10 +334,16 @@ function buildClientProgressMatrix(
 
   let targetClients: ClientEntity[] = [];
 
-  if (isOverall) {
-    targetClients = clients.filter((cl) => cl.status === 'Active' && cl.activeCardCount > 0).slice(0, 8);
-    if (targetClients.length < 4) {
-      targetClients = clients.filter((cl) => cl.status === 'Active').slice(0, 6);
+  if (isClientDeliverablesIntent) {
+    // Show all active & on-hold clients for this agency/portfolio
+    targetClients = clients.filter((cl) => cl.status === 'Active' || cl.status === 'On Hold' || (cl as any).isOnHold);
+    if (targetClients.length === 0) {
+      targetClients = clients;
+    }
+  } else if (isOverall) {
+    targetClients = clients.filter((cl) => cl.status === 'Active' && cl.activeCardCount > 0).slice(0, 10);
+    if (targetClients.length < 5) {
+      targetClients = clients.filter((cl) => cl.status === 'Active').slice(0, 8);
     }
   } else {
     const relevantClientNames = new Set<string>();
@@ -343,7 +353,7 @@ function buildClientProgressMatrix(
 
     targetClients = clients.filter((cl) => relevantClientNames.has(cl.canonicalName));
     if (targetClients.length === 0) {
-      targetClients = clients.filter((cl) => cl.status === 'Active' && cl.activeCardCount > 0).slice(0, 6);
+      targetClients = clients.filter((cl) => cl.status === 'Active' && cl.activeCardCount > 0).slice(0, 8);
     }
   }
 
@@ -355,14 +365,14 @@ function buildClientProgressMatrix(
 
     // Completed cards for this client
     const completedCardsInPeriod = isOverall
-      ? clientCards.filter((c) => c.statusSemantic === 'Completed').slice(0, 3).map((c) => c.name)
+      ? clientCards.filter((c) => c.statusSemantic === 'Completed').slice(0, 4).map((c) => c.name)
       : windowCardsCompleted.filter((c) => c.clientCanonical === clientName).map((c) => c.name);
 
     // Active deliverables
     const activeCards = clientCards.filter(
       (c) => c.isUnderProgress || c.statusSemantic === 'In Process' || c.statusSemantic === 'In Review'
     );
-    const activeDeliverables = activeCards.slice(0, 3).map((c) => `${c.name} (${c.listName || c.statusSemantic})`);
+    const activeDeliverables = activeCards.slice(0, 4).map((c) => `${c.name} (${c.listName || c.statusSemantic})`);
 
     // Checklist milestones
     const checklistHighlights: string[] = [];
@@ -384,10 +394,18 @@ function buildClientProgressMatrix(
       }
     }
 
+    // Check if on hold
+    const isOnHold = cl.status === 'On Hold' || (cl as any).isOnHold;
+    const holdCard = clientCards.find((c) => (c.labels || []).some((l: any) => (l.name || '').toLowerCase().includes('hold')));
+    const holdComment = holdCard?.comments?.[0]?.text;
+
     // Build real narrative work summary
     const summaryParts: string[] = [];
+    if (isOnHold) {
+      summaryParts.push(`Account currently on hold${holdComment ? ` (${cleanSnippet(holdComment, 100)})` : ''}.`);
+    }
     if (completedCardsInPeriod.length > 0) {
-      summaryParts.push(`Completed: ${completedCardsInPeriod.join(', ')}.`);
+      summaryParts.push(`Delivered: ${completedCardsInPeriod.join(', ')}.`);
     }
     if (checklistHighlights.length > 0) {
       summaryParts.push(`Key milestones finalized: ${checklistHighlights.slice(0, 3).join(', ')}.`);
@@ -396,16 +414,17 @@ function buildClientProgressMatrix(
       summaryParts.push(`Currently underway: ${activeDeliverables.join(', ')}.`);
     }
     if (cl.teamMembers && cl.teamMembers.length > 0) {
-      summaryParts.push(`Specialists assigned: ${cl.teamMembers.slice(0, 3).join(', ')}.`);
+      summaryParts.push(`Specialists: ${cl.teamMembers.slice(0, 3).join(', ')}.`);
     }
 
     const narrativeSummary =
       summaryParts.join(' ') ||
-      `${activeCards.length} active deliverables underway. Ongoing medical SEO enhancements and localized page execution in progress.`;
+      `${activeCards.length} active deliverables underway. Ongoing SEO enhancements and localized page execution in progress.`;
 
     matrix.push({
       client: clientName,
-      status: cl.agency ? `${cl.agency} Client` : 'Active Client',
+      status: isOnHold ? 'On-Hold Account' : (cl.agency ? `${cl.agency} Client` : 'Active Client'),
+      agency: cl.agency,
       summary: narrativeSummary,
       completedCards: completedCardsInPeriod,
       activeDeliverables,
@@ -463,15 +482,57 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
     periodLabel = `Custom Period (${dateFrom} to ${dateTo})`;
   }
 
+  // Agency & Intent configurations
+  const agencyTarget = params.agency || 'all';
+  const briefIntent = params.briefIntent || 'executive_summary';
+
   // Retrieve live entities
   let allCards = db.getCards();
   const allClients = db.getClients();
   const allLists = db.getLists();
   const allMembers = db.getMembers();
 
+  // Scoped clients based on agency selection
+  let scopedClients = allClients;
+  if (agencyTarget === 'GFM') {
+    scopedClients = allClients.filter((cl) => cl.agency === 'GFM' || cl.agency === 'Both');
+  } else if (agencyTarget === 'PDS') {
+    scopedClients = allClients.filter((cl) => cl.agency === 'PDS' || cl.agency === 'Both');
+  }
+
+  // Scoped cards based on agency selection
+  if (agencyTarget === 'GFM') {
+    const gfmClientNames = new Set(scopedClients.map((c) => c.canonicalName.toLowerCase()));
+    allCards = allCards.filter((c) => {
+      const cLower = (c.clientCanonical || '').toLowerCase();
+      const listLower = (c.listName || '').toLowerCase();
+      const cardNameLower = (c.name || '').toLowerCase();
+      return (
+        gfmClientNames.has(cLower) ||
+        listLower.includes('gfm') ||
+        cardNameLower.includes('gfm') ||
+        (!c.clientCanonical && !listLower.includes('pds') && !cardNameLower.includes('pds'))
+      );
+    });
+  } else if (agencyTarget === 'PDS') {
+    const pdsClientNames = new Set(scopedClients.map((c) => c.canonicalName.toLowerCase()));
+    allCards = allCards.filter((c) => {
+      const cLower = (c.clientCanonical || '').toLowerCase();
+      const listLower = (c.listName || '').toLowerCase();
+      const cardNameLower = (c.name || '').toLowerCase();
+      return (
+        pdsClientNames.has(cLower) ||
+        listLower.includes('pds') ||
+        cardNameLower.includes('pds') ||
+        (!c.clientCanonical && !listLower.includes('gfm') && !cardNameLower.includes('gfm'))
+      );
+    });
+  }
+
   const isClientTargeted = Boolean(params.client && params.client !== 'all');
   if (isClientTargeted) {
     const target = params.client!.toLowerCase().trim();
+    scopedClients = scopedClients.filter((cl) => cl.canonicalName.toLowerCase() === target || cl.canonicalName.toLowerCase().includes(target));
     allCards = allCards.filter((c) => {
       const cardClient = (c.clientCanonical || '').toLowerCase();
       const cardName = (c.name || '').toLowerCase();
@@ -490,8 +551,7 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
     ? allCards.filter((c) => c.createdAt >= windowStartISO && c.createdAt <= windowEndISO)
     : [];
 
-  // Cards completed in window: strictly verified completedAt within the window!
-  // This explicitly excludes 2-month-old cards from weekly/monthly reports
+  // Cards completed in window: strictly verified completedAt within the window
   const cardsCompletedInWindow = !isOverall && windowStartISO
     ? allCards.filter(
         (c) =>
@@ -526,11 +586,17 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
     }
   }
 
-  // Agency breakdowns
-  const pdsClients = allClients.filter((cl) => cl.agency === 'PDS' || cl.agency === 'Both');
-  const gfmClients = allClients.filter((cl) => cl.agency === 'GFM' || cl.agency === 'Both');
-  const activePdsClients = pdsClients.filter((cl) => cl.status === 'Active');
-  const activeGfmClients = gfmClients.filter((cl) => cl.status === 'Active');
+  // Active vs On-Hold vs Closed Breakdown
+  const activeClientsInScope = scopedClients.filter((cl) => cl.status === 'Active' && !(cl as any).isOnHold && !(cl as any).isClosed);
+  const onHoldClientsInScope = scopedClients.filter((cl) => cl.status === 'On Hold' || (cl as any).isOnHold);
+  const closedClientsInScope = scopedClients.filter((cl) => cl.status === 'Closed' || (cl as any).isClosed);
+
+  const portfolioStats = {
+    activeClients: activeClientsInScope.length,
+    onHoldClients: onHoldClientsInScope.length,
+    closedClients: closedClientsInScope.length,
+    totalCards: allCards.length,
+  };
 
   // Workstream segments of active cards
   const inProcessCards = activeUncompletedCards.filter(
@@ -554,6 +620,22 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
   const highPriorityCards = activeUncompletedCards.filter(
     (c) => c.priority === 'High Priority'
   );
+  const onHoldCards = allCards.filter(
+    (c) =>
+      c.statusSemantic === 'Blocked' ||
+      (c.labels || []).some((l: any) => {
+        const name = (l.name || '').toLowerCase();
+        return name.includes('on-hold') || name.includes('on hold') || name.includes('hold');
+      })
+  );
+
+  const workstreamBreakdown = {
+    inProcess: inProcessCards.length,
+    inReview: inReviewCards.length,
+    toDoClients: toDoClientsCards.length,
+    adhoc: adhocCards.length,
+    onHold: onHoldCards.length,
+  };
 
   // Specialist resource cards (Haseeb, Adil, Azeem, Humna, Ali Hamza)
   const specialistListIds = new Set(
@@ -567,24 +649,36 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
   const seoActivity: string[] = [];
   const contentActivity: string[] = [];
   const aiOverviewGeoActivity: string[] = [];
-  const clientProgress: { client: string; summary: string; status: string }[] = [];
+  const clientProgress: { client: string; summary: string; status: string; agency?: string; completedCards?: string[]; activeDeliverables?: string[]; checklistHighlights?: string[] }[] = [];
   const currentPriorities: string[] = [];
   const blockedWork: string[] = [];
   const innovationsExperiments: string[] = [];
   const talkingPoints: string[] = [];
   const sourceCardsPool: TrelloCard[] = [];
 
+  const agencyDisplayName = agencyTarget === 'GFM' ? 'Gold Flex Marketing (GFM)' : agencyTarget === 'PDS' ? 'Physicians Digital Services, LLC (PDS)' : 'Full Agency Portfolio';
+
   if (isOverall) {
     // -------------------------------------------------------------------------------------
     // OVERALL SUMMARY: Report on ALL cards that are NOT completed
     // -------------------------------------------------------------------------------------
-    executiveSummary = `Overall Agency Pipeline Status: There are currently ${activeUncompletedCards.length} active deliverables underway across the SEO and Content boards. The team actively services ${activePdsClients.length} running PDS client accounts and ${activeGfmClients.length} running GFM accounts. Work is organized across In Process sprints (${inProcessCards.length} deliverables), In Review QA gates (${inReviewCards.length} deliverables), Client To-Do backlogs (${toDoClientsCards.length} ad-hoc/new requests), and Specialist Resource queues (${specialistCards.length} weekly execution cards).`;
+    if (briefIntent === 'client_deliverables') {
+      executiveSummary = `${agencyDisplayName} Client Execution & Deliverable Status: Actively managing ${activeClientsInScope.length} running client accounts (${onHoldClientsInScope.length} on-hold, ${closedClientsInScope.length} closed). Currently advancing ${activeUncompletedCards.length} active deliverables with ${inProcessCards.length} cards in sprint execution and ${inReviewCards.length} in quality review gates.`;
+    } else if (briefIntent === 'team_workload') {
+      executiveSummary = `${agencyDisplayName} Team Workload & Capacity Assessment: The specialist team is operating with ${activeUncompletedCards.length} active deliverables distributed across core contributors (${allMembers.map((m) => m.fullName).slice(0, 4).join(', ')}). Workload is distributed with ${inProcessCards.length} items In Process, ${inReviewCards.length} under QA review, and ${specialistCards.length} weekly execution cards.`;
+    } else if (briefIntent === 'ai_geo_innovation') {
+      executiveSummary = `${agencyDisplayName} Generative Engine Optimization (GEO) & AI Intelligence: Advancing strategic search innovations targeting Google AI Overviews, Perplexity, ChatGPT, and Claude citations across clinical and local business accounts. Key initiatives center on structured physician authority pages, machine-readable llms.txt manifests, and conversational query mapping.`;
+    } else if (briefIntent === 'risk_blockers') {
+      executiveSummary = `${agencyDisplayName} Operational Risk Profile & Blocker Audit: The pipeline maintains ${onHoldCards.length} blocked or on-hold deliverables and ${onHoldClientsInScope.length} paused accounts. Immediate leadership intervention is focused on resolving client dependencies, approval gates, and keeping In Review turnaround within our 48-hour SLA.`;
+    } else {
+      executiveSummary = `${agencyDisplayName} Executive Pipeline Status: Currently advancing ${activeUncompletedCards.length} active deliverables across ${activeClientsInScope.length} running client accounts. Delivery velocity is healthy with ${inProcessCards.length} deliverables in active sprints, ${inReviewCards.length} in QA review, and ${toDoClientsCards.length} incoming client requests organized in structured backlogs.`;
+    }
 
     // Major active projects & running workloads
     if (highPriorityCards.length > 0) {
       const hpNames = highPriorityCards.slice(0, 4).map((c) => `"${c.name}"${c.clientCanonical ? ` (${c.clientCanonical})` : ''}`).join(', ');
       majorAccomplishments.push(
-        `High Priority Engagements: Actively advancing urgent deliverables for ${hpNames} with accelerated deadlines.`
+        `High Priority Deliverables: Actively advancing urgent milestones for ${hpNames} with accelerated deadlines.`
       );
     }
 
@@ -595,13 +689,13 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
     if (inReviewCards.length > 0) {
       const reviewNames = inReviewCards.slice(0, 3).map((c) => `"${c.name}"`).join(', ');
       majorAccomplishments.push(
-        `Quality Gate Pipeline: ${inReviewCards.length} deliverables completed by specialists and currently queued for stakeholder/manager review (${reviewNames}).`
+        `Quality Review Gate: ${inReviewCards.length} deliverables finalized by specialists and queued for manager/stakeholder verification (${reviewNames}).`
       );
     }
 
     if (toDoClientsCards.length > 0) {
       majorAccomplishments.push(
-        `Client Requests & Expansion: Processing ${toDoClientsCards.length} client-assigned and team-initiated SEO, content optimization, and page expansion tasks in To Do Clients.`
+        `Client Expansion & Requests: Processing ${toDoClientsCards.length} client-assigned optimization and expansion tasks in To Do Clients.`
       );
     }
 
@@ -616,10 +710,10 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
       seoActivity.push(`Active technical SEO and local optimization workstreams: ${sample}.`);
     }
     seoActivity.push(
-      `Ongoing schema markup deployments, Google Business Profile geotagging, and monthly technical audits across active PDS and GFM client rosters.`
+      `Ongoing schema markup deployments, Google Business Profile geotagging, and technical health checks across active client accounts.`
     );
     seoActivity.push(
-      `Maintaining NAP consistency and off-page citation building campaigns across healthcare, dental, and local service clients.`
+      `Maintaining NAP consistency and high-authority citation building campaigns across active healthcare and local service practices.`
     );
 
     // Content Strategy across uncompleted cards
@@ -630,7 +724,7 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
     );
     if (activeContent.length > 0) {
       const sample = activeContent.slice(0, 3).map((c) => c.name).join('; ');
-      contentActivity.push(`Active copywriting, medical service page drafting, and editorial pipelines: ${sample}.`);
+      contentActivity.push(`Active copywriting, clinical service page drafting, and editorial pipelines: ${sample}.`);
     }
     contentActivity.push(
       `Publishing authoritative Web 2.0 assets and supporting informational blog content structured to satisfy Google E-E-A-T guidelines.`
@@ -639,25 +733,26 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
       `Developing localized service silos for expanding clinical practices to capture high-intent geographic search volume.`
     );
 
-    // AI Overview & GEO Initiatives (100% evidence based from actual cards and checklists)
+    // AI Overview & GEO Initiatives
     aiOverviewGeoActivity.push(...(await extractAiOverviewGeoEvidence(allCards, true)));
 
-    // Client Progress Matrix with real substantive work summaries
+    // Client Progress Matrix
     clientProgress.push(
       ...buildClientProgressMatrix(
-        allClients,
+        scopedClients,
         allCards,
         true,
         [],
         [],
-        []
+        [],
+        briefIntent === 'client_deliverables'
       )
     );
 
-    // Priorities for uncompleted work
+    // Priorities
     if (inReviewCards.length > 0) {
       currentPriorities.push(
-        `Finalize review and approval for ${inReviewCards.length} cards currently in In Review.`
+        `Finalize review and stakeholder sign-off for ${inReviewCards.length} cards currently in In Review.`
       );
     }
     if (inProcessCards.length > 0) {
@@ -666,10 +761,10 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
       );
     }
     currentPriorities.push(
-      `Process client requests from To Do Clients list into scheduled weekly specialist sprints.`
+      `Process and schedule incoming client requests from To Do Clients list into upcoming weekly sprints.`
     );
 
-    // Blockers
+    // Blockers & On-Hold Accounts
     const blockedCards = activeUncompletedCards.filter(
       (c) =>
         c.statusSemantic === 'Blocked' ||
@@ -681,9 +776,21 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
       for (const b of blockedCards.slice(0, 3)) {
         blockedWork.push(`${b.clientCanonical ? `${b.clientCanonical}: ` : ''}${b.name} — pending prerequisites.`);
       }
-    } else {
+    }
+
+    if (onHoldClientsInScope.length > 0) {
+      for (const oh of onHoldClientsInScope) {
+        const ohCards = allCards.filter((c) => c.clientCanonical?.toLowerCase() === oh.canonicalName.toLowerCase());
+        const holdCard = ohCards.find((c) => (c.labels || []).some((l: any) => (l.name || '').toLowerCase().includes('hold')));
+        const reasonComment = holdCard?.comments?.[0]?.text;
+        const snippet = reasonComment ? ` (${cleanSnippet(reasonComment, 110)})` : '';
+        blockedWork.push(`[On-Hold Account] ${oh.canonicalName}: Account paused${snippet}.`);
+      }
+    }
+
+    if (blockedWork.length === 0) {
       blockedWork.push(
-        `No critical technical blockers reported. Workflow continuity is intact across all active PDS and GFM pipelines.`
+        `No critical technical blockers reported. Workflow continuity is intact across all active ${agencyDisplayName} pipelines.`
       );
     }
 
@@ -695,7 +802,7 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
     );
 
     talkingPoints.push(
-      `The agency has ${activeUncompletedCards.length} active deliverables underway across ${activePdsClients.length} running PDS clients and ${activeGfmClients.length} running GFM clients.`
+      `The agency has ${activeUncompletedCards.length} active deliverables underway across ${activeClientsInScope.length} running accounts in ${agencyDisplayName}.`
     );
     talkingPoints.push(
       `Delivery pipelines are healthy with ${inProcessCards.length} cards actively being worked on and ${inReviewCards.length} cards submitted for review.`
@@ -712,18 +819,28 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
     );
   } else {
     // -------------------------------------------------------------------------------------
-    // TIME-BOUND REPORT (Last 7 Days / Last 30 Days / Custom): Created or Completed in Window
+    // TIME-BOUND REPORT (Last 7 Days / Last 30 Days / Custom)
     // -------------------------------------------------------------------------------------
     const createdCount = cardsCreatedInWindow.length;
     const completedCount = cardsCompletedInWindow.length;
     const checklistCompletedCount = checklistItemsCompletedInWindow.length;
     const activePipelineCount = activeUncompletedCards.length;
 
-    executiveSummary = `During ${periodLabel}, the SEO & Content team marked ${completedCount} cards as completed, completed ${checklistCompletedCount} individual checklist deliverable items, and created ${createdCount} new task cards across the board. The active pipeline currently has ${activePipelineCount} deliverables underway across running PDS and GFM client accounts.`;
+    if (briefIntent === 'client_deliverables') {
+      executiveSummary = `During ${periodLabel}, the SEO & Content team for ${agencyDisplayName} marked ${completedCount} cards complete, finalized ${checklistCompletedCount} granular checklist deliverables, and launched ${createdCount} new tasks. There are currently ${activePipelineCount} active deliverables underway across ${activeClientsInScope.length} running client accounts.`;
+    } else if (briefIntent === 'team_workload') {
+      executiveSummary = `During ${periodLabel}, the team finalized ${completedCount} cards and ${checklistCompletedCount} checklist items. Current active capacity maintains ${activePipelineCount} deliverables underway with ${inProcessCards.length} In Process and ${inReviewCards.length} in quality review across core specialists.`;
+    } else if (briefIntent === 'ai_geo_innovation') {
+      executiveSummary = `During ${periodLabel}, the team deployed generative search and GEO enhancements, structured provider credentialing pages, and maintained machine-readable indexing across ${agencyDisplayName} client domains.`;
+    } else if (briefIntent === 'risk_blockers') {
+      executiveSummary = `Operational Risk Review for ${periodLabel}: The team identified ${blockedWork.length || onHoldCards.length} blocked or on-hold deliverables and maintains oversight on ${onHoldClientsInScope.length} on-hold client accounts to protect sprint velocity.`;
+    } else {
+      executiveSummary = `During ${periodLabel}, the SEO & Content team for ${agencyDisplayName} marked ${completedCount} cards as completed, completed ${checklistCompletedCount} individual checklist deliverable items, and created ${createdCount} new task cards. The active pipeline currently has ${activePipelineCount} deliverables underway across running client accounts.`;
+    }
 
     // 1. Accomplishments strictly from cards marked complete in this window
     if (cardsCompletedInWindow.length > 0) {
-      for (const c of cardsCompletedInWindow.slice(0, 5)) {
+      for (const c of cardsCompletedInWindow.slice(0, 6)) {
         majorAccomplishments.push(
           `Marked Complete: "${c.name}"${c.clientCanonical ? ` for ${c.clientCanonical}` : ''} (Completed: ${c.completedAt ? new Date(c.completedAt).toLocaleDateString() : 'verified in period'}).`
         );
@@ -788,20 +905,21 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
       `Produced high-authority Web 2.0 articles and off-page contextual references to reinforce domain authority.`
     );
 
-    // AI Overview & GEO Initiatives (100% evidence based from actual cards and checklists in window)
+    // AI Overview & GEO Initiatives
     aiOverviewGeoActivity.push(
       ...(await extractAiOverviewGeoEvidence(allCards, false, windowStartISO, windowEndISO))
     );
 
-    // Client Progress Matrix with real substantive work summaries
+    // Client Progress Matrix
     clientProgress.push(
       ...buildClientProgressMatrix(
-        allClients,
+        scopedClients,
         allCards,
         false,
         cardsCompletedInWindow,
         cardsCreatedInWindow,
-        checklistItemsCompletedInWindow
+        checklistItemsCompletedInWindow,
+        briefIntent === 'client_deliverables'
       )
     );
 
@@ -820,9 +938,22 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
       `Plan next weekly sprint from To Do Clients queue based on client priority.`
     );
 
-    blockedWork.push(
-      `No critical technical impediments reported during this reporting window.`
-    );
+    // Blockers & On-Hold
+    if (onHoldClientsInScope.length > 0) {
+      for (const oh of onHoldClientsInScope) {
+        const ohCards = allCards.filter((c) => c.clientCanonical?.toLowerCase() === oh.canonicalName.toLowerCase());
+        const holdCard = ohCards.find((c) => (c.labels || []).some((l: any) => (l.name || '').toLowerCase().includes('hold')));
+        const reasonComment = holdCard?.comments?.[0]?.text;
+        const snippet = reasonComment ? ` (${cleanSnippet(reasonComment, 110)})` : '';
+        blockedWork.push(`[On-Hold Account] ${oh.canonicalName}: Account paused${snippet}.`);
+      }
+    }
+
+    if (blockedWork.length === 0) {
+      blockedWork.push(
+        `No critical technical impediments reported during this reporting window.`
+      );
+    }
 
     innovationsExperiments.push(
       `Activity-verified completion tracking implemented to report deliverables based on actual completion dates rather than last activity.`
@@ -835,7 +966,7 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
       `${createdCount} new cards were added and prioritized into the production pipeline.`
     );
     talkingPoints.push(
-      `The active pipeline currently maintains ${activePipelineCount} deliverables underway with strict due date monitoring to prevent overdue tasks.`
+      `The active pipeline currently maintains ${activePipelineCount} deliverables underway with strict due date monitoring.`
     );
 
     sourceCardsPool.push(
@@ -870,19 +1001,14 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
 
   // --- EXECUTIVE SCORECARD CALCULATIONS ---
   const blockedCount = (blockedWork || []).length;
-  let healthStatus: 'on_track' | 'needs_attention' | 'at_risk' = 'on_track';
-  let healthStatusLabel = 'On Track • Strong Delivery Velocity';
-  let healthScore = 96;
+  const onHoldClientsCount = onHoldClientsInScope.length;
+  const inReviewCount = inReviewCards.length;
 
-  if (blockedCount >= 3) {
-    healthStatus = 'at_risk';
-    healthStatusLabel = 'At Risk • Critical Blockers Active';
-    healthScore = 72;
-  } else if (blockedCount >= 1) {
-    healthStatus = 'needs_attention';
-    healthStatusLabel = 'Needs Attention • Client Dependencies Pending';
-    healthScore = 84;
-  }
+  let healthScore = 96;
+  if (blockedCount > 0) healthScore -= Math.min(24, blockedCount * 6);
+  if (onHoldClientsCount > 0) healthScore -= Math.min(15, onHoldClientsCount * 5);
+  if (inReviewCount > 6) healthScore -= 10;
+  else if (inReviewCount > 3) healthScore -= 5;
 
   const completedCount = isOverall
     ? allCards.filter((c) => c.statusSemantic === 'Completed').length
@@ -891,8 +1017,38 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
   const totalTracked = completedCount + activeCount || 1;
   const deliveryVelocityRate = Math.min(100, Math.max(25, Math.round((completedCount / totalTracked) * 100))) || 75;
 
+  if (deliveryVelocityRate >= 70) healthScore += 4;
+  else if (deliveryVelocityRate < 40) healthScore -= 8;
+
+  healthScore = Math.max(45, Math.min(100, healthScore));
+
+  let healthStatus: 'on_track' | 'needs_attention' | 'at_risk' = 'on_track';
+  let healthStatusLabel = 'On Track • Strong Delivery Velocity';
+
+  if (healthScore < 70 || blockedCount >= 3) {
+    healthStatus = 'at_risk';
+    healthStatusLabel = 'At Risk • Critical Blockers Active';
+  } else if (healthScore < 85 || blockedCount >= 1 || onHoldClientsCount > 0) {
+    healthStatus = 'needs_attention';
+    healthStatusLabel = 'Needs Attention • Pending Dependencies';
+  }
+
+  // BLUF generation tailored to brief intent
+  let blufCurrentState = '';
+  if (briefIntent === 'team_workload') {
+    blufCurrentState = `Specialist capacity is focused across ${activeUncompletedCards.length} active deliverables, with ${inProcessCards.length} tasks in active execution and ${inReviewCards.length} queued in review.`;
+  } else if (briefIntent === 'client_deliverables') {
+    blufCurrentState = `${agencyDisplayName} actively manages ${activeClientsInScope.length} running client accounts (${onHoldClientsInScope.length} on-hold). ${completedCount} milestones were verified delivered and ${activeUncompletedCards.length} active deliverables remain underway.`;
+  } else if (briefIntent === 'ai_geo_innovation') {
+    blufCurrentState = `Advancing AI Overviews and Generative Engine Optimization (GEO) through provider entity pages, llms.txt manifests, and structured medical citation schemas.`;
+  } else if (briefIntent === 'risk_blockers') {
+    blufCurrentState = `Portfolio monitors ${onHoldClientsInScope.length} on-hold accounts and ${blockedCount || 1} dependency gates. Delivery pipeline maintains an active velocity of ${deliveryVelocityRate}%.`;
+  } else {
+    blufCurrentState = `${isClientTargeted ? `For ${params.client}, the team is advancing` : `Across ${agencyDisplayName}, the team is advancing`} ${activeUncompletedCards.length} active deliverables with ${completedCount} verified milestones completed ${isOverall ? 'overall' : 'in this window'}.`;
+  }
+
   const bluf = {
-    currentState: `${isClientTargeted ? `For ${params.client}, the team is advancing` : 'Across the agency portfolio, the team is advancing'} ${activeUncompletedCards.length} active deliverables with ${completedCount} verified milestones completed ${isOverall ? 'overall' : 'in this window'}.`,
+    currentState: blufCurrentState,
     criticalBlocker: blockedWork && blockedWork.length > 0
       ? blockedWork[0]
       : 'No critical blockers identified. Client approval gates and technical deliverables are progressing without delays.',
@@ -900,6 +1056,21 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
       ? currentPriorities[0]
       : 'Maintain scheduled velocity on staging reviews and ensure 48-hour turnarounds on quality review items.',
   };
+
+  // Recommendations for leadership
+  const recommendations: string[] = [];
+  if (inReviewCards.length > 5) {
+    recommendations.push(`Accelerate QA sign-offs on ${inReviewCards.length} deliverables queued in In Review to prevent sprint velocity bottlenecks.`);
+  } else {
+    recommendations.push(`Maintain the current 48-hour SLA on Quality Review Gates to ensure steady delivery cadence.`);
+  }
+  if (onHoldClientsInScope.length > 0) {
+    recommendations.push(`Conduct executive follow-up on ${onHoldClientsInScope.length} on-hold accounts (${onHoldClientsInScope.map((c) => c.canonicalName).join(', ')}) to resolve client-side pauses or billing prerequisites.`);
+  }
+  recommendations.push(`Deploy structured physician and provider authority pages across clinical practices to maximize citations in Google AI Overviews and LLM answer engines.`);
+  if (toDoClientsCards.length > 0) {
+    recommendations.push(`Prioritize and schedule the ${toDoClientsCards.length} incoming client requests from To Do Clients into upcoming weekly specialist sprints.`);
+  }
 
   // Resource allocation summary
   const resourceMap = new Map<string, { activeCount: number; completedCount: number }>();
@@ -918,16 +1089,32 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
     .sort((a, b) => (b.activeCount + b.completedCount) - (a.activeCount + a.completedCount))
     .slice(0, 6);
 
+  // Title formatting
+  const intentTitles: Record<string, string> = {
+    executive_summary: 'Executive Strategic Overview',
+    client_deliverables: 'Client Deliverables & Execution Matrix',
+    team_workload: 'Team Workload, Velocity & Capacity',
+    ai_geo_innovation: 'AI Overviews, GEO & Generative Search',
+    risk_blockers: 'Operational Risk Assessment & QA Bottlenecks',
+  };
+
+  let title = '';
+  if (isClientTargeted) {
+    title = `${params.client}: ${intentTitles[briefIntent] || 'Executive Status Brief'}`;
+  } else {
+    title = intentTitles[briefIntent] || 'Executive Strategic Overview';
+  }
+
   const brief: ManagementBrief = {
     id: `brief_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     userId: params.userId || 'usr_admin_awais',
     clientTarget: isClientTargeted ? params.client : undefined,
+    agencyTarget,
+    briefIntent,
     periodType: params.periodType,
     dateFrom: dateFrom || '',
     dateTo: dateTo || now.toISOString().slice(0, 10),
-    title: isClientTargeted
-      ? `${params.client} — Executive Status Brief (${periodLabel})`
-      : `SEO & Content Team Management Brief — ${periodLabel}`,
+    title,
     executiveSummary,
     cardsCreatedCount: isOverall ? undefined : cardsCreatedInWindow.length,
     cardsCompletedCount: isOverall ? undefined : cardsCompletedInWindow.length,
@@ -937,6 +1124,8 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
     healthScore,
     healthStatusLabel,
     deliveryVelocityRate,
+    workstreamBreakdown,
+    portfolioStats,
     bluf,
     resourceAllocation,
     majorAccomplishments,
@@ -948,6 +1137,7 @@ export async function generateManagementBrief(params: BriefRequestParams): Promi
     blockedWork,
     innovationsExperiments,
     talkingPoints,
+    recommendations,
     sourceCards,
     createdAt: new Date().toISOString(),
   };

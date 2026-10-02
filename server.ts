@@ -778,10 +778,20 @@ app.get('/api/team', requireAuth, (req, res) => {
 // 8. MANAGEMENT BRIEFS (ISOLATED PER USER ACCOUNT)
 // -------------------------------------------------------------
 app.post('/api/management-brief', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res) => {
-  const { periodType = 'this_month', dateFrom, dateTo, client } = req.body;
-  const allowed = ['overall', 'this_week', 'last_week', 'this_month', 'last_month', 'custom'];
-  if (!allowed.includes(periodType)) {
-    return res.status(400).json({ error: `periodType must be one of: ${allowed.join(', ')}` });
+  const { periodType = 'this_month', dateFrom, dateTo, client, agency = 'all', briefIntent = 'executive_summary' } = req.body;
+  const allowedPeriods = ['overall', 'this_week', 'last_week', 'this_month', 'last_month', 'custom'];
+  if (!allowedPeriods.includes(periodType)) {
+    return res.status(400).json({ error: `periodType must be one of: ${allowedPeriods.join(', ')}` });
+  }
+
+  const allowedAgencies = ['all', 'GFM', 'PDS'];
+  if (!allowedAgencies.includes(agency)) {
+    return res.status(400).json({ error: `agency must be one of: ${allowedAgencies.join(', ')}` });
+  }
+
+  const allowedIntents = ['executive_summary', 'client_deliverables', 'team_workload', 'ai_geo_innovation', 'risk_blockers'];
+  if (!allowedIntents.includes(briefIntent)) {
+    return res.status(400).json({ error: `briefIntent must be one of: ${allowedIntents.join(', ')}` });
   }
 
   try {
@@ -792,6 +802,8 @@ app.post('/api/management-brief', requireAuth, requireRole(['ADMIN', 'MANAGER'])
       dateTo,
       userId,
       client,
+      agency,
+      briefIntent,
     });
     res.json(brief);
   } catch (err: any) {

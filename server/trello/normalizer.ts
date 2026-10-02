@@ -381,7 +381,14 @@ export function buildClientRegistry(
 
     if (meta?.agency) {
       if (entry.agency && entry.agency !== 'Internal' && entry.agency !== meta.agency) {
-        entry.agency = 'Both';
+        // If already established as PDS, do not let unverified GFM list placement overwrite it
+        if (entry.agency === 'PDS') {
+          // Keep PDS
+        } else if (meta.agency === 'PDS') {
+          entry.agency = 'PDS';
+        } else {
+          entry.agency = meta.agency;
+        }
       } else if (!entry.agency || entry.agency === 'Internal') {
         entry.agency = meta.agency;
       }
@@ -421,7 +428,7 @@ export function buildClientRegistry(
     addClient(c.canonicalName, c.aliases || []);
   }
 
-  // Explicitly ensure Advanced Wellness MD is registered with exact canonical name and aliases
+  // Explicitly ensure Advanced Wellness MD is registered with exact canonical name and aliases under PDS
   addClient(
     'Advanced Wellness MD',
     [
@@ -434,7 +441,7 @@ export function buildClientRegistry(
       'Advnace Well',
       'AdvancedWellMD',
     ],
-    { agency: 'Both', isClosed: false }
+    { agency: 'PDS', isClosed: false }
   );
 
   // 2. Identify client cards from lists (e.g. "GFM Clients", "PDS Resources")
@@ -448,10 +455,57 @@ export function buildClientRegistry(
     'guidelines',
   ];
 
+  const knownPdsNames = new Set([
+    'woodlands heart and vascular, pa',
+    'swan primary care',
+    'express medical services',
+    'express medical services llc',
+    'motion focused podiatry llc',
+    'eoht llc',
+    'mindful behavioral solutions',
+    'mindul behaviour solutions',
+    'temeculla vallery ob/gyn',
+    'ai-x wellness',
+    'neos eclectic',
+    'ramzi steaks',
+    'main street physicians',
+    'main street physician p.c.',
+    'mydoctor pc',
+    'mydoctoc p.c.',
+    'rapid care',
+    'dr. pete cooper',
+    'pete cooper',
+    'precision psychiatry',
+    'mothermind psychology',
+    'haven health',
+    'advanced wellness md',
+    'advanced wellness',
+    'advanced well md',
+    'precision podiatry pllc',
+    'precision podiatry, pllc',
+    'abundance health care, p.c',
+    'rapid recovery wound care, pllc',
+    'rapid recovery wound care',
+    'katy family medicine and urgent care',
+    'amen family medicine',
+    'capital allergy & respiratory disease center',
+    'dr. saleem & associates pllc',
+    'ugi global',
+    'dynamic wave',
+    'san diego medical',
+    'blueprint mental health pllc',
+    'mentally healthy llc',
+    'mentally healthy care',
+    'bridges community support services, inc',
+    'children\'s & family medicine clinic',
+    'unlimited graphix',
+    'lakeside foot and ankle center',
+  ]);
+
   for (const list of raw.lists || []) {
     const listLower = list.name.toLowerCase();
     const isPds = listLower.includes('pds client') || listLower.includes('pds resource');
-    const isGfm = listLower.includes('gfm client') || (listLower.includes('client') && !listLower.includes('to do') && !isPds);
+    const isGfm = listLower.includes('gfm client');
 
     if (isPds || isGfm) {
       for (const card of raw.cards || []) {
@@ -499,11 +553,25 @@ export function buildClientRegistry(
             }
 
             const cardLabels = (card.labels || []).map((l: any) => (l.name || '').toLowerCase());
+            const hasGfmLabel = cardLabels.some((l: string) => l === 'gfm' || l.includes('gfm'));
+            const hasPdsLabel = cardLabels.some((l: string) => l === 'pds' || l.includes('pds'));
             const isClosed = cardLabels.some((l: string) => l.includes('project closed') || l.includes('closed') || l.includes('discontinue') || l.includes('terminate'));
             const isOnHold = cardLabels.some((l: string) => l.includes('on-hold') || l.includes('on hold') || l.includes('hold'));
             const isActive = cardLabels.some((l: string) => l === 'active' || l.includes('active'));
             const isHighPriority = cardLabels.some((l: string) => l.includes('high priority'));
-            const agency: 'PDS' | 'GFM' = isPds ? 'PDS' : 'GFM';
+
+            let agency: 'PDS' | 'GFM' = isPds ? 'PDS' : 'GFM';
+            if (isGfm) {
+              // In GFM Clients list, only cards that actually have GFM label belong to GFM.
+              // Any cards without GFM label that are known PDS accounts are PDS accounts.
+              if (hasGfmLabel) {
+                agency = 'GFM';
+              } else if (knownPdsNames.has(canonical.toLowerCase()) || hasPdsLabel) {
+                agency = 'PDS';
+              } else {
+                agency = 'GFM';
+              }
+            }
 
             addClient(canonical, [cardName], { agency, isClosed, isOnHold, isActive, isHighPriority });
           }
@@ -760,10 +828,14 @@ export function normalizeTrelloPayload(
     const hasPdsLabel = cardLabels.some((l) => l.name.toLowerCase() === 'pds' || l.name.toLowerCase().includes('pds client'));
     const hasGfmLabel = cardLabels.some((l) => l.name.toLowerCase() === 'gfm' || l.name.toLowerCase().includes('gfm client'));
 
-    if (listNameLower.includes('pds resource') || hasPdsLabel) {
-      agencySource = 'PDS';
-    } else if (listNameLower.includes('gfm client') || hasGfmLabel) {
+    if (hasGfmLabel) {
       agencySource = 'GFM';
+    } else if (hasPdsLabel || listNameLower.includes('pds client') || listNameLower.includes('pds resource')) {
+      agencySource = 'PDS';
+    } else if (listNameLower.includes('gfm client')) {
+      // In GFM Clients list, only cards with the GFM label belong to GFM.
+      // Other cards are unlabelled PDS medical clients.
+      agencySource = hasGfmLabel ? 'GFM' : 'PDS';
     }
 
     // Priority classification

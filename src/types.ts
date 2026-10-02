@@ -246,6 +246,8 @@ export interface ManagementBrief {
   id: string;
   userId?: string;
   clientTarget?: string;
+  agencyTarget?: 'all' | 'GFM' | 'PDS';
+  briefIntent?: 'executive_summary' | 'client_deliverables' | 'team_workload' | 'ai_geo_innovation' | 'risk_blockers';
   periodType: 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'overall' | 'custom';
   dateFrom: string;
   dateTo: string;
@@ -259,6 +261,19 @@ export interface ManagementBrief {
   healthScore?: number;
   healthStatusLabel?: string;
   deliveryVelocityRate?: number;
+  workstreamBreakdown?: {
+    inProcess: number;
+    inReview: number;
+    toDoClients: number;
+    adhoc: number;
+    onHold: number;
+  };
+  portfolioStats?: {
+    activeClients: number;
+    onHoldClients: number;
+    closedClients: number;
+    totalCards: number;
+  };
   bluf?: {
     currentState: string;
     criticalBlocker: string;
@@ -277,6 +292,7 @@ export interface ManagementBrief {
     client: string;
     summary: string;
     status: string;
+    agency?: string;
     completedCards?: string[];
     activeDeliverables?: string[];
     checklistHighlights?: string[];
@@ -285,6 +301,7 @@ export interface ManagementBrief {
   blockedWork: string[];
   innovationsExperiments: string[];
   talkingPoints: string[];
+  recommendations?: string[];
   sourceCards: ChatSource[];
   createdAt: string;
 }

@@ -169,21 +169,34 @@ function generateClientListAnswer(intent: QueryIntent): AnswerResult {
       .trim();
   };
 
-  // PDS Cards
+  // PDS Cards (Physicians Digital Services, LLC)
   const pdsAllCards = allCards.filter(
-    (c) => c.listId === pdsListId || c.listName?.toLowerCase().includes('pds client')
+    (c) =>
+      c.listId === pdsListId ||
+      c.listName?.toLowerCase().includes('pds client') ||
+      (c.labels || []).some((l: any) => {
+        const ln = (l.name || '').toLowerCase();
+        return ln === 'pds' || ln.includes('pds');
+      }) ||
+      c.agencySource === 'PDS'
   );
   const pdsActiveCards = pdsAllCards.filter(isActiveCard);
   const pdsHoldCards = pdsAllCards.filter(isHoldCard);
   const pdsClosedCards = pdsAllCards.filter(isClosedCard);
 
-  // GFM Cards
-  const gfmAllCards = allCards.filter(
-    (c) =>
-      c.listId === gfmListId ||
-      c.listName?.toLowerCase().includes('gfm client') ||
-      (c.labels || []).some((l: any) => (l.name || '').toLowerCase() === 'gfm')
-  );
+  // GFM Cards (Gold Flex Marketing) - Strictly cards with GFM label and NOT PDS medical accounts
+  const gfmAllCards = allCards.filter((c) => {
+    const hasGfmLabel = (c.labels || []).some((l: any) => {
+      const ln = (l.name || '').toLowerCase();
+      return ln === 'gfm' || ln.includes('gfm');
+    });
+    const hasPdsLabel = (c.labels || []).some((l: any) => {
+      const ln = (l.name || '').toLowerCase();
+      return ln === 'pds' || ln.includes('pds');
+    });
+    if (hasPdsLabel || c.agencySource === 'PDS') return false;
+    return hasGfmLabel;
+  });
   const gfmActiveCards = gfmAllCards.filter(isActiveCard);
   const gfmHoldCards = gfmAllCards.filter(isHoldCard);
   const gfmClosedCards = gfmAllCards.filter(isClosedCard);
@@ -246,7 +259,7 @@ ${gfmLines}
 
     if (agencyTarget === 'PDS') {
       const pdsLines = pdsActiveNames.map((name, i) => `${i + 1}. **${name}**`).join('\n');
-      const answer = `There are currently **${pdsActiveNames.length} active client accounts** under **PDS Clients**:
+      const answer = `There are currently **${pdsActiveNames.length} active client accounts** under **PDS (Physicians Digital Services, LLC)**:
 
 ### PDS Active Clients (${pdsActiveNames.length} Accounts)
 ${pdsLines}
@@ -269,7 +282,7 @@ ${pdsLines}
 
       return {
         answer,
-        summary: `PDS currently has ${pdsActiveNames.length} active client accounts (excluding ${pdsClosedCards.length} closed accounts).`,
+        summary: `PDS (Physicians Digital Services, LLC) currently has ${pdsActiveNames.length} active client accounts (excluding ${pdsClosedCards.length} closed accounts).`,
         keyPoints: [
           `PDS Active Clients: ${pdsActiveNames.length} active client accounts`,
           `PDS Closed Accounts: ${pdsClosedCards.length} accounts (excluded from active count)`,
@@ -587,6 +600,56 @@ ${closedLines}
         `GFM Total Accounts: ${totalGfm}`,
       ],
       statusBreakdown: { Active: gfmActiveNames.length, 'On Hold': gfmHoldCards.length, Closed: gfmClosedCards.length },
+      sources,
+      evidenceStrength: 'high',
+    };
+  }
+
+  if (agencyTarget === 'PDS') {
+    const totalPds = pdsActiveNames.length + pdsHoldCards.length + pdsClosedCards.length;
+    const pdsLines = pdsActiveNames.map((name, i) => `  ${i + 1}. ${name}`).join('\n');
+    const holdLines =
+      pdsHoldCards.length > 0
+        ? pdsHoldCards.map((c, i) => `  ${i + 1}. **${c.name.trim()}** (Reason: ${extractHoldReasonFromCard(c)})`).join('\n')
+        : '  _No client accounts currently labeled On Hold under PDS._';
+    const closedLines = pdsClosedCards.map((c, i) => `  ${i + 1}. **${c.name.trim()}** (Reason: ${extractClosedReasonFromCard(c)})`).join('\n');
+
+    const answer = `### PDS (Physicians Digital Services, LLC) Client Portfolio Breakdown
+
+PDS currently tracks a total of **${totalPds} client accounts** across all states:
+
+- **Active Clients (${pdsActiveNames.length}):**
+${pdsLines}
+
+- **On-Hold Clients (${pdsHoldCards.length}):**
+${holdLines}
+
+- **Closed / Terminated Projects (${pdsClosedCards.length}):**
+${closedLines}
+`;
+
+    const sources: ChatSource[] = [...pdsActiveCards, ...pdsHoldCards, ...pdsClosedCards].map((c) => ({
+      cardId: c.id,
+      title: c.name,
+      url: c.url,
+      relevance: 100,
+      reason: `PDS client record (${c.listName})`,
+      date: c.dateLastActivity,
+      client: c.clientCanonical,
+      status: isHoldCard(c) ? 'Blocked' : isClosedCard(c) ? 'Completed' : 'In Process',
+      listName: c.listName,
+    }));
+
+    return {
+      answer,
+      summary: `PDS (Physicians Digital Services, LLC) tracks ${totalPds} total client accounts: ${pdsActiveNames.length} active, ${pdsHoldCards.length} on-hold, and ${pdsClosedCards.length} closed.`,
+      keyPoints: [
+        `PDS Active Accounts: ${pdsActiveNames.length}`,
+        `PDS On-Hold Accounts: ${pdsHoldCards.length}`,
+        `PDS Closed Accounts: ${pdsClosedCards.length}`,
+        `PDS Total Accounts: ${totalPds}`,
+      ],
+      statusBreakdown: { Active: pdsActiveNames.length, 'On Hold': pdsHoldCards.length, Closed: pdsClosedCards.length },
       sources,
       evidenceStrength: 'high',
     };

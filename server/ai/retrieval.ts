@@ -160,25 +160,29 @@ export function hybridRetrieve(intent: QueryIntent, threshold = 35): ScoredCard[
 
     // Agency isolation: If user asked for GFM only, filter out PDS cards
     if (intent.targetAgency === 'GFM') {
-      const isGfmCard =
-        card.listName?.toLowerCase().includes('gfm client') ||
-        (card.labels || []).some((l: any) => (l.name || '').toLowerCase().includes('gfm'));
+      const hasGfmLabel = (card.labels || []).some((l: any) => {
+        const ln = (l.name || '').toLowerCase();
+        return ln === 'gfm' || ln.includes('gfm');
+      });
       const isPdsCard =
+        card.agencySource === 'PDS' ||
         card.listName?.toLowerCase().includes('pds client') ||
         card.listName?.toLowerCase().includes('pds resource') ||
         (card.labels || []).some((l: any) => (l.name || '').toLowerCase().includes('pds'));
-      if (isPdsCard && !isGfmCard) {
+
+      if (isPdsCard) {
+        continue;
+      }
+      // If card is in GFM Clients list but does NOT have the GFM label, it's an unlabelled PDS copy — exclude it
+      if (card.listName?.toLowerCase().includes('gfm client') && !hasGfmLabel) {
         continue;
       }
     } else if (intent.targetAgency === 'PDS') {
-      const isGfmCard =
-        card.listName?.toLowerCase().includes('gfm client') ||
-        (card.labels || []).some((l: any) => (l.name || '').toLowerCase().includes('gfm'));
-      const isPdsCard =
-        card.listName?.toLowerCase().includes('pds client') ||
-        card.listName?.toLowerCase().includes('pds resource') ||
-        (card.labels || []).some((l: any) => (l.name || '').toLowerCase().includes('pds'));
-      if (isGfmCard && !isPdsCard) {
+      const hasGfmLabel = (card.labels || []).some((l: any) => {
+        const ln = (l.name || '').toLowerCase();
+        return ln === 'gfm' || ln.includes('gfm');
+      });
+      if (hasGfmLabel || card.agencySource === 'GFM') {
         continue;
       }
     }

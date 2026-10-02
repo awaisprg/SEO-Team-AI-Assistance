@@ -273,14 +273,16 @@ export default function App() {
     periodType: 'overall' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'custom',
     dateFrom?: string,
     dateTo?: string,
-    client?: string
+    client?: string,
+    agency?: 'all' | 'GFM' | 'PDS',
+    briefIntent?: 'executive_summary' | 'client_deliverables' | 'team_workload' | 'ai_geo_innovation' | 'risk_blockers'
   ) => {
     setIsGeneratingBrief(true);
     try {
       const res = await fetchWithAuth('/api/management-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periodType, dateFrom, dateTo, client }),
+        body: JSON.stringify({ periodType, dateFrom, dateTo, client, agency, briefIntent }),
       });
 
       if (!res.ok) {

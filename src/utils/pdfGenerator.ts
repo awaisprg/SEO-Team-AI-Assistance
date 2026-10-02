@@ -308,6 +308,11 @@ export function downloadBriefPDF(brief: ManagementBrief): void {
     printBulletSection('Blocked Deliverables & Client Dependencies', brief.blockedWork, amberWarning, amberWarning);
   }
 
+  // Executive Recommendations
+  if (brief.recommendations && brief.recommendations.length > 0) {
+    printBulletSection('Executive Management Recommendations', brief.recommendations, deepIndigo, darkNavy);
+  }
+
   // Senior Management Talking Points
   if (brief.talkingPoints && brief.talkingPoints.length > 0) {
     checkPageBreak(60);

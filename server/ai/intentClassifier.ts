@@ -55,7 +55,7 @@ export function classifyUserQuery(
   // A. Agency detection
   let targetAgency: 'GFM' | 'PDS' | 'all' = 'all';
   const hasGfm = /\b(gfm|gold\s*flex|gold\s*flex\s*marketing)\b/i.test(q);
-  const hasPds = /\b(pds|premier\s*dental|premier\s*dental\s*solutions)\b/i.test(q);
+  const hasPds = /\b(pds|physicians?\s*digital(\s*services)?(\s*llc)?)\b/i.test(q);
   if (hasGfm && !hasPds) {
     targetAgency = 'GFM';
   } else if (hasPds && !hasGfm) {
@@ -116,8 +116,8 @@ export function classifyUserQuery(
 
   for (const listName of candidateLists) {
     const lLower = listName.toLowerCase();
-    const isStatusName = ['completed', 'in process', 'in review', 'to do', 'ad hoc tasks'].includes(lLower);
-    if (isStatusName) {
+    const isSpecialListName = ['completed', 'in process', 'in review', 'to do', 'ad hoc tasks', 'gfm clients', 'pds clients'].includes(lLower);
+    if (isSpecialListName) {
       if (
         q.includes(`"${lLower}"`) ||
         q.includes(`'${lLower}'`) ||
@@ -306,6 +306,19 @@ export function classifyUserQuery(
       q.includes('client roster') ||
       q.includes('client breakdown') ||
       q.includes('client portfolio') ||
+      q.includes('clients status') ||
+      q.includes('client status') ||
+      q.includes('status of client') ||
+      q.includes('status of clients') ||
+      q.includes('client report') ||
+      q.includes('clients report') ||
+      q.includes('accounts status') ||
+      q.includes('account status') ||
+      q.includes('client overview') ||
+      q.includes('clients overview') ||
+      ((q.includes('status') || q.includes('report') || q.includes('overview') || q.includes('summary')) &&
+        (hasGfm || hasPds || q.includes('client') || q.includes('clients') || q.includes('account') || q.includes('accounts')) &&
+        !matchedPerson) ||
       (wantsCount && (q.includes('client') || q.includes('clients')) && (hasGfm || hasPds || q.includes('total') || q.includes('all') || q.includes('have')))
     )
   );
@@ -545,7 +558,13 @@ export function classifyUserQuery(
         isOverall: q.includes('overall') || q.includes('pipeline') || q.includes('all cards'),
         isBoardAnalysis,
         isDeepInspection,
-        targetList,
+        targetList:
+          legacyIntent === 'clients_overview' ||
+          legacyIntent === 'active_clients_list' ||
+          legacyIntent === 'on_hold_clients_list' ||
+          legacyIntent === 'closed_clients_list'
+            ? undefined
+            : targetList,
         client: matchedClient,
         clientAliases: matchedClientAliases,
         person: matchedPerson,
