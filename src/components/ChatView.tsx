@@ -46,13 +46,50 @@ interface ChatViewProps {
 
 export interface PromptSuggestionItem {
   id: string;
-  category: 'Clients' | 'Tasks' | 'Team' | 'AI & SEO' | 'Executive';
+  category: 'Services' | 'Clients' | 'Tasks' | 'Team' | 'AI & SEO' | 'Executive';
   text: string;
   badge: string;
   desc?: string;
 }
 
 export const CATEGORIZED_PROMPT_SUGGESTIONS: PromptSuggestionItem[] = [
+  // Services & Deliverables
+  {
+    id: 's1',
+    category: 'Services',
+    text: 'How many clients we have with Social Media services?',
+    badge: 'Social Media',
+    desc: 'Audit client accounts receiving active social media management and posting',
+  },
+  {
+    id: 's2',
+    category: 'Services',
+    text: 'Which clients have Website Maintenance services?',
+    badge: 'Web Maintenance',
+    desc: 'List client accounts with site upkeep, speed, and hosting maintenance',
+  },
+  {
+    id: 's3',
+    category: 'Services',
+    text: 'Which clients have Website Development services?',
+    badge: 'Web Dev',
+    desc: 'Review clients with active website builds, redesigns, or development tasks',
+  },
+  {
+    id: 's4',
+    category: 'Services',
+    text: 'Which clients have Logo & Branding or Email Marketing?',
+    badge: 'Creative & Email',
+    desc: 'Audit creative brand identity and newsletter marketing deliverables',
+  },
+  {
+    id: 's5',
+    category: 'Services',
+    text: 'Show breakdown of all client services acquired across the portfolio',
+    badge: 'Services Matrix',
+    desc: 'Cross-service distribution of SEO, Web Dev, Maintenance, and Social retainers',
+  },
+
   // Clients (from Clients frontpage tab & metrics)
   {
     id: 'c1',
@@ -276,6 +313,7 @@ const ChatViewComponent: React.FC<ChatViewProps> = ({
   const categoriesWithCounts = useMemo(() => {
     return [
       { name: 'All', count: CATEGORIZED_PROMPT_SUGGESTIONS.length },
+      { name: 'Services', count: CATEGORIZED_PROMPT_SUGGESTIONS.filter((p) => p.category === 'Services').length },
       { name: 'Clients', count: CATEGORIZED_PROMPT_SUGGESTIONS.filter((p) => p.category === 'Clients').length },
       { name: 'Tasks', count: CATEGORIZED_PROMPT_SUGGESTIONS.filter((p) => p.category === 'Tasks').length },
       { name: 'Team', count: CATEGORIZED_PROMPT_SUGGESTIONS.filter((p) => p.category === 'Team').length },

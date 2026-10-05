@@ -144,6 +144,8 @@ export interface ClientEntity {
   totalTasksCount: number;
   teamMembers: string[];
   lastActivityDate: string;
+  services?: string[];
+  primaryInitiative?: string;
   cards?: TrelloCard[];
   recentActivities?: TrelloActivity[];
   recentComments?: TrelloComment[];

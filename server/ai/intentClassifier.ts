@@ -21,6 +21,7 @@ export interface IntentClassification {
     personMemberIds?: string[];
     personLists?: string[];
     targetList?: string;
+    targetService?: string;
     topic?: string;
     statusFilter?: StatusSemantic | 'all';
     wantsCount?: boolean;
@@ -74,6 +75,59 @@ export function classifyUserQuery(
     q.includes('tally') ||
     /\b(how many|count of|number of)\b/i.test(q)
   );
+
+  // B2. Service entity detection (e.g. Social Media, SEO, Web Development, Maintenance, Logo, Email Marketing, PPC)
+  let targetService: string | undefined;
+  if (
+    q.includes('social media') ||
+    q.includes('social network') ||
+    q.includes('social post') ||
+    q.includes('socials') ||
+    q.includes('facebook') ||
+    q.includes('instagram') ||
+    q.includes('linkedin') ||
+    /\bsocial\b/i.test(q)
+  ) {
+    targetService = 'Social Media';
+  } else if (
+    q.includes('website maintenance') ||
+    q.includes('web maintenance') ||
+    q.includes('site maintenance') ||
+    (q.includes('maintenance') && (q.includes('client') || q.includes('service') || q.includes('account') || q.includes('we have')))
+  ) {
+    targetService = 'Website Maintenance';
+  } else if (
+    q.includes('website development') ||
+    q.includes('web development') ||
+    q.includes('site development') ||
+    q.includes('web dev') ||
+    (q.includes('development') && (q.includes('client') || q.includes('service') || q.includes('website') || q.includes('we have')))
+  ) {
+    targetService = 'Website Development';
+  } else if (
+    q.includes('email marketing') ||
+    q.includes('newsletter')
+  ) {
+    targetService = 'Email Marketing';
+  } else if (
+    q.includes('logo') ||
+    q.includes('branding') ||
+    q.includes('brand identity')
+  ) {
+    targetService = 'Logo & Branding';
+  } else if (
+    q.includes('ppc') ||
+    q.includes('google ads') ||
+    q.includes('paid ads') ||
+    q.includes('adwords')
+  ) {
+    targetService = 'PPC / Ads';
+  } else if (
+    (q.includes('seo') || q.includes('search engine optimization')) &&
+    (q.includes('client') || q.includes('service') || q.includes('how many') || q.includes('which') || q.includes('who') || q.includes('we have'))
+  ) {
+    targetService = 'SEO';
+  }
 
   // C. Deep inspection & board analysis
   const isDeepInspection = Boolean(
@@ -258,20 +312,47 @@ export function classifyUserQuery(
 
   // --- 2. Categorization Pipeline ---
   // Flag indicators
+  const isAskingClientsByService = Boolean(
+    targetService &&
+    (
+      q.includes('client') ||
+      q.includes('clients') ||
+      q.includes('account') ||
+      q.includes('accounts') ||
+      q.includes('service') ||
+      q.includes('services') ||
+      q.includes('how many') ||
+      q.includes('which') ||
+      q.includes('who has') ||
+      q.includes('who have') ||
+      q.includes('list') ||
+      q.includes('show') ||
+      q.includes('do we have') ||
+      q.includes('we have')
+    )
+  );
+
   const isAskingOnHold = Boolean(
-    q.includes('on hold') ||
-    q.includes('on-hold') ||
-    (q.includes('hold') && !q.includes('threshold') && !q.includes('household') && !q.includes('withhold'))
+    !isAskingClientsByService &&
+    (
+      q.includes('on hold') ||
+      q.includes('on-hold') ||
+      (q.includes('hold') && !q.includes('threshold') && !q.includes('household') && !q.includes('withhold'))
+    )
   );
 
   const isAskingClosed = Boolean(
-    q.includes('closed') ||
-    q.includes('terminated') ||
-    q.includes('discontinued') ||
-    q.includes('project closed')
+    !isAskingClientsByService &&
+    (
+      q.includes('closed') ||
+      q.includes('terminated') ||
+      q.includes('discontinued') ||
+      q.includes('project closed')
+    )
   );
 
   const isAskingActiveClients = Boolean(
+    !isAskingClientsByService &&
     !isAskingOnHold &&
     !isAskingClosed &&
     (
@@ -291,6 +372,7 @@ export function classifyUserQuery(
   );
 
   const isAskingClientsOverview = Boolean(
+    !isAskingClientsByService &&
     !isAskingOnHold &&
     !isAskingClosed &&
     !isAskingActiveClients &&
@@ -359,6 +441,7 @@ export function classifyUserQuery(
 
   // Branch 1: CLIENT STATUS
   if (
+    isAskingClientsByService ||
     isAskingActiveClients ||
     isAskingOnHold ||
     isAskingClosed ||
@@ -369,7 +452,13 @@ export function classifyUserQuery(
     category = 'client_status';
     categoryLabel = 'Client Status';
 
-    if (isAskingActiveClients) {
+    if (isAskingClientsByService && targetService) {
+      subIntent = 'clients_by_service';
+      subIntentLabel = `Clients with ${targetService} Services`;
+      legacyIntent = 'clients_by_service';
+      confidence = 0.99;
+      reasoning = `Manager is querying client accounts acquiring ${targetService} services across the portfolio.`;
+    } else if (isAskingActiveClients) {
       subIntent = 'active_clients_roster';
       subIntentLabel = 'Active Clients Roster & Count';
       legacyIntent = 'active_clients_list';
@@ -529,6 +618,7 @@ export function classifyUserQuery(
       personMemberIds,
       personLists,
       targetList,
+      targetService,
       statusFilter: status,
       wantsCount,
       isDeepInspection,
@@ -554,6 +644,7 @@ export function classifyUserQuery(
         rawQuestion,
         intent: legacyIntent,
         targetAgency,
+        targetService,
         wantsCount,
         isOverall: q.includes('overall') || q.includes('pipeline') || q.includes('all cards'),
         isBoardAnalysis,
@@ -562,7 +653,8 @@ export function classifyUserQuery(
           legacyIntent === 'clients_overview' ||
           legacyIntent === 'active_clients_list' ||
           legacyIntent === 'on_hold_clients_list' ||
-          legacyIntent === 'closed_clients_list'
+          legacyIntent === 'closed_clients_list' ||
+          legacyIntent === 'clients_by_service'
             ? undefined
             : targetList,
         client: matchedClient,

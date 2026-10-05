@@ -25,6 +25,7 @@ import {
 } from './components/TabSkeletons';
 import { TrelloSettingsModal } from './components/TrelloSettingsModal';
 import { SourceCardModal } from './components/SourceCardModal';
+import { QuickQueryModal } from './components/QuickQueryModal';
 import { AuthScreen } from './components/AuthScreen';
 import {
   ChatMessage,
@@ -73,6 +74,7 @@ export default function App() {
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isTabTransitioning, setIsTabTransitioning] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(false);
+  const [isQuickQueryOpen, setIsQuickQueryOpen] = useState(false);
 
   const syncPollInterval = useRef<any>(null);
   const tabTransitionTimerRef = useRef<any>(null);
@@ -494,10 +496,41 @@ export default function App() {
     handleSendMessage(prompt);
   }, [handleTabChange, handleSendMessage]);
 
-  const handleAskAboutClient = useCallback((name: string) => {
+  const handleAskAboutClient = useCallback((queryOrName: string) => {
     handleTabChange('chat');
-    handleSendMessage(`Give me a detailed workstream update for client ${name}`);
+    const qLower = queryOrName.trim().toLowerCase();
+    if (
+      queryOrName.includes('?') ||
+      qLower.startsWith('what') ||
+      qLower.startsWith('which') ||
+      qLower.startsWith('how') ||
+      qLower.startsWith('who') ||
+      qLower.startsWith('break') ||
+      qLower.startsWith('show') ||
+      qLower.startsWith('audit')
+    ) {
+      handleSendMessage(queryOrName.trim());
+    } else {
+      handleSendMessage(`Give me a detailed workstream update for client ${queryOrName}`);
+    }
   }, [handleTabChange, handleSendMessage]);
+
+  const handleQuickQuerySubmit = useCallback((question: string) => {
+    handleTabChange('chat');
+    handleSendMessage(question);
+  }, [handleTabChange, handleSendMessage]);
+
+  // Global keyboard shortcut: Command+K / Ctrl+K opens Quick Intelligence Omnibar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsQuickQueryOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleAskAboutMember = useCallback((name: string) => {
     handleTabChange('chat');
@@ -559,6 +592,7 @@ export default function App() {
         onSync={handleSync}
         onSeedDemo={handleSeedDemo}
         onOpenSettings={handleOpenSettings}
+        onOpenQuickQuery={() => setIsQuickQueryOpen(true)}
         isSyncing={isSyncing}
         syncPhase={syncPhase}
       />
@@ -833,6 +867,15 @@ export default function App() {
           onClose={() => setSelectedSource(null)}
         />
       )}
+
+      {/* Global Quick Intelligence Omnibar Modal (⌘K) */}
+      <QuickQueryModal
+        isOpen={isQuickQueryOpen}
+        onClose={() => setIsQuickQueryOpen(false)}
+        onSubmitQuery={handleQuickQuerySubmit}
+        clientCount={clients.length}
+        activeClientCount={clients.filter((c) => c.status === 'Active').length}
+      />
     </div>
   );
 }

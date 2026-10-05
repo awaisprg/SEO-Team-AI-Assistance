@@ -33,6 +33,7 @@ const ClientsViewComponent: React.FC<ClientsViewProps> = ({
 }) => {
   const [newAliasInputs, setNewAliasInputs] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'On Hold' | 'Closed'>('All');
+  const [selectedService, setSelectedService] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleAddAlias = (clientId: string) => {
@@ -56,20 +57,42 @@ const ClientsViewComponent: React.FC<ClientsViewProps> = ({
     return { active, onHold, closed, total: clientList.length };
   }, [clientList]);
 
+  // Aggregate services across clients for intelligent filtering
+  const serviceCounts = useMemo(() => {
+    const tally: Record<string, number> = {};
+    clientList.forEach((c) => {
+      (c.services || []).forEach((s) => {
+        tally[s] = (tally[s] || 0) + 1;
+      });
+    });
+    return tally;
+  }, [clientList]);
+
+  const uniqueServices = useMemo(() => {
+    return Object.keys(serviceCounts).sort((a, b) => (serviceCounts[b] || 0) - (serviceCounts[a] || 0));
+  }, [serviceCounts]);
+
   const filteredClients = useMemo(() => {
     return clientList.filter((c) => {
       if (statusFilter !== 'All' && c.status !== statusFilter) {
         return false;
       }
+      if (selectedService !== 'All') {
+        const clientServices = c.services || [];
+        if (!clientServices.includes(selectedService)) {
+          return false;
+        }
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesName = c.canonicalName.toLowerCase().includes(q);
         const matchesAlias = (c.aliases || []).some((a) => a.toLowerCase().includes(q));
-        if (!matchesName && !matchesAlias) return false;
+        const matchesService = (c.services || []).some((s) => s.toLowerCase().includes(q));
+        if (!matchesName && !matchesAlias && !matchesService) return false;
       }
       return true;
     });
-  }, [clientList, statusFilter, searchQuery]);
+  }, [clientList, statusFilter, selectedService, searchQuery]);
 
   return (
     <div id="clients-view" className="space-y-4">
@@ -100,65 +123,157 @@ const ClientsViewComponent: React.FC<ClientsViewProps> = ({
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
-        {/* Status Filter Tabs */}
+      {/* Quick Natural Language Intelligence Shortcuts */}
+      <div className="bg-gradient-to-r from-violet-50/80 via-white to-indigo-50/60 p-3.5 rounded-2xl border border-violet-100 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+        <div className="flex items-center space-x-2.5">
+          <div className="w-8 h-8 rounded-xl bg-[#7C52F5] text-white flex items-center justify-center shrink-0 shadow-xs">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+              <span>Instant AI Account Queries</span>
+              <span className="text-[10px] font-semibold text-violet-700 bg-violet-100/70 px-1.5 py-0.5 rounded-md">1-Click Live Answers</span>
+            </div>
+            <p className="text-[11px] text-slate-500">Ask the real-time Trello intelligence engine any portfolio or services question:</p>
+          </div>
+        </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <button
-            onClick={() => setStatusFilter('All')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-              statusFilter === 'All'
-                ? 'bg-slate-900 text-white shadow-2xs'
-                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-            }`}
+            onClick={() => onAskAboutClient('How many clients we have with Social Media services?')}
+            className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-violet-50 text-slate-700 hover:text-violet-700 border border-slate-200/90 hover:border-violet-300 text-xs font-semibold transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+            title="Ask AI Assistant: How many clients we have with Social Media services?"
           >
-            All Accounts ({counts.total})
+            <span>📱 Social Media Clients ({serviceCounts['Social Media'] || 0})</span>
+            <ArrowRight className="w-3 h-3 text-slate-400" />
           </button>
           <button
-            onClick={() => setStatusFilter('Active')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center space-x-1.5 ${
-              statusFilter === 'Active'
-                ? 'bg-emerald-600 text-white shadow-2xs'
-                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-            }`}
+            onClick={() => onAskAboutClient('Which clients have Website Maintenance services?')}
+            className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-violet-50 text-slate-700 hover:text-violet-700 border border-slate-200/90 hover:border-violet-300 text-xs font-semibold transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+            title="Ask AI Assistant: Which clients have Website Maintenance services?"
           >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Active Clients ({counts.active})</span>
+            <span>🛠️ Web Maintenance ({serviceCounts['Website Maintenance'] || 0})</span>
+            <ArrowRight className="w-3 h-3 text-slate-400" />
           </button>
           <button
-            onClick={() => setStatusFilter('On Hold')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center space-x-1.5 ${
-              statusFilter === 'On Hold'
-                ? 'bg-amber-600 text-white shadow-2xs'
-                : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
-            }`}
+            onClick={() => onAskAboutClient('Which clients are currently on hold and why?')}
+            className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200/90 hover:border-amber-300 text-xs font-semibold transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+            title="Audit on-hold accounts"
           >
-            <PauseCircle className="w-3.5 h-3.5" />
-            <span>On Hold ({counts.onHold})</span>
+            <span>⏸️ On-Hold ({counts.onHold})</span>
+            <ArrowRight className="w-3 h-3 text-slate-400" />
           </button>
           <button
-            onClick={() => setStatusFilter('Closed')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center space-x-1.5 ${
-              statusFilter === 'Closed'
-                ? 'bg-rose-600 text-white shadow-2xs'
-                : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
-            }`}
+            onClick={() => onAskAboutClient('Break down active clients between PDS and GFM')}
+            className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200/90 hover:border-indigo-300 text-xs font-semibold transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+            title="PDS vs GFM portfolio split"
           >
-            <XCircle className="w-3.5 h-3.5" />
-            <span>Closed / Terminated ({counts.closed})</span>
+            <span>⚖️ PDS vs GFM Split</span>
+            <ArrowRight className="w-3 h-3 text-slate-400" />
           </button>
         </div>
+      </div>
 
-        {/* Search Input */}
-        <div className="relative w-full sm:w-64">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search accounts or aliases..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-900 placeholder-slate-400 focus:outline-hidden focus:border-[#7C52F5] focus:bg-white"
-          />
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Status Filter Tabs */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              onClick={() => setStatusFilter('All')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                statusFilter === 'All'
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              All Accounts ({counts.total})
+            </button>
+            <button
+              onClick={() => setStatusFilter('Active')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center space-x-1.5 ${
+                statusFilter === 'Active'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Active Clients ({counts.active})</span>
+            </button>
+            <button
+              onClick={() => setStatusFilter('On Hold')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center space-x-1.5 ${
+                statusFilter === 'On Hold'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+              }`}
+            >
+              <PauseCircle className="w-3.5 h-3.5" />
+              <span>On Hold ({counts.onHold})</span>
+            </button>
+            <button
+              onClick={() => setStatusFilter('Closed')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center space-x-1.5 ${
+                statusFilter === 'Closed'
+                  ? 'bg-rose-600 text-white shadow-2xs'
+                  : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+              }`}
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              <span>Closed / Terminated ({counts.closed})</span>
+            </button>
+          </div>
+
+          {/* Search Input */}
+          <div className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search accounts, services, aliases..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-900 placeholder-slate-400 focus:outline-hidden focus:border-[#7C52F5] focus:bg-white"
+            />
+          </div>
+        </div>
+
+        {/* Services Offerings Filter Bar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-slate-100 text-xs scrollbar-none">
+          <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+            <Tag className="w-3 h-3 text-slate-400" />
+            <span>Service Filter:</span>
+          </span>
+          <button
+            onClick={() => setSelectedService('All')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap ${
+              selectedService === 'All'
+                ? 'bg-violet-600 text-white shadow-2xs'
+                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+            }`}
+          >
+            All Services ({counts.total})
+          </button>
+          {uniqueServices.map((service) => {
+            const count = serviceCounts[service] || 0;
+            const isSelected = selectedService === service;
+            return (
+              <button
+                key={service}
+                onClick={() => setSelectedService(service)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-violet-600 text-white shadow-2xs'
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+                }`}
+              >
+                <span>{service}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                  isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -261,6 +376,49 @@ const ClientsViewComponent: React.FC<ClientsViewProps> = ({
                     />
                   </div>
                 </div>
+
+                {/* Acquired Services Badges */}
+                {client.services && client.services.length > 0 && (
+                  <div className="flex items-start space-x-2 mb-3 text-xs">
+                    <Tag className="w-3.5 h-3.5 text-[#7C52F5] shrink-0 mt-0.5" />
+                    <span className="font-semibold text-slate-800 text-[11px] shrink-0">Services:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {client.services.map((srv) => {
+                        const isSocial = srv === 'Social Media';
+                        const isSEO = srv === 'SEO';
+                        const isDev = srv === 'Website Development';
+                        const isMaint = srv === 'Website Maintenance';
+                        const isBrand = srv === 'Logo & Branding';
+                        const isEmail = srv === 'Email Marketing';
+                        const isPPC = srv === 'PPC / Ads';
+                        return (
+                          <span
+                            key={srv}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                              isSocial
+                                ? 'bg-violet-100 text-violet-800 border-violet-300 font-bold shadow-2xs'
+                                : isSEO
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : isDev
+                                ? 'bg-sky-50 text-sky-800 border-sky-200'
+                                : isMaint
+                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : isBrand
+                                ? 'bg-fuchsia-50 text-fuchsia-800 border-fuchsia-200'
+                                : isEmail
+                                ? 'bg-teal-50 text-teal-800 border-teal-200'
+                                : isPPC
+                                ? 'bg-rose-50 text-rose-800 border-rose-200'
+                                : 'bg-slate-50 text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            {srv}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Team Members */}
                 <div className="flex items-center space-x-2 mb-3 text-xs text-slate-500">

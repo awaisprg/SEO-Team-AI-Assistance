@@ -772,8 +772,36 @@ class Store {
         (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       )[0]?.timestamp || client.lastActivityDate;
 
+      // Extract client services from checklists (especially 'Services Acquired')
+      const servicesSet = new Set<string>(client.services || []);
+      for (const card of matchingCards) {
+        for (const cl of card.checklists || []) {
+          const isServicesChecklist = cl.name.toLowerCase().includes('service');
+          for (const it of cl.items || []) {
+            const itemLower = it.name.trim().toLowerCase();
+            if (isServicesChecklist) {
+              if (itemLower.includes('social media') || itemLower === 'social media') servicesSet.add('Social Media');
+              else if (itemLower === 'seo' || itemLower.includes('seo')) servicesSet.add('SEO');
+              else if (itemLower.includes('website development') || itemLower === 'development') servicesSet.add('Website Development');
+              else if (itemLower.includes('website maint') || itemLower.includes('maintenance')) servicesSet.add('Website Maintenance');
+              else if (itemLower.includes('logo') || itemLower.includes('branding')) servicesSet.add('Logo & Branding');
+              else if (itemLower.includes('email marketing')) servicesSet.add('Email Marketing');
+              else if (itemLower === 'ppc' || itemLower.includes('ppc')) servicesSet.add('PPC / Ads');
+            } else {
+              if (itemLower.includes('social media')) servicesSet.add('Social Media');
+              if (itemLower.includes('seo audit') || itemLower.includes('seo strategy')) servicesSet.add('SEO');
+              if (itemLower.includes('website maintenance')) servicesSet.add('Website Maintenance');
+            }
+          }
+        }
+      }
+      if (servicesSet.size === 0) {
+        servicesSet.add('SEO');
+      }
+
       return {
         ...client,
+        services: Array.from(servicesSet),
         activeCardCount: activeCards.length || client.activeCardCount,
         totalTasksCount: totalTasks || client.totalTasksCount,
         completedTasksCount: completedTasks || client.completedTasksCount,
@@ -804,8 +832,10 @@ class Store {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 30);
 
+    const clientWithServices = this.getClients().find((c) => c.id === id) || client;
+
     return {
-      ...client,
+      ...clientWithServices,
       cards,
       recentActivities,
       recentComments,

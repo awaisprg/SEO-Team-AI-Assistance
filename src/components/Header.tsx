@@ -6,6 +6,7 @@ import {
   LogOut,
   ChevronRight,
   Sparkles,
+  Search,
 } from 'lucide-react';
 import { TrelloConnectionStatus, UserSession } from '../types';
 import { ThemeDropdown } from './ThemeDropdown';
@@ -18,6 +19,7 @@ interface HeaderProps {
   onSync: () => void;
   onSeedDemo: () => void;
   onOpenSettings: () => void;
+  onOpenQuickQuery?: () => void;
   isSyncing: boolean;
   syncPhase?: string;
 }
@@ -29,6 +31,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
   onSync,
   onSeedDemo,
   onOpenSettings,
+  onOpenQuickQuery,
   isSyncing,
   syncPhase,
 }) => {
@@ -121,6 +124,23 @@ const HeaderComponent: React.FC<HeaderProps> = ({
               </span>
             </div>
           </div>
+
+          {/* Center-Left: Quick Intelligence Omnibar Button */}
+          {onOpenQuickQuery && (
+            <button
+              type="button"
+              id="header-quick-query-btn"
+              onClick={onOpenQuickQuery}
+              className="hidden md:flex items-center gap-2.5 h-9 px-3 rounded-xl bg-slate-100/90 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700 border border-slate-200/90 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer shadow-2xs hover:shadow-xs group max-w-[210px] lg:max-w-[270px] xl:max-w-[340px] w-full"
+              title="Press ⌘K to ask any question about clients, services, tasks"
+            >
+              <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#7C52F5] transition-colors shrink-0" />
+              <span className="truncate text-left text-xs font-medium">Ask query e.g. "Clients with Social Media"</span>
+              <kbd className="ml-auto hidden xl:inline-flex items-center gap-0.5 text-[10px] font-mono text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded shadow-2xs">
+                <span>⌘</span>K
+              </kbd>
+            </button>
+          )}
 
           {/* Center: Live Board Connection Status */}
           <div className="hidden lg:flex items-center">

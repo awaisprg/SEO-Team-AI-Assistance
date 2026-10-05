@@ -21,8 +21,10 @@ export interface QueryIntent {
     | 'active_clients_list'
     | 'closed_clients_list'
     | 'on_hold_clients_list'
-    | 'clients_overview';
+    | 'clients_overview'
+    | 'clients_by_service';
   targetAgency?: 'GFM' | 'PDS' | 'all';
+  targetService?: string;
   wantsCount?: boolean;
   isOverall?: boolean;
   isBoardAnalysis?: boolean;

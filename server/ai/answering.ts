@@ -704,11 +704,110 @@ The agency currently tracks a total of **${totalAgency} client accounts** across
   };
 }
 
+export function generateClientsByServiceAnswer(intent: QueryIntent): AnswerResult {
+  const serviceName = intent.targetService || 'Social Media';
+  const allClients = db.getClients();
+  const allCards = db.getCards();
+
+  // Filter clients matching the service
+  const matchingClients = allClients.filter((c) => {
+    if (intent.targetAgency && intent.targetAgency !== 'all' && c.agency && c.agency !== intent.targetAgency && c.agency !== 'Both') {
+      return false;
+    }
+    return (c.services || []).some((s) => s.toLowerCase() === serviceName.toLowerCase() || s.toLowerCase().includes(serviceName.toLowerCase()));
+  });
+
+  // Calculate full portfolio service distribution for comparative intelligence
+  const serviceTally: Record<string, number> = {};
+  allClients.forEach((c) => {
+    (c.services || []).forEach((s) => {
+      serviceTally[s] = (serviceTally[s] || 0) + 1;
+    });
+  });
+
+  const count = matchingClients.length;
+  const clientLines = matchingClients.map((c, i) => {
+    const servicesList = (c.services || []).join(', ') || serviceName;
+    const team = c.teamMembers && c.teamMembers.length > 0 ? c.teamMembers.slice(0, 5).join(', ') : 'Assigned in Trello';
+    const deliverables = c.totalTasksCount > 0 ? `${c.completedTasksCount} / ${c.totalTasksCount} tasks complete` : `${c.activeCardCount} active cards`;
+    return `#### ${i + 1}. **${c.canonicalName}**
+- **Agency & Status:** ${c.agency || 'PDS'} • **${c.status}**${c.isHighPriority ? ' • *(High Priority)*' : ''}
+- **Acquired Services:** \`${servicesList}\`
+- **Assigned Team:** ${team}
+- **Deliverables Progress:** ${deliverables}`;
+  }).join('\n\n');
+
+  const otherServicesLines = Object.entries(serviceTally)
+    .sort((a, b) => b[1] - a[1])
+    .map(([s, n]) => `- **${s}:** ${n} client accounts`)
+    .join('\n');
+
+  const answer = `### Client Accounts with ${serviceName} Services (${count} Client Accounts)
+
+Based on synchronized Trello board deliverables and verified **Services Acquired** records, the agency currently has **${count} client accounts** with **${serviceName}** services:
+
+${count > 0 ? clientLines : `_No clients currently have ${serviceName} recorded under their active service agreements._`}
+
+---
+
+### Agency Portfolio Service Distribution
+For comparative context across all ${allClients.length} tracked client accounts:
+${otherServicesLines}
+`;
+
+  // Find relevant sources from Trello cards for these clients
+  const clientNames = new Set(matchingClients.map((c) => c.canonicalName.toLowerCase()));
+  const sources: ChatSource[] = allCards
+    .filter((card) => {
+      if (card.clientCanonical && clientNames.has(card.clientCanonical.toLowerCase())) return true;
+      if (clientNames.has(card.name.toLowerCase().trim())) return true;
+      return false;
+    })
+    .slice(0, 15)
+    .map((c) => ({
+      cardId: c.id,
+      title: c.name,
+      url: c.url,
+      relevance: 100,
+      reason: `${serviceName} service deliverable (${c.listName})`,
+      date: c.dateLastActivity,
+      client: c.clientCanonical || c.name,
+      status: c.statusSemantic,
+      listName: c.listName,
+    }));
+
+  const activeCount = matchingClients.filter((c) => c.status === 'Active').length;
+  const holdCount = matchingClients.filter((c) => c.status === 'On Hold').length;
+  const closedCount = matchingClients.filter((c) => c.status === 'Closed').length;
+
+  return {
+    answer,
+    summary: `The agency currently has ${count} client account${count === 1 ? '' : 's'} with ${serviceName} services (${matchingClients.map((c) => c.canonicalName).join(', ')}).`,
+    keyPoints: [
+      `${serviceName} Clients: ${count} account${count === 1 ? '' : 's'} (${activeCount} Active, ${holdCount} On Hold, ${closedCount} Closed)`,
+      `Client Accounts: ${matchingClients.map((c) => c.canonicalName).join(', ') || 'None'}`,
+      `Cross-Service Breadth: SEO (${serviceTally['SEO'] || 0}), Web Dev (${serviceTally['Website Development'] || 0}), Maintenance (${serviceTally['Website Maintenance'] || 0})`,
+    ],
+    statusBreakdown: {
+      Active: activeCount,
+      'On Hold': holdCount,
+      Closed: closedCount,
+    },
+    sources,
+    evidenceStrength: 'high',
+  };
+}
+
 export async function generateEvidenceAnswer(
   intent: QueryIntent,
   scoredCards: ScoredCard[],
   conversationHistory: { role: string; content: string }[] = []
 ): Promise<AnswerResult> {
+  // Direct specialized handler for Services inquiries (e.g. Social Media, SEO, Web Dev)
+  if (intent.intent === 'clients_by_service') {
+    return generateClientsByServiceAnswer(intent);
+  }
+
   // Direct specialized handler for Active Clients, Closed Clients, On Hold Clients, and Portfolio Overviews
   if (
     intent.intent === 'active_clients_list' ||
