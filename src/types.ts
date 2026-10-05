@@ -176,6 +176,9 @@ export interface TrelloConnectionStatus {
   tokenConfigured: boolean;
   maskedApiKey?: string;
   hasCustomCredentials?: boolean;
+  autoSyncEnabled?: boolean;
+  autoSyncIntervalMinutes?: number;
+  lastAutoSyncAt?: string;
 }
 
 export interface ChatSource {

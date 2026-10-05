@@ -100,6 +100,11 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
   const [missingBackupUsers, setMissingBackupUsers] = useState<any[]>([]);
   const [isSyncingManifest, setIsSyncingManifest] = useState(false);
 
+  // Auto-Sync state
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(connection?.autoSyncEnabled ?? true);
+  const [autoSyncInterval, setAutoSyncInterval] = useState<number>(connection?.autoSyncIntervalMinutes ?? 60);
+  const [isUpdatingAutoSync, setIsUpdatingAutoSync] = useState(false);
+
   const fetchTokenAuthUrl = async (keyOverride?: string) => {
     try {
       const keyParam = keyOverride ? `?apiKey=${encodeURIComponent(keyOverride)}` : '';
@@ -118,13 +123,42 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
   };
 
   useEffect(() => {
-    if (connection?.boardId) {
-      setBoardId(connection.boardId);
-    }
-    if (connection?.boardName) {
-      setBoardName(connection.boardName);
+    if (connection) {
+      if (connection.boardId) setBoardId(connection.boardId);
+      if (connection.boardName) setBoardName(connection.boardName);
+      if (connection.autoSyncEnabled !== undefined) setAutoSyncEnabled(connection.autoSyncEnabled);
+      if (connection.autoSyncIntervalMinutes !== undefined) setAutoSyncInterval(connection.autoSyncIntervalMinutes);
     }
   }, [connection]);
+
+  const handleUpdateAutoSync = async (enabled: boolean, interval: number) => {
+    setIsUpdatingAutoSync(true);
+    try {
+      const res = await fetchWithAuth('/api/trello/autosync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled, intervalMinutes: interval }),
+      });
+      if (res.ok) {
+        setAutoSyncEnabled(enabled);
+        setAutoSyncInterval(interval);
+        setFeedback({
+          type: 'success',
+          message: enabled
+            ? `Auto-sync active: board will automatically refresh every ${interval} minutes.`
+            : 'Auto-sync has been paused.',
+        });
+        if (onRefreshStatus) onRefreshStatus();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setFeedback({ type: 'error', message: err.error || 'Failed to update auto-sync settings' });
+      }
+    } catch (e: any) {
+      setFeedback({ type: 'error', message: e.message || 'Network error updating auto-sync' });
+    } finally {
+      setIsUpdatingAutoSync(false);
+    }
+  };
 
   // Fetch boards and users when opening modal as admin
   useEffect(() => {
@@ -342,8 +376,19 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
       return;
     }
 
-    if (!apiKeyInput.trim() || !tokenInput.trim()) {
-      setFeedback({ type: 'error', message: 'Both Trello API Key and Member Token are required.' });
+    const hasStoredKey = Boolean(connection?.apiKeyConfigured);
+    const hasStoredToken = Boolean(connection?.tokenConfigured);
+
+    const keyToUse = apiKeyInput.trim();
+    const tokenToUse = tokenInput.trim();
+
+    if (!keyToUse && !hasStoredKey) {
+      setFeedback({ type: 'error', message: 'Trello API Key is required. Please enter your API Key.' });
+      return;
+    }
+
+    if (!tokenToUse && !hasStoredToken) {
+      setFeedback({ type: 'error', message: 'Trello Member Token is required. Please enter your token.' });
       return;
     }
 
@@ -355,8 +400,8 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          apiKey: apiKeyInput.trim(),
-          token: tokenInput.trim(),
+          apiKey: keyToUse || undefined,
+          token: tokenToUse || undefined,
         }),
       });
 
@@ -637,6 +682,36 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
                   </div>
                 </div>
 
+                {/* Permanent Token (Never Expires) Guidance Banner */}
+                <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl p-3.5 space-y-2.5 mt-2">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-5 h-5 rounded-md bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 mt-0.5 text-amber-800 font-bold text-xs">
+                      !
+                    </div>
+                    <div className="text-xs text-amber-950/90 leading-relaxed">
+                      <strong className="text-amber-950 font-bold block mb-0.5">
+                        Why Trello tokens expire every hour &amp; how to solve it permanently:
+                      </strong>
+                      Trello&apos;s standard developer page generates temporary tokens that expire in 60 minutes. To connect permanently so you <strong>never have to re-enter your credentials</strong>, use our 1-click button below. It requests an unlimited token with <code className="bg-amber-100/90 border border-amber-200 px-1 py-0.5 rounded text-[11px] font-mono font-bold text-amber-900">expiration=never</code>.
+                    </div>
+                  </div>
+                  <div className="pl-7 flex flex-wrap items-center gap-2">
+                    <a
+                      href={getDirectTokenUrl()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs transition-colors shadow-2xs cursor-pointer"
+                    >
+                      <Key className="w-3.5 h-3.5" />
+                      <span>Generate Permanent Token (Never Expires)</span>
+                      <ExternalLink className="w-3 h-3 ml-0.5 opacity-80" />
+                    </a>
+                    <span className="text-[10.5px] text-amber-800/80">
+                      Authorizes read/write with no expiration.
+                    </span>
+                  </div>
+                </div>
+
                 {/* Form to update credentials */}
                 <form onSubmit={handleSaveCredentials} className="space-y-3.5 pt-2">
                   <div>
@@ -692,15 +767,9 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center space-x-1 text-[11px] font-medium text-[#7C52F5] hover:text-[#683EE6] hover:underline"
-                        title={
-                          apiKeyInput.trim()
-                            ? 'Authorize and generate token for your entered API key'
-                            : connection?.apiKeyConfigured
-                            ? 'Authorize and generate token using your saved API key'
-                            : 'Generate token on Trello'
-                        }
+                        title="Authorize permanent member token"
                       >
-                        <span>Get Member Token</span>
+                        <span>Get Member Token (Permanent)</span>
                         <ExternalLink className="w-3 h-3" />
                       </a>
                     </div>
@@ -722,9 +791,9 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
                     </div>
                     <div className="mt-1 text-[10.5px] text-slate-500">
                       {apiKeyInput.trim() ? (
-                        <span className="text-emerald-600 font-medium">Ready: Click "Get Member Token" above for 1-click authorization.</span>
+                        <span className="text-emerald-600 font-medium">Ready: Click &quot;Get Member Token (Permanent)&quot; above for 1-click authorization.</span>
                       ) : connection?.apiKeyConfigured ? (
-                        <span>Uses your saved Trello API Key to grant 1-click token authorization.</span>
+                        <span>Uses your saved Trello API Key to grant 1-click permanent token authorization.</span>
                       ) : (
                         <span>Tip: Enter your API key above first to generate your token directly in 1 click.</span>
                       )}
@@ -751,6 +820,63 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
                     </button>
                   </div>
                 </form>
+
+                {/* Automated Background Synchronization Card */}
+                <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-3.5 space-y-2.5 mt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2.5 h-2.5 rounded-full ${autoSyncEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        Automated Background Sync
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateAutoSync(!autoSyncEnabled, autoSyncInterval)}
+                      disabled={isUpdatingAutoSync}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                        autoSyncEnabled ? 'bg-[#7C52F5]' : 'bg-slate-300'
+                      }`}
+                      title={autoSyncEnabled ? 'Pause automated background sync' : 'Enable automated background sync'}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                          autoSyncEnabled ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    When enabled, the server automatically synchronizes Trello cards, checklists, and client assignments in the background so all metrics and chat answers stay live without needing manual clicks.
+                  </p>
+                  {autoSyncEnabled && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/80 text-xs">
+                      <span className="text-slate-600 font-medium">Sync Frequency:</span>
+                      <div className="flex items-center gap-1.5">
+                        {[15, 30, 60, 120].map((mins) => (
+                          <button
+                            key={mins}
+                            type="button"
+                            onClick={() => handleUpdateAutoSync(true, mins)}
+                            disabled={isUpdatingAutoSync}
+                            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                              autoSyncInterval === mins
+                                ? 'bg-[#7C52F5] text-white shadow-2xs'
+                                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {mins === 60 ? 'Every 60m (Default)' : mins === 120 ? '2h' : `${mins}m`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {connection?.lastAutoSyncAt && (
+                    <div className="text-[10.5px] text-slate-400 pt-0.5">
+                      Last background auto-sync: {new Date(connection.lastAutoSyncAt).toLocaleTimeString()}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* 2. Board Selection & Live Connection */}

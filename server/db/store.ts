@@ -33,6 +33,9 @@ export interface TrelloConnectionConfig {
   lastSyncStatus?: string;
   trelloApiKey?: string;
   trelloToken?: string;
+  autoSyncEnabled?: boolean;
+  autoSyncIntervalMinutes?: number;
+  lastAutoSyncAt?: string;
 }
 
 export interface SearchFilterParams {
@@ -50,6 +53,7 @@ export interface SearchFilterParams {
 
 const DATA_DIR = path.join(process.cwd(), '.data');
 const DATA_FILE = path.join(DATA_DIR, 'team_intelligence_store.json');
+const CREDS_FILE = path.join(DATA_DIR, 'trello_credentials.json');
 
 interface StorageState {
   connection: TrelloConnectionConfig;
@@ -347,14 +351,35 @@ class Store {
             parsed.connection.mode = process.env.TRELLO_MODE as 'real' | 'demo';
             parsed.connection.isDemoData = process.env.TRELLO_MODE === 'demo';
           }
-          // Ensure secrets are never retained in state
+          // Ensure legacy fields are cleaned, but preserve trelloApiKey/trelloToken
           delete parsed.connection.apiKey;
           delete parsed.connection.token;
+
+          // Hydrate from CREDS_FILE if missing in state
+          if ((!parsed.connection.trelloApiKey || !parsed.connection.trelloToken) && fs.existsSync(CREDS_FILE)) {
+            try {
+              const credsData = JSON.parse(fs.readFileSync(CREDS_FILE, 'utf-8'));
+              if (credsData.apiKey && !parsed.connection.trelloApiKey) parsed.connection.trelloApiKey = credsData.apiKey;
+              if (credsData.token && !parsed.connection.trelloToken) parsed.connection.trelloToken = credsData.token;
+            } catch (e) {}
+          }
+
           return parsed;
         }
       }
     } catch (err) {
       console.warn('Could not read existing state file, initializing clean state:', err);
+    }
+
+    let defaultApiKey = (process.env.TRELLO_API_KEY || '').trim();
+    let defaultToken = (process.env.TRELLO_TOKEN || '').trim();
+
+    if ((!defaultApiKey || !defaultToken) && fs.existsSync(CREDS_FILE)) {
+      try {
+        const credsData = JSON.parse(fs.readFileSync(CREDS_FILE, 'utf-8'));
+        if (credsData.apiKey && !defaultApiKey) defaultApiKey = credsData.apiKey;
+        if (credsData.token && !defaultToken) defaultToken = credsData.token;
+      } catch (e) {}
     }
 
     return {
@@ -364,6 +389,10 @@ class Store {
         connected: false,
         isDemoData: isExplicitDemo,
         mode: isRealMode ? 'real' : 'demo',
+        trelloApiKey: defaultApiKey || undefined,
+        trelloToken: defaultToken || undefined,
+        autoSyncEnabled: true,
+        autoSyncIntervalMinutes: 60,
       },
       boards: {},
       lists: {},
@@ -398,14 +427,60 @@ class Store {
   }
 
   getTrelloCredentials(): { apiKey: string; token: string } {
-    const apiKey = (this.state.connection.trelloApiKey || process.env.TRELLO_API_KEY || '').trim();
-    const token = (this.state.connection.trelloToken || process.env.TRELLO_TOKEN || '').trim();
+    let apiKey = (this.state.connection.trelloApiKey || process.env.TRELLO_API_KEY || '').trim();
+    let token = (this.state.connection.trelloToken || process.env.TRELLO_TOKEN || '').trim();
+
+    // Check backup credentials file if either is missing
+    if ((!apiKey || !token) && fs.existsSync(CREDS_FILE)) {
+      try {
+        const raw = fs.readFileSync(CREDS_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (parsed.apiKey && !apiKey) apiKey = parsed.apiKey.trim();
+        if (parsed.token && !token) token = parsed.token.trim();
+        if (parsed.apiKey && !this.state.connection.trelloApiKey) this.state.connection.trelloApiKey = parsed.apiKey.trim();
+        if (parsed.token && !this.state.connection.trelloToken) this.state.connection.trelloToken = parsed.token.trim();
+      } catch (err) {
+        // Safe catch
+      }
+    } else if (apiKey && token && !fs.existsSync(CREDS_FILE)) {
+      try {
+        if (!fs.existsSync(DATA_DIR)) {
+          fs.mkdirSync(DATA_DIR, { recursive: true });
+        }
+        fs.writeFileSync(
+          CREDS_FILE,
+          JSON.stringify({ apiKey, token, syncedAt: new Date().toISOString() }, null, 2),
+          'utf-8'
+        );
+      } catch (err) {}
+    }
+
     return { apiKey, token };
   }
 
   setTrelloCredentials(apiKey: string, token: string) {
-    this.state.connection.trelloApiKey = apiKey.trim();
-    this.state.connection.trelloToken = token.trim();
+    const cleanKey = apiKey.trim();
+    const cleanToken = token.trim();
+
+    this.state.connection.trelloApiKey = cleanKey;
+    this.state.connection.trelloToken = cleanToken;
+    process.env.TRELLO_API_KEY = cleanKey;
+    process.env.TRELLO_TOKEN = cleanToken;
+
+    // Save dedicated credentials file
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(
+        CREDS_FILE,
+        JSON.stringify({ apiKey: cleanKey, token: cleanToken, updatedAt: new Date().toISOString() }, null, 2),
+        'utf-8'
+      );
+    } catch (err) {
+      console.warn('Notice: Could not write dedicated trello_credentials.json file:', err);
+    }
+
     this.persist();
   }
 
@@ -435,6 +510,9 @@ class Store {
       tokenConfigured: Boolean(creds.token),
       maskedApiKey: maskedKey,
       hasCustomCredentials: Boolean(this.state.connection.trelloApiKey),
+      autoSyncEnabled: this.state.connection.autoSyncEnabled ?? true,
+      autoSyncIntervalMinutes: this.state.connection.autoSyncIntervalMinutes ?? 60,
+      lastAutoSyncAt: this.state.connection.lastAutoSyncAt,
     };
   }
 

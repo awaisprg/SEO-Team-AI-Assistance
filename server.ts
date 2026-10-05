@@ -13,6 +13,7 @@ import { generateManagementBrief } from './server/ai/brief';
 import { requireAuth, requireRole } from './server/auth/supabase';
 import { userRegistry, ADMIN_EMAIL } from './server/auth/users';
 import { startSyncJob, getActiveJob, getLatestJob } from './server/trello/syncJob';
+import { initAutoSync, getAutoSyncStatus, updateAutoSyncSettings } from './server/trello/autoSync';
 import { createRateLimiter } from './server/middleware/rateLimiter';
 import { UserRole } from './src/types';
 
@@ -223,15 +224,17 @@ app.get('/api/trello/status', requireAuth, (req, res) => {
 // Configure Trello API Key and Token (ADMIN only)
 app.post('/api/trello/credentials', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   const { apiKey, token } = req.body || {};
-  if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) {
+  const currentCreds = db.getTrelloCredentials();
+
+  const cleanKey = (typeof apiKey === 'string' && apiKey.trim()) ? apiKey.trim() : currentCreds.apiKey;
+  const cleanToken = (typeof token === 'string' && token.trim()) ? token.trim() : currentCreds.token;
+
+  if (!cleanKey) {
     return res.status(400).json({ error: 'Valid Trello API Key is required.' });
   }
-  if (!token || typeof token !== 'string' || !token.trim()) {
+  if (!cleanToken) {
     return res.status(400).json({ error: 'Valid Trello Member Token is required.' });
   }
-
-  const cleanKey = apiKey.trim();
-  const cleanToken = token.trim();
 
   try {
     const client = new TrelloClient({ apiKey: cleanKey, token: cleanToken });
@@ -247,7 +250,7 @@ app.post('/api/trello/credentials', requireAuth, requireRole(['ADMIN']), async (
 
     res.json({
       success: true,
-      message: `Trello credentials verified and saved for member ${test.fullName} (@${test.username}).`,
+      message: `Trello credentials verified and permanently saved for member ${test.fullName} (@${test.username}).`,
       user: {
         username: test.username,
         fullName: test.fullName,
@@ -426,10 +429,37 @@ app.get('/api/trello/sync/status', requireAuth, (req, res) => {
     phase: activeJob?.phase,
     lastSyncAt: status.lastSyncAt,
     lastRun,
+    autoSyncEnabled: status.autoSyncEnabled,
+    autoSyncIntervalMinutes: status.autoSyncIntervalMinutes,
+    lastAutoSyncAt: status.lastAutoSyncAt,
+    boardName: status.boardName,
     totalCards: status.totalCards,
     totalComments: status.totalComments,
     totalActivities: status.totalActivities,
     totalClients: status.totalClients,
+  });
+});
+
+// Auto-Sync Status & Settings Endpoints
+app.get('/api/trello/autosync', requireAuth, (req, res) => {
+  res.json(getAutoSyncStatus());
+});
+
+app.post('/api/trello/autosync', requireAuth, requireRole(['ADMIN']), (req, res) => {
+  const { enabled, intervalMinutes } = req.body || {};
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'enabled must be a boolean' });
+  }
+  const interval = typeof intervalMinutes === 'number' ? intervalMinutes : 15;
+  if (interval < 5 || interval > 1440) {
+    return res.status(400).json({ error: 'intervalMinutes must be between 5 and 1440 (24h)' });
+  }
+
+  const updated = updateAutoSyncSettings(enabled, interval);
+  res.json({
+    success: true,
+    message: enabled ? `Auto-sync enabled (every ${interval} minutes)` : 'Auto-sync paused',
+    settings: updated,
   });
 });
 
@@ -873,6 +903,9 @@ async function setupViteMiddleware() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  // Initialize automated background sync scheduler
+  initAutoSync();
 
   // Only start listening if not running in a Vercel serverless environment
   if (!process.env.VERCEL) {
