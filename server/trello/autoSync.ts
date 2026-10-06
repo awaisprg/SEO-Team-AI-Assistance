@@ -1,13 +1,15 @@
 import { db } from '../db/store';
-import { startSyncJob, canStartSync } from './syncJob';
+import { startSyncJob, canStartSync, getActiveJob } from './syncJob';
+import { TrelloClient } from './client';
 
 let timer: NodeJS.Timeout | null = null;
-let currentIntervalMinutes = 60; // Default recurring interval: 60 minutes
+let currentIntervalMinutes = 15; // Default recurring interval: 15 minutes
 let isEnabled = true;
 
 export function getAutoSyncStatus() {
   const conn = db.getConnection();
   const status = db.getConnectionStatus();
+  const activeJob = getActiveJob();
   return {
     enabled: isEnabled,
     intervalMinutes: currentIntervalMinutes,
@@ -15,6 +17,7 @@ export function getAutoSyncStatus() {
     lastSyncAt: conn.lastSyncAt,
     lastSyncStatus: conn.lastSyncStatus,
     boardName: conn.boardName,
+    isSyncing: Boolean(activeJob),
     connectionActive: Boolean(status.connected && conn.boardId && status.apiKeyConfigured && status.tokenConfigured),
   };
 }
@@ -32,6 +35,12 @@ export function updateAutoSyncSettings(enabled: boolean, intervalMinutes: number
   });
 
   restartTimer();
+
+  // If enabled and connection is active, trigger an immediate sync cycle
+  if (isEnabled) {
+    triggerImmediateAutoSync('settings_updated');
+  }
+
   return getAutoSyncStatus();
 }
 
@@ -54,16 +63,46 @@ function restartTimer() {
   }, ms);
 }
 
-async function performScheduledSync() {
-  if (!isEnabled) return;
+export async function triggerImmediateAutoSync(reason: string): Promise<boolean> {
+  if (!isEnabled) {
+    console.log(`[AutoSync] Auto-sync is currently paused. Skipping trigger (${reason}).`);
+    return false;
+  }
 
-  const conn = db.getConnection();
-  const creds = db.getTrelloCredentials();
-  const status = db.getConnectionStatus();
+  let conn = db.getConnection();
+  let creds = db.getTrelloCredentials();
 
-  // Verify Trello connection status is active and configured
+  // If credentials are present but boardId is missing, attempt auto-selection
+  if (creds.apiKey && creds.token && !conn.boardId) {
+    try {
+      const client = new TrelloClient({ apiKey: creds.apiKey, token: creds.token });
+      const boards = await client.getBoards();
+      if (boards && boards.length > 0) {
+        const preferred = boards.find(
+          (b) => !b.closed && (b.name.includes('SEO') || b.name.includes('Content') || b.name.includes('PDS') || b.name.includes('Goldflex'))
+        ) || boards.find((b) => !b.closed) || boards[0];
+
+        if (preferred) {
+          console.log(`[AutoSync] Auto-selected board "${preferred.name}" (${preferred.id}) for sync.`);
+          db.updateConnection({
+            boardId: preferred.id,
+            boardName: preferred.name,
+            connected: true,
+            isDemoData: false,
+            mode: 'real',
+          });
+          conn = db.getConnection();
+        }
+      }
+    } catch (err: any) {
+      console.warn('[AutoSync] Notice: could not auto-resolve board:', err.message);
+    }
+  }
+
+  conn = db.getConnection();
+  creds = db.getTrelloCredentials();
+
   const isConnectionActive = Boolean(
-    status.connected &&
     conn.boardId &&
     creds.apiKey &&
     creds.token &&
@@ -71,31 +110,60 @@ async function performScheduledSync() {
   );
 
   if (!isConnectionActive) {
-    console.log('[AutoSync] Trello connection status is not active or credentials missing. Skipping background sync.');
-    return;
+    console.log(`[AutoSync] Cannot auto-sync (${reason}): board or credentials not configured.`);
+    return false;
   }
 
   if (!canStartSync()) {
-    console.log('[AutoSync] Sync job already in progress. Skipping cycle.');
-    return;
+    console.log(`[AutoSync] Sync already in progress. Skipping trigger (${reason}).`);
+    return true;
   }
 
-  console.log(`[AutoSync] Recurring 60m trigger: Initiating automatic synchronization for active board "${conn.boardName || conn.boardId}"...`);
+  console.log(`[AutoSync] Auto-sync triggered (${reason}) for board "${conn.boardName || conn.boardId}"...`);
   try {
     const result = startSyncJob({
       boardId: conn.boardId,
       mode: 'real',
-      triggeredBy: 'recurring_60m_auto_sync',
+      triggeredBy: `auto_sync_${reason}`,
     });
 
     db.updateConnection({
       lastAutoSyncAt: new Date().toISOString(),
+      connected: true,
     });
 
-    console.log(`[AutoSync] Successfully triggered background sync job (${result.syncRun.id}).`);
+    console.log(`[AutoSync] Successfully launched background sync job ${result.syncRun.id}.`);
+    return true;
   } catch (err: any) {
-    console.warn('[AutoSync] Error during recurring background sync:', err.message);
+    console.warn(`[AutoSync] Error starting sync job (${reason}):`, err.message);
+    return false;
   }
+}
+
+/**
+ * Opportunistic check called on API requests (e.g. /api/trello/status).
+ * Ensures that if a container on Render recently woke up from sleep and was
+ * not synced within the target interval, a background sync runs automatically.
+ */
+export function checkOpportunisticAutoSync(): void {
+  if (!isEnabled) return;
+  const conn = db.getConnection();
+  const creds = db.getTrelloCredentials();
+  if (!conn.boardId || !creds.apiKey || !creds.token || conn.mode === 'demo') return;
+  if (!canStartSync()) return;
+
+  const lastSync = conn.lastSyncAt ? new Date(conn.lastSyncAt).getTime() : 0;
+  const elapsedMinutes = (Date.now() - lastSync) / (60 * 1000);
+
+  if (elapsedMinutes >= currentIntervalMinutes || lastSync === 0) {
+    console.log(`[AutoSync] Opportunistic trigger: board was last synced ${Math.round(elapsedMinutes)}m ago (interval: ${currentIntervalMinutes}m). Initiating sync...`);
+    triggerImmediateAutoSync('opportunistic_request');
+  }
+}
+
+async function performScheduledSync() {
+  if (!isEnabled) return;
+  await triggerImmediateAutoSync('recurring_timer');
 }
 
 export function initAutoSync() {
@@ -103,39 +171,17 @@ export function initAutoSync() {
   if (conn.autoSyncEnabled !== undefined) {
     isEnabled = conn.autoSyncEnabled;
   }
-  // Default to 60 minutes if not set or set to older default
+  // Default to 15 minutes if not set or set to older default
   if (conn.autoSyncIntervalMinutes && conn.autoSyncIntervalMinutes >= 5) {
     currentIntervalMinutes = conn.autoSyncIntervalMinutes;
   } else {
-    currentIntervalMinutes = 60;
+    currentIntervalMinutes = 15;
   }
 
   restartTimer();
 
-  // Initial delayed sync after server start (10 seconds) if connection is active and was not synced in the last hour
+  // Initial delayed sync after server start (5 seconds) if connection is active
   setTimeout(async () => {
-    const freshConn = db.getConnection();
-    const creds = db.getTrelloCredentials();
-    const status = db.getConnectionStatus();
-    const isConnectionActive = Boolean(
-      status.connected &&
-      freshConn.boardId &&
-      creds.apiKey &&
-      creds.token &&
-      (freshConn.mode === 'real' || !freshConn.isDemoData)
-    );
-
-    if (isConnectionActive && isEnabled) {
-      const lastSync = freshConn.lastSyncAt ? new Date(freshConn.lastSyncAt).getTime() : 0;
-      const elapsedMinutes = (Date.now() - lastSync) / (60 * 1000);
-
-      // If last sync was more than 60 minutes ago, initiate background sync
-      if (elapsedMinutes >= currentIntervalMinutes) {
-        console.log(`[AutoSync] Initial startup check: last sync was ${Math.round(elapsedMinutes)}m ago (>= ${currentIntervalMinutes}m). Initiating background sync...`);
-        await performScheduledSync();
-      } else {
-        console.log(`[AutoSync] Board recently synced (${Math.round(elapsedMinutes)}m ago). Next auto-sync scheduled in ${Math.round(currentIntervalMinutes - elapsedMinutes)}m.`);
-      }
-    }
-  }, 10000);
+    checkOpportunisticAutoSync();
+  }, 5000);
 }

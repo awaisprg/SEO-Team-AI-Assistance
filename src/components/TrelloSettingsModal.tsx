@@ -163,6 +163,20 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
   // Fetch boards and users when opening modal as admin
   useEffect(() => {
     if (isOpen && role === 'ADMIN') {
+      try {
+        const raw = localStorage.getItem('trello_persistent_config');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.apiKey && !apiKeyInput) setApiKeyInput(parsed.apiKey);
+          if (parsed.token && !tokenInput) setTokenInput(parsed.token);
+          if (parsed.boardId && !boardId) setBoardId(parsed.boardId);
+          if (parsed.boardName && !boardName) setBoardName(parsed.boardName);
+          if (parsed.autoSyncIntervalMinutes) {
+            setAutoSyncInterval(parsed.autoSyncIntervalMinutes);
+          }
+        }
+      } catch (e) {}
+
       fetchBoards();
       fetchUsers();
       fetchTokenAuthUrl();
@@ -379,8 +393,17 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
     const hasStoredKey = Boolean(connection?.apiKeyConfigured);
     const hasStoredToken = Boolean(connection?.tokenConfigured);
 
-    const keyToUse = apiKeyInput.trim();
-    const tokenToUse = tokenInput.trim();
+    let keyToUse = apiKeyInput.trim();
+    let tokenToUse = tokenInput.trim();
+
+    // Check localStorage fallback if inputs are empty
+    if (!keyToUse || !tokenToUse) {
+      try {
+        const cached = JSON.parse(localStorage.getItem('trello_persistent_config') || '{}');
+        if (!keyToUse && cached.apiKey) keyToUse = cached.apiKey;
+        if (!tokenToUse && cached.token) tokenToUse = cached.token;
+      } catch (e) {}
+    }
 
     if (!keyToUse && !hasStoredKey) {
       setFeedback({ type: 'error', message: 'Trello API Key is required. Please enter your API Key.' });
@@ -410,19 +433,73 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
         throw new Error(data.error || 'Failed to verify and save Trello credentials.');
       }
 
-      setFeedback({
-        type: 'success',
-        message: `Trello credentials verified and saved for ${data.user?.fullName} (@${data.user?.username}). Found ${data.boardsCount} accessible boards.`,
-      });
+      // Save to localStorage for Render container resilience
+      try {
+        const existing = JSON.parse(localStorage.getItem('trello_persistent_config') || '{}');
+        localStorage.setItem(
+          'trello_persistent_config',
+          JSON.stringify({
+            ...existing,
+            apiKey: keyToUse || existing.apiKey,
+            token: tokenToUse || existing.token,
+            boardId: boardId || existing.boardId,
+            boardName: boardName || existing.boardName,
+            autoSyncEnabled,
+            autoSyncIntervalMinutes: autoSyncInterval,
+          })
+        );
+      } catch (e) {}
+
+      let availableBoards = data.boards || [];
+      if (!availableBoards || availableBoards.length === 0) {
+        try {
+          const boardsRes = await fetchWithAuth('/api/trello/boards');
+          if (boardsRes.ok) {
+            availableBoards = await boardsRes.json();
+            setBoards(availableBoards || []);
+          }
+        } catch (bErr) {}
+      } else {
+        setBoards(availableBoards);
+      }
+
+      const activeBoardId = boardId || connection?.boardId;
+      if (activeBoardId) {
+        setFeedback({
+          type: 'success',
+          message: `Credentials saved & verified for ${data.user?.fullName} (@${data.user?.username})! Synchronization automatically started in the background.`,
+        });
+        onSync();
+      } else if (availableBoards.length > 0) {
+        // Auto-select preferred board (SEO/Content/PDS or first open board)
+        const preferred =
+          availableBoards.find(
+            (b: any) =>
+              !b.closed &&
+              (b.name.includes('SEO') || b.name.includes('Content') || b.name.includes('PDS') || b.name.includes('Goldflex'))
+          ) ||
+          availableBoards.find((b: any) => !b.closed) ||
+          availableBoards[0];
+
+        if (preferred) {
+          setBoardId(preferred.id);
+          setBoardName(preferred.name);
+          await onSaveBoard(preferred.id, preferred.name);
+          setFeedback({
+            type: 'success',
+            message: `Credentials verified & saved! Connected board "${preferred.name}" and automatically started synchronization.`,
+          });
+          onSync();
+        }
+      } else {
+        setFeedback({
+          type: 'success',
+          message: `Trello credentials verified and saved for ${data.user?.fullName} (@${data.user?.username}). Found ${data.boardsCount} accessible boards.`,
+        });
+      }
 
       setTokenInput('');
       setApiKeyInput('');
-
-      if (data.boards && data.boards.length > 0) {
-        setBoards(data.boards);
-      } else {
-        await fetchBoards();
-      }
 
       if (onRefreshStatus) onRefreshStatus();
     } catch (err: any) {
@@ -486,6 +563,19 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
 
     const selectedOption = boards.find((b) => b.id === boardId);
     const resolvedName = boardName.trim() || selectedOption?.name || 'Production Board';
+
+    // Persist board selection to localStorage
+    try {
+      const existing = JSON.parse(localStorage.getItem('trello_persistent_config') || '{}');
+      localStorage.setItem(
+        'trello_persistent_config',
+        JSON.stringify({
+          ...existing,
+          boardId: boardId.trim(),
+          boardName: resolvedName,
+        })
+      );
+    } catch (e) {}
 
     const ok = await onSaveBoard(boardId.trim(), resolvedName);
     setIsSaving(false);
@@ -852,8 +942,8 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
                   {autoSyncEnabled && (
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/80 text-xs">
                       <span className="text-slate-600 font-medium">Sync Frequency:</span>
-                      <div className="flex items-center gap-1.5">
-                        {[15, 30, 60, 120].map((mins) => (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {[5, 10, 15, 30, 60].map((mins) => (
                           <button
                             key={mins}
                             type="button"
@@ -865,17 +955,52 @@ export const TrelloSettingsModal: React.FC<TrelloSettingsModalProps> = ({
                                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
                             }`}
                           >
-                            {mins === 60 ? 'Every 60m (Default)' : mins === 120 ? '2h' : `${mins}m`}
+                            {mins === 15 ? '15m (Default)' : `${mins}m`}
                           </button>
                         ))}
                       </div>
                     </div>
                   )}
-                  {connection?.lastAutoSyncAt && (
-                    <div className="text-[10.5px] text-slate-400 pt-0.5">
-                      Last background auto-sync: {new Date(connection.lastAutoSyncAt).toLocaleTimeString()}
-                    </div>
-                  )}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10.5px] text-slate-500">
+                      {connection?.lastAutoSyncAt
+                        ? `Last auto-sync: ${new Date(connection.lastAutoSyncAt).toLocaleTimeString()}`
+                        : 'Auto-sync active in background'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSync();
+                        setFeedback({
+                          type: 'success',
+                          message: 'Immediate synchronization triggered! Updating cards in background...',
+                        });
+                      }}
+                      disabled={isSyncing}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-800 text-xs font-semibold cursor-pointer transition-colors"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                      <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Render.com Persistence & Cloud Restart Protection Callout */}
+                <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-xl p-3 text-xs space-y-1.5 mt-2">
+                  <div className="flex items-center gap-2">
+                    <HardDrive className="w-3.5 h-3.5 text-emerald-700" />
+                    <span className="font-bold text-emerald-900 text-xs">Persistent Storage Active</span>
+                    <span className="text-[10px] bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded-full font-semibold">
+                      Render Proof
+                    </span>
+                  </div>
+                  <p className="text-emerald-950/85 text-[11px] leading-relaxed">
+                    Your Trello credentials and connected board are automatically backed up in browser storage. If your Render.com container sleeps or restarts, credentials will auto-restore and auto-sync immediately without requiring re-entry.
+                  </p>
+                  <div className="text-[10px] text-emerald-900/80">
+                    💡 Optional: Define <code className="font-mono font-bold text-emerald-950 bg-emerald-100 px-1 py-0.5 rounded">TRELLO_API_KEY</code>, <code className="font-mono font-bold text-emerald-950 bg-emerald-100 px-1 py-0.5 rounded">TRELLO_TOKEN</code>, and <code className="font-mono font-bold text-emerald-950 bg-emerald-100 px-1 py-0.5 rounded">TRELLO_BOARD_ID</code> in Render Environment Variables for permanent 24/7 server retention.
+                  </div>
                 </div>
               </div>
 

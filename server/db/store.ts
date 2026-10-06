@@ -330,6 +330,21 @@ class Store {
           this.state.connection.boardName = firstBoard.name;
           this.state.connection.connected = true;
         }
+
+        // Hydrate persistent Trello connection and credentials from PostgreSQL
+        const savedConn = await pgStore.loadTrelloConnection();
+        if (savedConn) {
+          if (savedConn.boardId) this.state.connection.boardId = savedConn.boardId;
+          if (savedConn.boardName) this.state.connection.boardName = savedConn.boardName;
+          if (savedConn.apiKey) this.state.connection.trelloApiKey = savedConn.apiKey;
+          if (savedConn.token) this.state.connection.trelloToken = savedConn.token;
+          if (savedConn.connected !== undefined) this.state.connection.connected = savedConn.connected;
+          if (savedConn.lastSyncAt) this.state.connection.lastSyncAt = savedConn.lastSyncAt;
+          if (savedConn.autoSyncEnabled !== undefined) this.state.connection.autoSyncEnabled = savedConn.autoSyncEnabled;
+          if (savedConn.autoSyncIntervalMinutes) this.state.connection.autoSyncIntervalMinutes = savedConn.autoSyncIntervalMinutes;
+          if (savedConn.lastAutoSyncAt) this.state.connection.lastAutoSyncAt = savedConn.lastAutoSyncAt;
+        }
+
         return true;
       }
     } catch (err: any) {
@@ -392,7 +407,7 @@ class Store {
         trelloApiKey: defaultApiKey || undefined,
         trelloToken: defaultToken || undefined,
         autoSyncEnabled: true,
-        autoSyncIntervalMinutes: 60,
+        autoSyncIntervalMinutes: 15,
       },
       boards: {},
       lists: {},
@@ -482,6 +497,14 @@ class Store {
     }
 
     this.persist();
+
+    if (pgStore.isConfigured()) {
+      pgStore.saveTrelloConnection({
+        ...this.state.connection,
+        apiKey: cleanKey,
+        token: cleanToken,
+      }).catch((e) => console.warn('Postgres save credentials notice:', e.message));
+    }
   }
 
   getConnectionStatus(): TrelloConnectionStatus {
@@ -511,7 +534,7 @@ class Store {
       maskedApiKey: maskedKey,
       hasCustomCredentials: Boolean(this.state.connection.trelloApiKey),
       autoSyncEnabled: this.state.connection.autoSyncEnabled ?? true,
-      autoSyncIntervalMinutes: this.state.connection.autoSyncIntervalMinutes ?? 60,
+      autoSyncIntervalMinutes: this.state.connection.autoSyncIntervalMinutes ?? 15,
       lastAutoSyncAt: this.state.connection.lastAutoSyncAt,
     };
   }
@@ -519,6 +542,14 @@ class Store {
   updateConnection(config: Partial<TrelloConnectionConfig>) {
     this.state.connection = { ...this.state.connection, ...config };
     this.persist();
+
+    if (pgStore.isConfigured()) {
+      pgStore.saveTrelloConnection({
+        ...this.state.connection,
+        apiKey: this.state.connection.trelloApiKey,
+        token: this.state.connection.trelloToken,
+      }).catch((e) => console.warn('Postgres update connection notice:', e.message));
+    }
   }
 
   disconnect() {

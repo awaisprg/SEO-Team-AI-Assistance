@@ -136,6 +136,51 @@ export default function App() {
     };
   }, []);
 
+  // Reusable Polling for Background Sync
+  const startPollingSync = useCallback((initialPhase?: string) => {
+    setIsSyncing(true);
+    setSyncPhase(initialPhase || 'Background synchronization running...');
+
+    if (syncPollInterval.current) {
+      clearInterval(syncPollInterval.current);
+    }
+
+    syncPollInterval.current = setInterval(async () => {
+      try {
+        const pollRes = await fetchWithAuth('/api/trello/sync/status');
+        if (!pollRes.ok) return;
+
+        const pollData = await pollRes.json();
+        if (pollData.phase) {
+          setSyncPhase(pollData.phase);
+        }
+
+        if (pollData.status === 'success') {
+          clearInterval(syncPollInterval.current);
+          syncPollInterval.current = null;
+          setIsSyncing(false);
+          setSyncPhase(undefined);
+          await refreshAllData();
+          showNotification(
+            'success',
+            pollData.latestJob?.message || 'Trello board synchronized successfully.'
+          );
+        } else if (pollData.status === 'failed') {
+          clearInterval(syncPollInterval.current);
+          syncPollInterval.current = null;
+          setIsSyncing(false);
+          setSyncPhase(undefined);
+          showNotification(
+            'error',
+            pollData.latestJob?.message || 'Trello synchronization failed.'
+          );
+        }
+      } catch (pollErr) {
+        console.warn('Poll error:', pollErr);
+      }
+    }, 2000);
+  }, []);
+
   // Initial Data Fetch
   const refreshAllData = async () => {
     try {
@@ -148,7 +193,44 @@ export default function App() {
         fetchWithAuth('/api/chat/sessions').then((r) => (r.ok ? r.json() : [])),
       ]);
 
-      if (statusRes) setConnection(statusRes);
+      if (statusRes) {
+        setConnection(statusRes);
+
+        // Auto-restore check for Render ephemeral container reboots
+        if (
+          (!statusRes.apiKeyConfigured || !statusRes.tokenConfigured || !statusRes.boardId) &&
+          userRef.current?.role === 'ADMIN'
+        ) {
+          try {
+            const rawStored = localStorage.getItem('trello_persistent_config');
+            if (rawStored) {
+              const parsed = JSON.parse(rawStored);
+              if (parsed.apiKey && parsed.token) {
+                console.log('[AutoRestore] Restoring saved Trello credentials to server...');
+                const restoreRes = await fetchWithAuth('/api/trello/auto-restore', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(parsed),
+                });
+                if (restoreRes.ok) {
+                  const rData = await restoreRes.json();
+                  if (rData.connection) {
+                    setConnection(rData.connection);
+                  }
+                  if (rData.syncRun) {
+                    startPollingSync(rData.syncRun.phase);
+                  }
+                }
+              }
+            }
+          } catch (resErr) {
+            console.warn('[AutoRestore] Notice:', resErr);
+          }
+        } else if (statusRes.lastSyncStatus === 'in_progress') {
+          // If server reports an in-progress sync job, join the poll
+          startPollingSync();
+        }
+      }
       if (teamRes?.metrics) setMetrics(teamRes.metrics);
       if (teamRes?.memberOverviews) setMemberOverviews(teamRes.memberOverviews);
       if (teamRes?.activeCards) setAllCards([...teamRes.activeCards, ...(teamRes.recentCompleted || [])]);
@@ -364,52 +446,14 @@ export default function App() {
         throw new Error(data.error || 'Sync request rejected');
       }
 
-      setSyncPhase(data.syncRun?.phase || 'Background job running...');
       showNotification('success', 'Synchronization job dispatched. Polling progress...');
-
-      // Start polling status endpoint
-      if (syncPollInterval.current) clearInterval(syncPollInterval.current);
-
-      syncPollInterval.current = setInterval(async () => {
-        try {
-          const pollRes = await fetchWithAuth('/api/trello/sync/status');
-          if (!pollRes.ok) return;
-
-          const pollData = await pollRes.json();
-          if (pollData.phase) {
-            setSyncPhase(pollData.phase);
-          }
-
-          if (pollData.status === 'success') {
-            clearInterval(syncPollInterval.current);
-            syncPollInterval.current = null;
-            setIsSyncing(false);
-            setSyncPhase(undefined);
-            await refreshAllData();
-            showNotification(
-              'success',
-              pollData.latestJob?.message || 'Trello board synchronized successfully.'
-            );
-          } else if (pollData.status === 'failed') {
-            clearInterval(syncPollInterval.current);
-            syncPollInterval.current = null;
-            setIsSyncing(false);
-            setSyncPhase(undefined);
-            showNotification(
-              'error',
-              pollData.latestJob?.message || 'Trello synchronization failed.'
-            );
-          }
-        } catch (pollErr) {
-          console.warn('Poll error:', pollErr);
-        }
-      }, 2000);
+      startPollingSync(data.syncRun?.phase || 'Background job running...');
     } catch (err: any) {
       setIsSyncing(false);
       setSyncPhase(undefined);
       showNotification('error', err.message || 'Trello synchronization failed');
     }
-  }, []);
+  }, [startPollingSync]);
 
   // Reset Demo Data
   const handleSeedDemo = useCallback(async () => {
@@ -442,14 +486,28 @@ export default function App() {
         throw new Error(errData.error || 'Failed to connect board');
       }
 
+      const data = await res.json();
+
+      // Persist to localStorage for Render resilience
+      try {
+        const existing = JSON.parse(localStorage.getItem('trello_persistent_config') || '{}');
+        localStorage.setItem(
+          'trello_persistent_config',
+          JSON.stringify({ ...existing, boardId, boardName: boardName || existing.boardName })
+        );
+      } catch (e) {}
+
       await refreshAllData();
-      showNotification('success', 'Trello board linked successfully.');
+      if (data.autoSyncTriggered && data.syncRun) {
+        startPollingSync(data.syncRun.phase);
+      }
+      showNotification('success', 'Trello board linked and sync started.');
       return true;
     } catch (err: any) {
       showNotification('error', err.message || 'Failed to connect board');
       return false;
     }
-  }, []);
+  }, [startPollingSync]);
 
   // Add Client Alias
   const handleAddAlias = useCallback(async (clientId: string, alias: string) => {

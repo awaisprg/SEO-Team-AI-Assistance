@@ -13,7 +13,13 @@ import { generateManagementBrief } from './server/ai/brief';
 import { requireAuth, requireRole } from './server/auth/supabase';
 import { userRegistry, ADMIN_EMAIL } from './server/auth/users';
 import { startSyncJob, getActiveJob, getLatestJob } from './server/trello/syncJob';
-import { initAutoSync, getAutoSyncStatus, updateAutoSyncSettings } from './server/trello/autoSync';
+import {
+  initAutoSync,
+  getAutoSyncStatus,
+  updateAutoSyncSettings,
+  triggerImmediateAutoSync,
+  checkOpportunisticAutoSync,
+} from './server/trello/autoSync';
 import { createRateLimiter } from './server/middleware/rateLimiter';
 import { UserRole } from './src/types';
 
@@ -218,7 +224,53 @@ app.get('/api/auth/session', requireAuth, (req, res) => {
 // 3. TRELLO CONFIGURATION & SYNCHRONIZATION
 // -------------------------------------------------------------
 app.get('/api/trello/status', requireAuth, (req, res) => {
+  checkOpportunisticAutoSync();
   res.json(db.getConnectionStatus());
+});
+
+// Auto-restore credentials and board from client localStorage on cold boot
+app.post('/api/trello/auto-restore', requireAuth, async (req, res) => {
+  const { apiKey, token, boardId, boardName, autoSyncEnabled, autoSyncIntervalMinutes } = req.body || {};
+  if (!apiKey || !token) {
+    return res.status(400).json({ error: 'Valid apiKey and token are required for auto-restore.' });
+  }
+
+  try {
+    const cleanKey = String(apiKey).trim();
+    const cleanToken = String(token).trim();
+    const client = new TrelloClient({ apiKey: cleanKey, token: cleanToken });
+    const test = await client.testConnection();
+
+    if (!test.success) {
+      return res.status(401).json({ error: test.error || 'Saved credentials failed validation' });
+    }
+
+    db.setTrelloCredentials(cleanKey, cleanToken);
+
+    if (boardId) {
+      db.updateConnection({
+        boardId: String(boardId).trim(),
+        boardName: boardName ? String(boardName).trim() : 'Connected Board',
+        connected: true,
+        mode: 'real',
+        isDemoData: false,
+        autoSyncEnabled: autoSyncEnabled !== undefined ? Boolean(autoSyncEnabled) : true,
+        autoSyncIntervalMinutes: autoSyncIntervalMinutes || 15,
+      });
+    }
+
+    await triggerImmediateAutoSync('auto_restore');
+    const activeJob = getActiveJob();
+
+    res.json({
+      success: true,
+      message: `Trello credentials and board state successfully restored for ${test.fullName} (@${test.username}).`,
+      connection: db.getConnectionStatus(),
+      syncRun: activeJob || undefined,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Auto-restore failed' });
+  }
 });
 
 // Configure Trello API Key and Token (ADMIN only)
@@ -248,14 +300,20 @@ app.post('/api/trello/credentials', requireAuth, requireRole(['ADMIN']), async (
 
     db.setTrelloCredentials(cleanKey, cleanToken);
 
+    // Automatically trigger immediate background synchronization
+    await triggerImmediateAutoSync('credentials_configured');
+    const activeJob = getActiveJob();
+
     res.json({
       success: true,
-      message: `Trello credentials verified and permanently saved for member ${test.fullName} (@${test.username}).`,
+      message: `Trello credentials verified and permanently saved for member ${test.fullName} (@${test.username}). Auto-sync started.`,
       user: {
         username: test.username,
         fullName: test.fullName,
       },
       boardsCount: test.boardsCount || 0,
+      autoSyncTriggered: Boolean(activeJob),
+      syncRun: activeJob || undefined,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to verify Trello credentials' });
@@ -358,11 +416,17 @@ app.post('/api/trello/connect', requireAuth, requireRole(['ADMIN']), async (req,
       mode: 'real',
     });
 
+    // Automatically trigger immediate background synchronization
+    await triggerImmediateAutoSync('board_connected');
+    const activeJob = getActiveJob();
+
     res.json({
       success: true,
-      message: `Successfully connected to board "${board.name}"`,
+      message: `Successfully connected to board "${board.name}". Background sync started automatically.`,
       boardId: board.id,
       boardName: board.name,
+      autoSyncTriggered: Boolean(activeJob),
+      syncRun: activeJob || undefined,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to connect to Trello board' });

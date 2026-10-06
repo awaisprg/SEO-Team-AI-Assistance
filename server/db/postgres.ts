@@ -93,6 +93,11 @@ export class PostgresStore {
           ALTER TABLE management_briefs ADD COLUMN IF NOT EXISTS cards_created_count INT DEFAULT 0;
 
           ALTER TABLE trello_connections ADD COLUMN IF NOT EXISTS mode VARCHAR(50) DEFAULT 'real';
+          ALTER TABLE trello_connections ADD COLUMN IF NOT EXISTS api_key TEXT;
+          ALTER TABLE trello_connections ADD COLUMN IF NOT EXISTS token TEXT;
+          ALTER TABLE trello_connections ADD COLUMN IF NOT EXISTS auto_sync_enabled BOOLEAN DEFAULT TRUE;
+          ALTER TABLE trello_connections ADD COLUMN IF NOT EXISTS auto_sync_interval_minutes INT DEFAULT 15;
+          ALTER TABLE trello_connections ADD COLUMN IF NOT EXISTS last_auto_sync_at TIMESTAMPTZ;
 
           CREATE TABLE IF NOT EXISTS app_users (
             id VARCHAR(128) PRIMARY KEY,
@@ -975,6 +980,74 @@ export class PostgresStore {
       };
     } catch (err: any) {
       console.error('Failed to load state from PostgreSQL:', err.message);
+      return null;
+    }
+  }
+
+  async saveTrelloConnection(conn: {
+    boardId?: string;
+    boardName?: string;
+    connected?: boolean;
+    isDemoData?: boolean;
+    mode?: string;
+    lastSyncAt?: string;
+    apiKey?: string;
+    token?: string;
+    autoSyncEnabled?: boolean;
+    autoSyncIntervalMinutes?: number;
+    lastAutoSyncAt?: string;
+  }): Promise<void> {
+    if (!this.pool) return;
+    try {
+      await this.pool.query(
+        `INSERT INTO trello_connections (
+          id, board_id, board_name, status, mode, is_demo_data, last_sync_at,
+          api_key, token, auto_sync_enabled, auto_sync_interval_minutes, last_auto_sync_at, updated_at
+        ) VALUES (
+          gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW()
+        )`,
+        [
+          conn.boardId || null,
+          conn.boardName || null,
+          conn.connected ? 'connected' : 'disconnected',
+          conn.mode || 'real',
+          Boolean(conn.isDemoData),
+          conn.lastSyncAt ? new Date(conn.lastSyncAt) : null,
+          conn.apiKey || null,
+          conn.token || null,
+          conn.autoSyncEnabled !== undefined ? conn.autoSyncEnabled : true,
+          conn.autoSyncIntervalMinutes || 15,
+          conn.lastAutoSyncAt ? new Date(conn.lastAutoSyncAt) : null,
+        ]
+      );
+    } catch (err: any) {
+      console.warn('Failed to save trello connection in PostgreSQL:', err.message);
+    }
+  }
+
+  async loadTrelloConnection(): Promise<any | null> {
+    if (!this.pool) return null;
+    try {
+      const res = await this.pool.query(
+        `SELECT * FROM trello_connections ORDER BY updated_at DESC LIMIT 1;`
+      );
+      if (res.rows.length === 0) return null;
+      const row = res.rows[0];
+      return {
+        boardId: row.board_id || '',
+        boardName: row.board_name || '',
+        connected: row.status === 'connected',
+        mode: row.mode || 'real',
+        isDemoData: Boolean(row.is_demo_data),
+        lastSyncAt: row.last_sync_at ? new Date(row.last_sync_at).toISOString() : undefined,
+        apiKey: row.api_key || undefined,
+        token: row.token || undefined,
+        autoSyncEnabled: row.auto_sync_enabled !== false,
+        autoSyncIntervalMinutes: row.auto_sync_interval_minutes || 15,
+        lastAutoSyncAt: row.last_auto_sync_at ? new Date(row.last_auto_sync_at).toISOString() : undefined,
+      };
+    } catch (err: any) {
+      console.warn('Failed to load trello connection from PostgreSQL:', err.message);
       return null;
     }
   }
