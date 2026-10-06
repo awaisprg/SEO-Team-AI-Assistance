@@ -592,7 +592,6 @@ export default function App() {
         onSync={handleSync}
         onSeedDemo={handleSeedDemo}
         onOpenSettings={handleOpenSettings}
-        onOpenQuickQuery={() => setIsQuickQueryOpen(true)}
         isSyncing={isSyncing}
         syncPhase={syncPhase}
       />

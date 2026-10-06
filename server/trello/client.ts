@@ -308,8 +308,9 @@ export class TrelloClient {
       filter: 'all',
       checklists: 'all',
       attachments: 'true',
+      customFieldItems: 'true',
       attachment_fields: 'id,name,url,mimeType,date',
-      fields: 'id,idBoard,idList,name,desc,url,due,dateLastActivity,closed,idLabels,idMembers,labels,badges',
+      fields: 'id,idBoard,idList,name,desc,url,due,dateLastActivity,closed,idLabels,idMembers,labels,badges,customFieldItems',
     };
 
     if (since) {

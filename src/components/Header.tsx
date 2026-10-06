@@ -6,7 +6,6 @@ import {
   LogOut,
   ChevronRight,
   Sparkles,
-  Search,
 } from 'lucide-react';
 import { TrelloConnectionStatus, UserSession } from '../types';
 import { ThemeDropdown } from './ThemeDropdown';
@@ -19,7 +18,6 @@ interface HeaderProps {
   onSync: () => void;
   onSeedDemo: () => void;
   onOpenSettings: () => void;
-  onOpenQuickQuery?: () => void;
   isSyncing: boolean;
   syncPhase?: string;
 }
@@ -31,7 +29,6 @@ const HeaderComponent: React.FC<HeaderProps> = ({
   onSync,
   onSeedDemo,
   onOpenSettings,
-  onOpenQuickQuery,
   isSyncing,
   syncPhase,
 }) => {
@@ -60,11 +57,11 @@ const HeaderComponent: React.FC<HeaderProps> = ({
       className="backdrop-blur-xl border-b sticky top-0 z-40 transition-all shadow-xs"
     >
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between min-h-14 sm:h-[68px] gap-2 sm:gap-4 py-1.5 sm:py-2.5">
+        <div className="flex items-center justify-between h-14 sm:h-[68px] gap-2 sm:gap-4 py-1.5 sm:py-2.5 flex-nowrap">
           {/* Left: Brand Identity & Executive Hub */}
-          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3.5 shrink-0 flex-nowrap">
             {/* Prominent Logo & SEO Subtitle */}
-            <div className="flex flex-col justify-center min-w-0">
+            <div className="flex flex-col justify-center shrink-0">
               <a
                 href="https://goldflexmarketing.com/"
                 target="_blank"
@@ -112,7 +109,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
 
             {/* Elevated Executive Hub Indicator */}
             <div
-              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10.5px] sm:text-xs font-semibold tracking-wide bg-gradient-to-r from-amber-500/10 via-amber-500/15 to-amber-600/10 dark:from-amber-400/15 dark:via-amber-400/10 dark:to-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-300/50 dark:border-amber-500/30 shadow-2xs select-none backdrop-blur-md shrink-0"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-[10.5px] sm:text-xs font-semibold tracking-wide bg-gradient-to-r from-amber-500/10 via-amber-500/15 to-amber-600/10 dark:from-amber-400/15 dark:via-amber-400/10 dark:to-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-300/50 dark:border-amber-500/30 shadow-2xs select-none backdrop-blur-md shrink-0 whitespace-nowrap"
               title="Gold Flex Marketing Executive Intelligence Hub"
             >
               <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2 shrink-0">
@@ -125,23 +122,6 @@ const HeaderComponent: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Center-Left: Quick Intelligence Omnibar Button */}
-          {onOpenQuickQuery && (
-            <button
-              type="button"
-              id="header-quick-query-btn"
-              onClick={onOpenQuickQuery}
-              className="hidden md:flex items-center gap-2.5 h-9 px-3 rounded-xl bg-slate-100/90 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-700 border border-slate-200/90 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer shadow-2xs hover:shadow-xs group max-w-[210px] lg:max-w-[270px] xl:max-w-[340px] w-full"
-              title="Press ⌘K to ask any question about clients, services, tasks"
-            >
-              <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#7C52F5] transition-colors shrink-0" />
-              <span className="truncate text-left text-xs font-medium">Ask query e.g. "Clients with Social Media"</span>
-              <kbd className="ml-auto hidden xl:inline-flex items-center gap-0.5 text-[10px] font-mono text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded shadow-2xs">
-                <span>⌘</span>K
-              </kbd>
-            </button>
-          )}
-
           {/* Center: Live Board Connection Status */}
           <div className="hidden lg:flex items-center">
             {isAdmin ? (
@@ -149,7 +129,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
                 type="button"
                 id="header-board-status-btn"
                 onClick={onOpenSettings}
-                className="group h-9 px-3.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700/90 border border-slate-200/90 dark:border-slate-700/90 hover:border-slate-300 dark:hover:border-slate-600 text-xs transition-all cursor-pointer shadow-2xs hover:shadow-xs inline-flex items-center gap-2.5 select-none backdrop-blur-md"
+                className="group h-9 px-3.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700/90 border border-slate-200/90 dark:border-slate-700/90 hover:border-slate-300 dark:hover:border-slate-600 text-xs transition-all cursor-pointer shadow-2xs hover:shadow-xs inline-flex items-center gap-2.5 select-none backdrop-blur-md shrink-0"
                 title="Click to manage Trello API credentials & board configuration"
               >
                 <span className="relative flex h-2 w-2 shrink-0">

@@ -1056,6 +1056,72 @@ export function normalizeTrelloPayload(
       status = 'Active';
     }
 
+    // Extract client services authoritatively from the client's official card in PDS/GFM Clients list.
+    // Strictly validated against:
+    // 1. Trello Labels on the client card
+    // 2. Trello Custom Fields on the client card
+    // 3. The official 'Services Acquired' checklist on the client card
+    // Loose text inference from weekly task cards, comments, or descriptions is strictly disallowed.
+    const primaryClientCard = matchingCards.find((c) => {
+      const isClientList = c.listName === 'PDS Clients' || c.listName === 'GFM Clients' || Boolean(c.listName?.includes('Clients'));
+      if (!isClientList) return false;
+      const nameMatch = c.name.trim().toLowerCase() === reg.canonicalName.trim().toLowerCase();
+      const aliasMatch = aliases.some((a) => a === c.name.trim().toLowerCase());
+      return nameMatch || aliasMatch;
+    }) || matchingCards.find((c) => {
+      const hasServiceChecklist = c.checklists?.some((cl) => cl.name.trim().toLowerCase().includes('service'));
+      if (!hasServiceChecklist) return false;
+      return c.name.trim().toLowerCase() === reg.canonicalName.trim().toLowerCase() ||
+             aliases.some((a) => a === c.name.trim().toLowerCase());
+    });
+
+    const servicesSet = new Set<string>();
+    if (primaryClientCard) {
+      // A. Validate against Trello Labels on the primary client card
+      for (const label of primaryClientCard.labels || []) {
+        const labelName = (label.name || '').trim().toLowerCase();
+        if (labelName === 'social media' || labelName.includes('social media')) servicesSet.add('Social Media');
+        else if (labelName === 'seo' || labelName.includes('seo')) servicesSet.add('SEO');
+        else if (labelName === 'website development' || labelName === 'development' || labelName === 'web dev') servicesSet.add('Website Development');
+        else if (labelName === 'website maintenance' || labelName === 'maintenance') servicesSet.add('Website Maintenance');
+        else if (labelName === 'logo' || labelName === 'branding') servicesSet.add('Logo & Branding');
+        else if (labelName === 'email marketing') servicesSet.add('Email Marketing');
+        else if (labelName === 'ppc' || labelName.includes('ppc')) servicesSet.add('PPC / Ads');
+      }
+
+      // B. Validate against Trello Custom Fields on the primary client card (if present)
+      const customFields = (primaryClientCard as any).customFields || (primaryClientCard as any).customFieldItems || [];
+      for (const cf of Array.isArray(customFields) ? customFields : Object.values(customFields)) {
+        const cfValue = String(cf?.value?.text || cf?.value || cf?.name || '').toLowerCase();
+        if (cfValue.includes('social media')) servicesSet.add('Social Media');
+        if (cfValue.includes('seo')) servicesSet.add('SEO');
+        if (cfValue.includes('development')) servicesSet.add('Website Development');
+        if (cfValue.includes('maintenance')) servicesSet.add('Website Maintenance');
+        if (cfValue.includes('branding') || cfValue.includes('logo')) servicesSet.add('Logo & Branding');
+        if (cfValue.includes('email')) servicesSet.add('Email Marketing');
+        if (cfValue.includes('ppc')) servicesSet.add('PPC / Ads');
+      }
+
+      // C. Validate against the official 'Services Acquired' checklist on the primary client card
+      const serviceChecklist = primaryClientCard.checklists?.find((cl) => cl.name.trim().toLowerCase().includes('service'));
+      if (serviceChecklist) {
+        serviceChecklist.items.forEach((it) => {
+          const itemLower = it.name.trim().toLowerCase();
+          if (itemLower === 'social media' || itemLower.includes('social media')) servicesSet.add('Social Media');
+          else if (itemLower === 'seo' || itemLower.includes('seo')) servicesSet.add('SEO');
+          else if (itemLower === 'development' || itemLower.includes('website development') || itemLower.includes('web development')) servicesSet.add('Website Development');
+          else if (itemLower === 'maintenance' || itemLower === 'maintenanace' || itemLower.includes('website maint') || itemLower.includes('website maintain')) servicesSet.add('Website Maintenance');
+          else if (itemLower === 'logo' || itemLower === 'branding') servicesSet.add('Logo & Branding');
+          else if (itemLower === 'email marketing') servicesSet.add('Email Marketing');
+          else if (itemLower === 'ppc' || itemLower.includes('ppc')) servicesSet.add('PPC / Ads');
+        });
+      }
+    }
+
+    if (servicesSet.size === 0) {
+      servicesSet.add('SEO');
+    }
+
     return {
       id: `client_${Buffer.from(reg.canonicalName).toString('hex').slice(0, 16)}`,
       canonicalName: reg.canonicalName,
@@ -1067,6 +1133,7 @@ export function normalizeTrelloPayload(
       completedTasksCount,
       totalTasksCount,
       teamMembers: Array.from(teamSet),
+      services: Array.from(servicesSet),
       lastActivityDate: latestActivity !== new Date(0).toISOString() ? latestActivity : new Date().toISOString(),
     };
   });
